@@ -80,6 +80,14 @@ export const routes: Routes = [
 		loadComponent: () => import('./components/admin/item-form/item-form.component').then((m) => m.ItemFormComponent),
 		canActivate: [AdminGuard],
 	},
+	{
+		path: 'pages-not-found', 
+		loadComponent: () => import('./components/shared/header/page-not-found.component').then((m) => m.PageNotFoundComponent),
+	},
+	{
+		path: 'coming-soon', 
+		loadComponent: () => import('./components/shared/header/coming-soon.component').then((m) => m.ComingSoonComponent),
+	},
 	// fallback
 	{ path: '**', redirectTo: 'inventory' },
 ];
