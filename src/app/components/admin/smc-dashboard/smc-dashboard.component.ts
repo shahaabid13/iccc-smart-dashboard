@@ -70,12 +70,29 @@ import autoTable from 'jspdf-autotable';
 
         <div class="action-buttons">
           <button (click)="applyFilters()" class="btn btn-primary">Apply Filters</button>
-          <button (click)="exportToExcel()" class="btn btn-secondary" [disabled]="!filteredRecords.length">
-            <span class="export-icon">📊</span> Export Excel
-          </button>
-          <button (click)="exportToPDF()" class="btn btn-secondary" [disabled]="!filteredRecords.length">
-            <span class="export-icon">📄</span> Export PDF
-          </button>
+
+          <!-- Export dropdown -->
+          <div class="dropdown" [class.open]="exportDropdownOpen">
+            <button (click)="toggleExportDropdown()" class="btn btn-secondary" [disabled]="!filteredRecords.length">
+              <span class="export-icon">📤</span> Export
+            </button>
+            <ul class="dropdown-menu" *ngIf="exportDropdownOpen">
+              <li><button class="dropdown-item" (click)="exportToExcel(); toggleExportDropdown(false)">Export as Excel</button></li>
+              <li><button class="dropdown-item" (click)="exportToPDF(); toggleExportDropdown(false)">Export as PDF</button></li>
+            </ul>
+          </div>
+
+          <!-- Report dropdown (limited columns + totals) -->
+          <div class="dropdown" [class.open]="reportDropdownOpen">
+            <button (click)="toggleReportDropdown()" class="btn btn-secondary" [disabled]="!filteredRecords.length">
+              <span class="export-icon">📑</span> Report
+            </button>
+            <ul class="dropdown-menu" *ngIf="reportDropdownOpen">
+              <li><button class="dropdown-item" (click)="exportReportToExcel(); toggleReportDropdown(false)">Report as Excel</button></li>
+              <li><button class="dropdown-item" (click)="exportReportToPDF(); toggleReportDropdown(false)">Report as PDF</button></li>
+            </ul>
+          </div>
+
           <button (click)="resetFilters()" class="btn btn-outline">Reset</button>
         </div>
       </div>
@@ -273,6 +290,13 @@ import autoTable from 'jspdf-autotable';
         margin-right: 5px;
       }
 
+      /* Dropdown styles for Export and Report buttons */
+      .dropdown { position: relative; display: inline-block; }
+      .dropdown .dropdown-menu { display: none; position: absolute; right: 0; top: calc(100% + 6px); background: white; min-width: 180px; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 6px 12px rgba(0,0,0,0.08); z-index: 2000; padding: 6px 0; }
+      .dropdown.open .dropdown-menu { display: block; }
+      .dropdown .dropdown-item { background: transparent; border: none; width: 100%; text-align: left; padding: 8px 12px; cursor: pointer; font-size: 14px; color: #333; }
+      .dropdown .dropdown-item:hover { background: #f1f1f1; }
+
       .summary-stats {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -464,6 +488,10 @@ export class SmcDashboardComponent implements OnInit {
   currentPage: number = 1;
   itemsPerPage: number = 25;
   totalPages: number = 1;
+
+  // UI dropdown states
+  exportDropdownOpen = false;
+  reportDropdownOpen = false;
 
   constructor(private smc: SmcService) {
     this.initializeDates();
@@ -777,6 +805,115 @@ export class SmcDashboardComponent implements OnInit {
     } catch (error) {
       console.error('Error exporting to PDF:', error);
       alert('Error exporting to PDF. Please try again.');
+    }
+  }
+
+  // Toggle export dropdown
+  toggleExportDropdown(force?: boolean) {
+    if (typeof force === 'boolean') {
+      this.exportDropdownOpen = force;
+    } else {
+      this.exportDropdownOpen = !this.exportDropdownOpen;
+    }
+    // close report dropdown when opening export
+    if (this.exportDropdownOpen) this.reportDropdownOpen = false;
+  }
+
+  // Toggle report dropdown
+  toggleReportDropdown(force?: boolean) {
+    if (typeof force === 'boolean') {
+      this.reportDropdownOpen = force;
+    } else {
+      this.reportDropdownOpen = !this.reportDropdownOpen;
+    }
+    if (this.reportDropdownOpen) this.exportDropdownOpen = false;
+  }
+
+  // Generate report rows (limited columns)
+  private getReportRows() {
+    return this.filteredRecords.map(r => ({
+      'Slip No': r.id?.slipno || '-',
+      'VNo': r.vno || '-',
+      'EDate': this.formatDateForExport(r.edate),
+      'GWeight': parseFloat(r.gweight) || 0,
+      'NWeight': parseFloat(r.nweight) || 0,
+    }));
+  }
+
+  // Export the limited report to Excel with totals
+  exportReportToExcel(): void {
+    if (!this.filteredRecords.length) { alert('No data to export'); return; }
+
+    try {
+      const rows = this.getReportRows();
+
+      // Build array-of-arrays: header + data rows
+      const header = ['Slip No', 'VNo', 'EDate', 'GWeight', 'NWeight'];
+      const body = rows.map(r => [r['Slip No'], r['VNo'], r['EDate'], r['GWeight'], r['NWeight']]);
+
+      // Totals
+      const sumG = rows.reduce((s, x) => s + (Number(x['GWeight']) || 0), 0);
+      const sumN = rows.reduce((s, x) => s + (Number(x['NWeight']) || 0), 0);
+      const trips = rows.length;
+
+      // Add an empty row then totals rows
+      body.push(['', '', '', '', '']);
+      body.push(['', '', 'Totals', sumG, sumN]);
+      body.push(['', '', 'Total Trips', trips, '']);
+
+      const aoa = [header, ...body];
+      const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(aoa);
+
+      // set column widths
+      worksheet['!cols'] = [ {wch:12},{wch:12},{wch:20},{wch:12},{wch:12} ];
+
+      const workbook: XLSX.WorkBook = { Sheets: { 'Report': worksheet }, SheetNames: ['Report'] };
+      const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (err) {
+      console.error('Error exporting report to Excel', err);
+      alert('Error exporting report to Excel');
+    }
+  }
+
+  // Export the limited report to PDF with totals
+  exportReportToPDF(): void {
+    if (!this.filteredRecords.length) { alert('No data to export'); return; }
+
+    try {
+      const rows = this.getReportRows();
+      const doc = new jsPDF();
+
+      doc.setFontSize(14);
+      doc.text('SMC Report', 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 22);
+
+      const tableBody = rows.map(r => [ r['Slip No'], r['VNo'], r['EDate'], (r['GWeight']).toString(), (r['NWeight']).toString() ]);
+
+      // totals
+      const sumG = rows.reduce((s, x) => s + (Number(x['GWeight']) || 0), 0);
+      const sumN = rows.reduce((s, x) => s + (Number(x['NWeight']) || 0), 0);
+      const trips = rows.length;
+
+      // Add an empty row then totals rows
+      tableBody.push(['', '', '', '', '']);
+      tableBody.push(['', '', 'Totals', sumG.toString(), sumN.toString()]);
+      tableBody.push(['', '', 'Total Trips', trips.toString(), '']);
+
+      autoTable(doc, {
+        head: [['Slip No','VNo','EDate','GWeight','NWeight']],
+        body: tableBody,
+        startY: 30,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [18,46,82], textColor: 255 }
+      });
+
+      const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.pdf`;
+      doc.save(fileName);
+    } catch (err) {
+      console.error('Error exporting report to PDF', err);
+      alert('Error exporting report to PDF');
     }
   }
 
