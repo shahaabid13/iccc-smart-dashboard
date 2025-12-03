@@ -848,7 +848,7 @@ export class SmcDashboardComponent implements OnInit {
       const rows = this.getReportRows();
 
       // Build array-of-arrays: header + data rows
-      const header = ['Slip No', 'VNo', 'EDate', 'GWeight', 'NWeight'];
+      const header = ['Slip No', 'VNo', 'EDate', 'GWeight (Kg)', 'NWeight (Kg)'];
       const body = rows.map(r => [r['Slip No'], r['VNo'], r['EDate'], r['GWeight'], r['NWeight']]);
 
       // Totals
@@ -858,14 +858,14 @@ export class SmcDashboardComponent implements OnInit {
 
       // Add an empty row then totals rows
       body.push(['', '', '', '', '']);
-      body.push(['', '', 'Totals', sumG, sumN]);
+      body.push(['', '', 'Totals', this.formatNumberWithCommas(sumG.toFixed(2)), this.formatNumberWithCommas(sumN.toFixed(2))]);
       body.push(['', '', 'Total Trips', trips, '']);
 
       const aoa = [header, ...body];
       const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(aoa);
 
       // set column widths
-      worksheet['!cols'] = [ {wch:12},{wch:12},{wch:20},{wch:12},{wch:12} ];
+      worksheet['!cols'] = [ {wch:12},{wch:12},{wch:20},{wch:14},{wch:14} ];
 
       const workbook: XLSX.WorkBook = { Sheets: { 'Report': worksheet }, SheetNames: ['Report'] };
       const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.xlsx`;
@@ -898,11 +898,11 @@ export class SmcDashboardComponent implements OnInit {
 
       // Add an empty row then totals rows
       tableBody.push(['', '', '', '', '']);
-      tableBody.push(['', '', 'Totals', sumG.toString(), sumN.toString()]);
+      tableBody.push(['', '', 'Totals', this.formatNumberWithCommas(sumG.toFixed(2)), this.formatNumberWithCommas(sumN.toFixed(2))]);
       tableBody.push(['', '', 'Total Trips', trips.toString(), '']);
 
       autoTable(doc, {
-        head: [['Slip No','VNo','EDate','GWeight','NWeight']],
+        head: [['Slip No','VNo','EDate','GWeight (Kg)','NWeight (Kg)']],
         body: tableBody,
         startY: 30,
         styles: { fontSize: 8 },
@@ -915,6 +915,32 @@ export class SmcDashboardComponent implements OnInit {
       console.error('Error exporting report to PDF', err);
       alert('Error exporting report to PDF');
     }
+  }
+
+  // Helper method to format numbers with Indian numbering system (10,000 and 1,00,000)
+  private formatNumberWithCommas(num: string | number): string {
+    const numStr = num.toString();
+    const parts = numStr.split('.');
+    const integerPart = parts[0];
+    const decimalPart = parts[1] || '';
+
+    // Reverse the integer part to process from right to left
+    let reversed = integerPart.split('').reverse().join('');
+    let formatted = '';
+
+    // Apply Indian numbering: first 3 digits, then groups of 2
+    for (let i = 0; i < reversed.length; i++) {
+      if (i === 3 || (i > 3 && (i - 3) % 2 === 0)) {
+        formatted += ',';
+      }
+      formatted += reversed[i];
+    }
+
+    // Reverse back to get the correct order
+    const result = formatted.split('').reverse().join('');
+    
+    // Add back the decimal part
+    return decimalPart ? result + '.' + decimalPart : result;
   }
 
   // Helper method to format dates for export

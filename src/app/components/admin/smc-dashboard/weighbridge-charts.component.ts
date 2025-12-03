@@ -26,7 +26,6 @@ import { NgChartsModule } from 'ng2-charts';
           <button (click)="loadAllCharts()" class="load-btn">Load Data</button>
         </div>
         
-        <!-- Date Range Controls -->
         <div class="date-controls" *ngIf="summaryData">
           <div class="date-input-group">
             <label>From Date:</label>
@@ -56,6 +55,15 @@ import { NgChartsModule } from 'ng2-charts';
         </div>
       </div>
 
+      <!-- Add debug info -->
+      <div *ngIf="debugInfo" class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 4px; font-size: 12px;">
+        <h4>Debug Information:</h4>
+        <div>Data Type Labels:</div>
+        <div>Net Trend Labels: {{ getLabelPreview(netTrendChartData.labels) }}</div>
+        <div>Gross Trend Labels: {{ getLabelPreview(grossTrendChartData.labels) }}</div>
+        <div>24h Labels: {{ getLabelPreview(last24ChartData.labels) }}</div>
+      </div>
+
       <div *ngIf="loading" class="loading">Loading chart data...</div>
       
       <div *ngIf="error" class="error">
@@ -64,7 +72,6 @@ import { NgChartsModule } from 'ng2-charts';
         <button (click)="loadAllCharts()" class="retry-btn">Retry</button>
       </div>
 
-      <!-- Summary: daily total weight & trips -->
       <div *ngIf="summaryData" class="summary-cards">
         <div class="summary-card">
           <div class="card-icon">⚖️</div>
@@ -77,6 +84,15 @@ import { NgChartsModule } from 'ng2-charts';
         </div>
 
         <div class="summary-card">
+          <div class="card-icon">🏗️</div>
+          <div class="card-content">
+            <h3>Total Gross Weight</h3>
+            <div class="card-value">{{ formatWeight(summaryData.totalGrossWeight) }}</div>
+            <div class="card-label">Weight for selected period</div>
+            <div class="card-period">{{ getPeriodLabel() }}</div>
+          </div>
+        </div>
+        <div class="summary-card">
           <div class="card-icon">🛣️</div>
           <div class="card-content">
             <h3>Total Trips</h3>
@@ -87,47 +103,56 @@ import { NgChartsModule } from 'ng2-charts';
         </div>
       </div>
 
-      <!-- Charts Grid -->
       <div class="charts-grid" *ngIf="!loading && !error">
         
-        <!-- Net Weight Trend -->
         <div class="chart-card">
-          <h3>Net Weight Trend</h3>
+          <h3>Monthly/Daily Net Weight Trend</h3>
           <div class="chart-container">
             <canvas 
               baseChart
               [data]="netTrendChartData"
-              [options]="lineChartOptions"
-              [type]="lineChartType"
+              [options]="getWeightTrendChartOptions('Day')"
+              [type]="barChartType"
             >
             </canvas>
           </div>
         </div>
 
-        <!-- Gross Weight Trend -->
         <div class="chart-card">
-          <h3>Gross Weight Trend</h3>
+          <h3>Monthly/Daily Gross Weight Trend</h3>
           <div class="chart-container">
             <canvas 
               baseChart
               [data]="grossTrendChartData"
-              [options]="lineChartOptions"
-              [type]="lineChartType"
+              [options]="getWeightTrendChartOptions('Day')"
+              [type]="barChartType"
             >
             </canvas>
           </div>
         </div>
 
 
-        <!-- Last 24 Hours -->
         <div class="chart-card">
           <h3>Last 24 Hours Trend</h3>
           <div class="chart-container">
             <canvas 
               baseChart
               [data]="last24ChartData"
-              [options]="lineChartOptions"
-              [type]="lineChartType"
+              [options]="getWeightTrendChartOptions('Hour')"
+              [type]="barChartType"
+            >
+            </canvas>
+          </div>
+        </div>
+        
+        <div class="chart-card">
+          <h3>Weight by Vehicle Type</h3>
+          <div class="chart-container">
+            <canvas 
+              baseChart
+              [data]="vehicleTrendChartData"
+              [options]="barChartOptions"
+              [type]="barChartType"
             >
             </canvas>
           </div>
@@ -354,6 +379,7 @@ export class WeighbridgeChartsComponent implements OnInit {
   loading = false;
   error = false;
   errorMessage = '';
+  debugInfo = true; // Set to false in production
   
   // Date range properties
   startDate: string;
@@ -370,11 +396,10 @@ export class WeighbridgeChartsComponent implements OnInit {
   summaryData: any = null;
 
   // Chart types
-  lineChartType: ChartType = 'line';
   barChartType: ChartType = 'bar';
 
-  // Chart options
-  lineChartOptions: ChartConfiguration['options'] = {
+  // Base chart options
+  baseChartOptions: ChartConfiguration['options'] = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
@@ -383,28 +408,44 @@ export class WeighbridgeChartsComponent implements OnInit {
         title: {
           display: true,
           text: 'Weight (kg)'
+        },
+        ticks: {
+          callback: (value) => {
+            const numValue = Number(value);
+            if (numValue >= 1000) {
+              return (numValue / 1000).toFixed(1) + ' tons';
+            }
+            return numValue + ' kg';
+          }
         }
-      },
-      x: {
-        title: {
-          display: true,
-          text: 'Time'
+      }
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            const value = Number(context.parsed.y);
+            if (value >= 1000) {
+              label += (value / 1000).toFixed(2) + ' tons';
+            } else {
+              label += value + ' kg';
+            }
+            return label;
+          }
         }
       }
     }
   };
 
+  // Chart options for Vehicle Trend (Bar Chart)
   barChartOptions: ChartConfiguration['options'] = {
-    responsive: true,
-    maintainAspectRatio: false,
+    ...this.baseChartOptions,
     scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Weight (kg)'
-        }
-      },
+      ...(this.baseChartOptions?.scales as any || {}),
       x: {
         title: {
           display: true,
@@ -418,7 +459,9 @@ export class WeighbridgeChartsComponent implements OnInit {
     // Initialize with current date
     const today = new Date();
     this.endDate = today.toISOString().split('T')[0];
-    this.startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    this.startDate = weekAgo.toISOString().split('T')[0];
   }
 
   ngOnInit(): void {
@@ -457,12 +500,18 @@ export class WeighbridgeChartsComponent implements OnInit {
         break;
     }
     
+    // Reload only the summary and trends that depend on the date range
     this.loadSummary();
+    this.loadNetTrend();
+    this.loadGrossTrend();
   }
 
   onDateChange(): void {
     this.selectedPeriod = 'custom';
+    // Reload only the summary and trends that depend on the date range
     this.loadSummary();
+    this.loadNetTrend();
+    this.loadGrossTrend();
   }
 
   loadAllCharts(): void {
@@ -489,12 +538,14 @@ export class WeighbridgeChartsComponent implements OnInit {
 
   loadNetTrend(): Promise<void> {
     return new Promise((resolve) => {
-      this.smcService.getNetTrend(this.wbId).subscribe({
+      this.smcService.getNetTrend(this.wbId, this.startDate, this.endDate).subscribe({
         next: (data: any[]) => {
-          this.netTrendChartData = this.createLineChartData(
+          console.log('Net Trend Data:', data); // Debug log
+          this.netTrendChartData = this.createBarChartData(
             data, 
-            'Net Weight Trend', 
-            '#007bff'
+            'Net Weight (kg)', 
+            '#007bff',
+            'daily'
           );
           resolve();
         },
@@ -509,12 +560,14 @@ export class WeighbridgeChartsComponent implements OnInit {
 
   loadGrossTrend(): Promise<void> {
     return new Promise((resolve) => {
-      this.smcService.getGrossTrend(this.wbId).subscribe({
+      this.smcService.getGrossTrend(this.wbId, this.startDate, this.endDate).subscribe({
         next: (data: any[]) => {
-          this.grossTrendChartData = this.createLineChartData(
+          console.log('Gross Trend Data:', data); // Debug log
+          this.grossTrendChartData = this.createBarChartData(
             data, 
-            'Gross Weight Trend', 
-            '#28a745'
+            'Gross Weight (kg)', 
+            '#28a745',
+            'daily'
           );
           resolve();
         },
@@ -531,10 +584,12 @@ export class WeighbridgeChartsComponent implements OnInit {
     return new Promise((resolve) => {
       this.smcService.getVehicleTrend(this.wbId).subscribe({
         next: (data: any[]) => {
+          console.log('Vehicle Trend Data:', data); // Debug log
           this.vehicleTrendChartData = this.createBarChartData(
             data,
             'Weight by Vehicle',
-            '#ffc107'
+            '#ffc107',
+            'vehicle'
           );
           resolve();
         },
@@ -551,10 +606,12 @@ export class WeighbridgeChartsComponent implements OnInit {
     return new Promise((resolve) => {
       this.smcService.getLast24Trend(this.wbId).subscribe({
         next: (data: any[]) => {
-          this.last24ChartData = this.createLineChartData(
+          console.log('Last 24 Trend Data:', data); // Debug log
+          this.last24ChartData = this.createBarChartData(
             data,
-            'Last 24 Hours',
-            '#dc3545'
+            'Net Weight (kg)',
+            '#dc3545',
+            'hourly'
           );
           resolve();
         },
@@ -569,7 +626,6 @@ export class WeighbridgeChartsComponent implements OnInit {
 
   loadSummary(): Promise<void> {
     return new Promise((resolve) => {
-      // API expects full ISO datetimes; append start-of-day and end-of-day times
       const startIso = this.startDate.includes('T') ? this.startDate : `${this.startDate}T00:00:00`;
       const endIso = this.endDate.includes('T') ? this.endDate : `${this.endDate}T23:59:59`;
 
@@ -587,28 +643,29 @@ export class WeighbridgeChartsComponent implements OnInit {
     });
   }
 
-  private createLineChartData(apiData: any[], label: string, borderColor: string): ChartConfiguration['data'] {
-    const labels = apiData.map(item => this.formatDate(item.date || item.time));
-    const data = apiData.map(item => item.weight || item.netWeight || item.grossWeight || 0);
-
-    return {
-      labels,
-      datasets: [
-        {
-          label,
-          data,
-          borderColor,
-          backgroundColor: this.hexToRgba(borderColor, 0.1),
-          tension: 0.4,
-          fill: true
-        }
-      ]
-    };
-  }
-
-  private createBarChartData(apiData: any[], label: string, backgroundColor: string): ChartConfiguration['data'] {
-    const labels = apiData.map(item => item.vehicleNumber || item.vehicle || 'Unknown');
-    const data = apiData.map(item => item.weight || item.netWeight || 0);
+  private createBarChartData(
+    apiData: any[], 
+    label: string, 
+    backgroundColor: string,
+    dataType: 'daily' | 'hourly' | 'vehicle' = 'daily'
+  ): ChartConfiguration['data'] {
+    
+    console.log(`Creating ${dataType} chart data:`, apiData); // Debug log
+    
+    // Process labels based on data type
+    const labels = apiData.map((item, index) => {
+      // Try different property names that might come from backend
+      const dateValue = item.dateTime || item.date || item.time || item.day || item.hour || item.label || item.period || item.vehicleNumber || item.vehicle || item.vehicleNo;
+      console.log(`Item ${index}:`, item, 'Date value:', dateValue); // Debug log
+      const formattedLabel = this.formatLabel(dateValue, dataType);
+      console.log(`Formatted label:`, formattedLabel); // Debug log
+      return formattedLabel;
+    });
+    
+    const data = apiData.map(item => {
+      // Try different property names for weight
+      return item.weight || item.netWeight || item.grossWeight || item.value || item.totalWeight || 0;
+    });
 
     return {
       labels,
@@ -618,32 +675,108 @@ export class WeighbridgeChartsComponent implements OnInit {
           data,
           backgroundColor,
           borderColor: backgroundColor,
-          borderWidth: 1
+          borderWidth: 1,
+          barPercentage: 0.8,
+          categoryPercentage: 0.8,
         }
       ]
     };
   }
-
-  private formatDate(dateString: string): string {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return dateString;
+  
+  private formatLabel(labelString: any, dataType: 'daily' | 'hourly' | 'vehicle'): string {
+    console.log(`Formatting label for ${dataType}:`, labelString, 'Type:', typeof labelString); // Debug log
+    
+    if (!labelString) return 'Unknown';
+    
+    // For vehicle data, just return the vehicle identifier
+    if (dataType === 'vehicle') {
+      return String(labelString);
     }
+    
+    // Check if it's already a string that might be a valid date
+    if (typeof labelString === 'string') {
+      // Check if it's a date-time string (ISO format like 2025-12-03T14:30:00)
+      if (labelString.includes('T')) {
+        const date = new Date(labelString);
+        if (!isNaN(date.getTime())) {
+          if (dataType === 'hourly') {
+            // Format: 2 PM, 3 AM, etc.
+            return date.toLocaleTimeString('en-US', { 
+              hour: 'numeric',
+              hour12: true,
+              minute: '2-digit'
+            });
+          } else {
+            // Format: Dec 3, Nov 28, etc.
+            return date.toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric' 
+            });
+          }
+        }
+      }
+      // Check if it's a date string (YYYY-MM-DD)
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(labelString)) {
+        const date = new Date(labelString + 'T00:00:00');
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric' 
+          });
+        }
+      }
+      // Check if it's a time string (HH:MM or HH:MM:SS)
+      else if (/^\d{2}:\d{2}/.test(labelString)) {
+        const timeParts = labelString.split(':');
+        const hour = parseInt(timeParts[0], 10);
+        if (hour === 0) return '12 AM';
+        if (hour === 12) return '12 PM';
+        return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
+      }
+      // Check if it's just a day number
+      else if (/^\d+$/.test(labelString)) {
+        const dayNum = parseInt(labelString, 10);
+        return `Day ${dayNum}`;
+      }
+    }
+    
+    // If it's a number (like day of month or hour)
+    if (typeof labelString === 'number') {
+      if (dataType === 'hourly') {
+        // For hours, show as 1 AM, 2 PM, etc.
+        const hour = labelString % 24; // Handle hour wrap-around
+        if (hour === 0) return '12 AM';
+        if (hour === 12) return '12 PM';
+        return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
+      } else {
+        // For days, just show the day number
+        return `Day ${labelString}`;
+      }
+    }
+    
+    // Fallback: convert to string
+    return String(labelString);
   }
 
-  private hexToRgba(hex: string, alpha: number): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  // Helper method to get chart options with dynamic X-axis label
+  getWeightTrendChartOptions(xAxisLabel: 'Day' | 'Hour'): ChartConfiguration['options'] {
+    return {
+      ...this.baseChartOptions,
+      scales: {
+        ...(this.baseChartOptions?.scales as any || {}),
+        x: {
+          title: {
+            display: true,
+            text: xAxisLabel
+          },
+          ticks: {
+            // Ensure labels fit properly
+            maxRotation: 45,
+            minRotation: 45
+          }
+        }
+      }
+    };
   }
 
   private handleError(error: any): void {
@@ -664,5 +797,11 @@ export class WeighbridgeChartsComponent implements OnInit {
       return this.startDate;
     }
     return `${this.startDate} to ${this.endDate}`;
+  }
+
+  // Debug method to preview labels
+  getLabelPreview(labels: any[]): string {
+    if (!labels || !Array.isArray(labels)) return 'No labels';
+    return labels.slice(0, 5).join(', ') + (labels.length > 5 ? '...' : '');
   }
 }

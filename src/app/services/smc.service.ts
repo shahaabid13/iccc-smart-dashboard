@@ -4,6 +4,11 @@ import { Observable, map, catchError, of } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class SmcService {
+  getMonthlyNetTrend: any;
+  getMonthlyGrossWeight: any;
+  getMonthlyGrossTrend(wbId: string) {
+    throw new Error('Method not implemented.');
+  }
   // Updated API base URL for the new endpoint
   private readonly baseUrl = 'http://localhost:8080/api/weighbridge';
 
@@ -38,7 +43,7 @@ export class SmcService {
   }
 // Add these methods to your SmcService class
 
-getNetTrend(wbId: string): Observable<any[]> {
+getNetTrend(wbId: string, startDate: string, endDate: string): Observable<any[]> {
   return this.http.get<any[]>(`${this.baseUrl}/report/trend/net/${wbId}`).pipe(
     map(data => {
       // Transform backend response to chart-friendly format
@@ -54,7 +59,7 @@ getNetTrend(wbId: string): Observable<any[]> {
   );
 }
 
-getGrossTrend(wbId: string): Observable<any[]> {
+getGrossTrend(wbId: string, startDate: string, endDate: string): Observable<any[]> {
   return this.http.get<any[]>(`${this.baseUrl}/report/trend/gross/${wbId}`).pipe(
     map(data => {
       // Transform backend response to chart-friendly format
@@ -101,6 +106,31 @@ getLast24Trend(wbId: string): Observable<any[]> {
     catchError(error => {
       console.error('Error fetching last 24 trend:', error);
       return of(this.getMockTrendData('Last 24 Hours'));
+    })
+  );
+}
+
+getMonthlyWeightData(wbId: string, type: string, startDate: string, endDate: string): Observable<any[]> {
+  const params = { wbId, type, startDate, endDate };
+  return this.http.get<any[]>(`${this.baseUrl}/report/monthly/${type}`, { params }).pipe(
+    map(data => {
+      return Array.isArray(data) ? data : [];
+    }),
+    catchError(error => {
+      console.error(`Error fetching monthly ${type} weight:`, error);
+      return of([]);
+    })
+  );
+}
+
+getLast24HoursData(wbId: string): Observable<any[]> {
+  return this.http.get<any[]>(`${this.baseUrl}/report/last24/${wbId}`).pipe(
+    map(data => {
+      return Array.isArray(data) ? data : [];
+    }),
+    catchError(error => {
+      console.error('Error fetching last 24 hours data:', error);
+      return of([]);
     })
   );
 }
