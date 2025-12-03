@@ -74,7 +74,7 @@ import { AuthService } from '../../../services/auth.service';
   styles: [`
     :host { display:block; }
     .signup-wrapper { display:flex; min-height:80vh; }
-    .left-hero { flex:1; background-image: url('/scs.jpg'); background-size:cover; background-position:center; position:relative; border-radius:8px; }
+    .left-hero { flex:1; background-image: url('/IMG_20251203_100859.jpg'); background-size:cover; background-position:center; position:relative; border-radius:8px; }
     .signup-panel { width:420px; display:flex; align-items:center; justify-content:center; background:#fff; }
     .signup-card { width:360px; padding:32px; box-shadow:0 6px 30px rgba(0,0,0,0.08); border-radius:8px; }
     .title { margin:0 0 18px 0; font-size:28px; font-weight:700; text-align:center; color:#5a00ff; }

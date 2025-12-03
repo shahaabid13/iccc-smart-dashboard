@@ -11,7 +11,7 @@ import { AuthService } from '../../../services/auth.service';
   template: `
   <div class="login-wrapper">
     <div class="login-left">
-      <img src="/logo.jfif" alt="hero" class="left-image" />
+      <img src="/IMG_20251203_100849.jpg" alt="hero" class="left-image" />
     </div>
 
     <div class="login-right">
