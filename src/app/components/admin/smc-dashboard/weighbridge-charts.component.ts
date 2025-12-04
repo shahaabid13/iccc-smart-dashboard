@@ -55,15 +55,6 @@ import { NgChartsModule } from 'ng2-charts';
         </div>
       </div>
 
-      <!-- Add debug info -->
-      <div *ngIf="debugInfo" class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 4px; font-size: 12px;">
-        <h4>Debug Information:</h4>
-        <div>Data Type Labels:</div>
-        <div>Net Trend Labels: {{ getLabelPreview(netTrendChartData.labels) }}</div>
-        <div>Gross Trend Labels: {{ getLabelPreview(grossTrendChartData.labels) }}</div>
-        <div>24h Labels: {{ getLabelPreview(last24ChartData.labels) }}</div>
-      </div>
-
       <div *ngIf="loading" class="loading">Loading chart data...</div>
       
       <div *ngIf="error" class="error">
@@ -84,15 +75,6 @@ import { NgChartsModule } from 'ng2-charts';
         </div>
 
         <div class="summary-card">
-          <div class="card-icon">🏗️</div>
-          <div class="card-content">
-            <h3>Total Gross Weight</h3>
-            <div class="card-value">{{ formatWeight(summaryData.totalGrossWeight) }}</div>
-            <div class="card-label">Weight for selected period</div>
-            <div class="card-period">{{ getPeriodLabel() }}</div>
-          </div>
-        </div>
-        <div class="summary-card">
           <div class="card-icon">🛣️</div>
           <div class="card-content">
             <h3>Total Trips</h3>
@@ -104,7 +86,6 @@ import { NgChartsModule } from 'ng2-charts';
       </div>
 
       <div class="charts-grid" *ngIf="!loading && !error">
-        
         <div class="chart-card">
           <h3>Monthly/Daily Net Weight Trend</h3>
           <div class="chart-container">
@@ -119,20 +100,6 @@ import { NgChartsModule } from 'ng2-charts';
         </div>
 
         <div class="chart-card">
-          <h3>Monthly/Daily Gross Weight Trend</h3>
-          <div class="chart-container">
-            <canvas 
-              baseChart
-              [data]="grossTrendChartData"
-              [options]="getWeightTrendChartOptions('Day')"
-              [type]="barChartType"
-            >
-            </canvas>
-          </div>
-        </div>
-
-
-        <div class="chart-card">
           <h3>Last 24 Hours Trend</h3>
           <div class="chart-container">
             <canvas 
@@ -144,20 +111,6 @@ import { NgChartsModule } from 'ng2-charts';
             </canvas>
           </div>
         </div>
-        
-        <div class="chart-card">
-          <h3>Weight by Vehicle Type</h3>
-          <div class="chart-container">
-            <canvas 
-              baseChart
-              [data]="vehicleTrendChartData"
-              [options]="barChartOptions"
-              [type]="barChartType"
-            >
-            </canvas>
-          </div>
-        </div>
-
       </div>
     </div>
   `,
@@ -283,17 +236,6 @@ import { NgChartsModule } from 'ng2-charts';
       margin-bottom: 10px;
     }
 
-    .card-subvalue {
-      font-size: 1.2rem;
-      font-weight: bold;
-      color: #28a745;
-    }
-
-    .card-sublabel {
-      font-size: 12px;
-      color: #888;
-    }
-
     .card-period {
       font-size: 12px;
       color: #666;
@@ -388,8 +330,6 @@ export class WeighbridgeChartsComponent implements OnInit {
 
   // Chart data
   netTrendChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
-  grossTrendChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
-  vehicleTrendChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
   last24ChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
 
   // Summary data
@@ -436,20 +376,6 @@ export class WeighbridgeChartsComponent implements OnInit {
             }
             return label;
           }
-        }
-      }
-    }
-  };
-
-  // Chart options for Vehicle Trend (Bar Chart)
-  barChartOptions: ChartConfiguration['options'] = {
-    ...this.baseChartOptions,
-    scales: {
-      ...(this.baseChartOptions?.scales as any || {}),
-      x: {
-        title: {
-          display: true,
-          text: 'Vehicles'
         }
       }
     }
@@ -503,7 +429,6 @@ export class WeighbridgeChartsComponent implements OnInit {
     // Reload only the summary and trends that depend on the date range
     this.loadSummary();
     this.loadNetTrend();
-    this.loadGrossTrend();
   }
 
   onDateChange(): void {
@@ -511,7 +436,6 @@ export class WeighbridgeChartsComponent implements OnInit {
     // Reload only the summary and trends that depend on the date range
     this.loadSummary();
     this.loadNetTrend();
-    this.loadGrossTrend();
   }
 
   loadAllCharts(): void {
@@ -527,8 +451,6 @@ export class WeighbridgeChartsComponent implements OnInit {
     // Load all charts and summary
     Promise.all([
       this.loadNetTrend(),
-      this.loadGrossTrend(),
-      this.loadVehicleTrend(),
       this.loadLast24Trend(),
       this.loadSummary()
     ]).finally(() => {
@@ -551,50 +473,6 @@ export class WeighbridgeChartsComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error loading net trend:', err);
-          this.handleError(err);
-          resolve();
-        }
-      });
-    });
-  }
-
-  loadGrossTrend(): Promise<void> {
-    return new Promise((resolve) => {
-      this.smcService.getGrossTrend(this.wbId, this.startDate, this.endDate).subscribe({
-        next: (data: any[]) => {
-          console.log('Gross Trend Data:', data); // Debug log
-          this.grossTrendChartData = this.createBarChartData(
-            data, 
-            'Gross Weight (kg)', 
-            '#28a745',
-            'daily'
-          );
-          resolve();
-        },
-        error: (err) => {
-          console.error('Error loading gross trend:', err);
-          this.handleError(err);
-          resolve();
-        }
-      });
-    });
-  }
-
-  loadVehicleTrend(): Promise<void> {
-    return new Promise((resolve) => {
-      this.smcService.getVehicleTrend(this.wbId).subscribe({
-        next: (data: any[]) => {
-          console.log('Vehicle Trend Data:', data); // Debug log
-          this.vehicleTrendChartData = this.createBarChartData(
-            data,
-            'Weight by Vehicle',
-            '#ffc107',
-            'vehicle'
-          );
-          resolve();
-        },
-        error: (err) => {
-          console.error('Error loading vehicle trend:', err);
           this.handleError(err);
           resolve();
         }
@@ -647,7 +525,7 @@ export class WeighbridgeChartsComponent implements OnInit {
     apiData: any[], 
     label: string, 
     backgroundColor: string,
-    dataType: 'daily' | 'hourly' | 'vehicle' = 'daily'
+    dataType: 'daily' | 'hourly'
   ): ChartConfiguration['data'] {
     
     console.log(`Creating ${dataType} chart data:`, apiData); // Debug log
@@ -655,7 +533,7 @@ export class WeighbridgeChartsComponent implements OnInit {
     // Process labels based on data type
     const labels = apiData.map((item, index) => {
       // Try different property names that might come from backend
-      const dateValue = item.dateTime || item.date || item.time || item.day || item.hour || item.label || item.period || item.vehicleNumber || item.vehicle || item.vehicleNo;
+      const dateValue = item.dateTime || item.date || item.time || item.day || item.hour || item.label || item.period;
       console.log(`Item ${index}:`, item, 'Date value:', dateValue); // Debug log
       const formattedLabel = this.formatLabel(dateValue, dataType);
       console.log(`Formatted label:`, formattedLabel); // Debug log
@@ -664,7 +542,7 @@ export class WeighbridgeChartsComponent implements OnInit {
     
     const data = apiData.map(item => {
       // Try different property names for weight
-      return item.weight || item.netWeight || item.grossWeight || item.value || item.totalWeight || 0;
+      return item.weight || item.netWeight || item.value || item.totalWeight || 0;
     });
 
     return {
@@ -683,15 +561,10 @@ export class WeighbridgeChartsComponent implements OnInit {
     };
   }
   
-  private formatLabel(labelString: any, dataType: 'daily' | 'hourly' | 'vehicle'): string {
+  private formatLabel(labelString: any, dataType: 'daily' | 'hourly'): string {
     console.log(`Formatting label for ${dataType}:`, labelString, 'Type:', typeof labelString); // Debug log
     
     if (!labelString) return 'Unknown';
-    
-    // For vehicle data, just return the vehicle identifier
-    if (dataType === 'vehicle') {
-      return String(labelString);
-    }
     
     // Check if it's already a string that might be a valid date
     if (typeof labelString === 'string') {
@@ -797,11 +670,5 @@ export class WeighbridgeChartsComponent implements OnInit {
       return this.startDate;
     }
     return `${this.startDate} to ${this.endDate}`;
-  }
-
-  // Debug method to preview labels
-  getLabelPreview(labels: any[]): string {
-    if (!labels || !Array.isArray(labels)) return 'No labels';
-    return labels.slice(0, 5).join(', ') + (labels.length > 5 ? '...' : '');
   }
 }

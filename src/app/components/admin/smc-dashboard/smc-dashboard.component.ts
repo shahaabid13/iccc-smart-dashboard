@@ -841,81 +841,298 @@ export class SmcDashboardComponent implements OnInit {
   }
 
   // Export the limited report to Excel with totals
-  exportReportToExcel(): void {
-    if (!this.filteredRecords.length) { alert('No data to export'); return; }
+ // Helper method to format numbers with dots for thousands and optional decimals
+formatNumberWithUnits(num: number | string): string {
+  // Clean the input number
+  const cleanNum = num.toString()
+    .replace(/\./g, '')
+    .replace(/,/g, '.')
+    .replace(/[^\d.-]/g, '');
+  
+  const numberValue = parseFloat(cleanNum);
+  
+  if (isNaN(numberValue)) return '0';
+  
+  // For millions (1,000,000 and above)
+  if (Math.abs(numberValue) >= 1000000) {
+    const millions = numberValue / 1000000;
+    // Format with 2 decimal places only if needed
+    const formatted = millions % 1 === 0 ? 
+      Math.floor(millions).toString() : 
+      millions.toFixed(2).replace('.', ',');
+    
+    // Add thousand separators (dots) to integer part
+    const parts = formatted.split(',');
+    if (parts[0].length > 3) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    
+    return parts.join(',') + ' M';
+  }
+  
+  // For thousands (1,000 and above, below 1,000,000)
+  if (Math.abs(numberValue) >= 1000) {
+    const formatted = numberValue % 1 === 0 ? 
+      Math.floor(numberValue).toString() : 
+      numberValue.toFixed(2).replace('.', ',');
+    
+    // Add thousand separators (dots)
+    const parts = formatted.split(',');
+    if (parts[0].length > 3) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    
+    return parts.join(',') + ' K';
+  }
+  
+  // For numbers below 1000
+  if (numberValue % 1 === 0) {
+    return Math.floor(numberValue).toString();
+  } else {
+    return numberValue.toFixed(2).replace('.', ',');
+  }
+}
 
-    try {
-      const rows = this.getReportRows();
+// Helper method to format individual weight values (no units for individual rows)
+formatWeightSimple(weight: string | number): string {
+  if (!weight && weight !== 0) return '0';
+  
+  // Clean the input
+  const cleanWeight = weight.toString()
+    .replace(/\./g, '')
+    .replace(/,/g, '.')
+    .replace(/[^\d.-]/g, '');
+  
+  const weightNum = parseFloat(cleanWeight);
+  
+  if (isNaN(weightNum)) return '0';
+  
+  // No decimal places for whole numbers
+  if (weightNum % 1 === 0) {
+    const intPart = Math.floor(Math.abs(weightNum)).toString();
+    const sign = weightNum < 0 ? '-' : '';
+    
+    // Add thousand separators
+    if (intPart.length > 3) {
+      return sign + intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    return sign + intPart;
+  }
+  
+  // With decimal places
+  const formatted = weightNum.toFixed(2).replace('.', ',');
+  const parts = formatted.split(',');
+  
+  // Add thousand separators to integer part
+  if (parts[0].replace('-', '').length > 3) {
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  
+  return parts.join(',');
+}
 
-      // Build array-of-arrays: header + data rows
-      const header = ['Slip No', 'VNo', 'EDate', 'GWeight (Kg)', 'NWeight (Kg)'];
-      const body = rows.map(r => [r['Slip No'], r['VNo'], r['EDate'], r['GWeight'], r['NWeight']]);
+// Updated export to Excel method
+exportReportToExcel(): void {
+  if (!this.filteredRecords.length) { alert('No data to export'); return; }
 
-      // Totals
-      const sumG = rows.reduce((s, x) => s + (Number(x['GWeight']) || 0), 0);
-      const sumN = rows.reduce((s, x) => s + (Number(x['NWeight']) || 0), 0);
-      const trips = rows.length;
+  try {
+    const rows = this.getReportRows();
 
-      // Add an empty row then totals rows
-      body.push(['', '', '', '', '']);
-      body.push(['', '', 'Totals', this.formatNumberWithCommas(sumG.toFixed(2)), this.formatNumberWithCommas(sumN.toFixed(2))]);
-      body.push(['', '', 'Total Trips', trips, '']);
+    // Build array-of-arrays: header + data rows
+    const header = ['Slip No', 'VNo', 'EDate', 'GWeight', 'NWeight'];
+    
+    // Format weight values for each row (simple format, no units)
+    const body = rows.map(r => [
+      r['Slip No'], 
+      r['VNo'], 
+      r['EDate'], 
+      this.formatWeightSimple(r['GWeight']),
+      this.formatWeightSimple(r['NWeight'])
+    ]);
 
-      const aoa = [header, ...body];
-      const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(aoa);
+    // Calculate totals
+    const sumG = rows.reduce((s, x) => {
+      const value = parseFloat(x['GWeight'].toString()
+        .replace(/\./g, '')
+        .replace(/,/g, '.'));
+      return s + (isNaN(value) ? 0 : value);
+    }, 0);
+    
+    const sumN = rows.reduce((s, x) => {
+      const value = parseFloat(x['NWeight'].toString()
+        .replace(/\./g, '')
+        .replace(/,/g, '.'));
+      return s + (isNaN(value) ? 0 : value);
+    }, 0);
+    
+    const trips = rows.length;
 
-      // set column widths
-      worksheet['!cols'] = [ {wch:12},{wch:12},{wch:20},{wch:14},{wch:14} ];
+    // Add an empty row then totals rows with units
+    body.push(['', '', '', '', '']);
+    body.push(['', '', 'Totals', 
+      this.formatNumberWithUnits(sumG), 
+      this.formatNumberWithUnits(sumN)
+    ]);
+    body.push(['', '', 'Total Trips', trips.toString(), '']);
 
-      const workbook: XLSX.WorkBook = { Sheets: { 'Report': worksheet }, SheetNames: ['Report'] };
-      const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
-    } catch (err) {
-      console.error('Error exporting report to Excel', err);
-      alert('Error exporting report to Excel');
+    const aoa = [header, ...body];
+    const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Set column widths
+    worksheet['!cols'] = [ 
+      {wch: 12},  // Slip No
+      {wch: 12},  // VNo
+      {wch: 20},  // EDate
+      {wch: 18},  // GWeight
+      {wch: 18}   // NWeight
+    ];
+
+    // Format columns in Excel
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    
+    for (let R = 1; R <= range.e.r; R++) {
+      // Column D (GWeight) and E (NWeight)
+      const gWeightCell = XLSX.utils.encode_cell({r: R, c: 3});
+      const nWeightCell = XLSX.utils.encode_cell({r: R, c: 4});
+      
+      if (worksheet[gWeightCell]) {
+        // Custom format for European style without forcing decimals
+        worksheet[gWeightCell].z = '#.##0';
+      }
+      if (worksheet[nWeightCell]) {
+        worksheet[nWeightCell].z = '#.##0';
+      }
+    }
+
+    const workbook: XLSX.WorkBook = { Sheets: { 'Report': worksheet }, SheetNames: ['Report'] };
+    const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  } catch (err) {
+    console.error('Error exporting report to Excel', err);
+    alert('Error exporting report to Excel');
+  }
+}
+
+// Updated export to PDF method
+exportReportToPDF(): void {
+  if (!this.filteredRecords.length) { alert('No data to export'); return; }
+
+  try {
+    const rows = this.getReportRows();
+    const doc = new jsPDF();
+
+    doc.setFontSize(14);
+    doc.text('SMC Report', 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 22);
+
+    // Format weight values for PDF table (simple format for individual rows)
+    const tableBody = rows.map(r => [
+      r['Slip No'], 
+      r['VNo'], 
+      r['EDate'], 
+      this.formatWeightSimple(r['GWeight']),
+      this.formatWeightSimple(r['NWeight'])
+    ]);
+
+    // Calculate totals
+    const sumG = rows.reduce((s, x) => {
+      const value = parseFloat(x['GWeight'].toString()
+        .replace(/\./g, '')
+        .replace(/,/g, '.'));
+      return s + (isNaN(value) ? 0 : value);
+    }, 0);
+    
+    const sumN = rows.reduce((s, x) => {
+      const value = parseFloat(x['NWeight'].toString()
+        .replace(/\./g, '')
+        .replace(/,/g, '.'));
+      return s + (isNaN(value) ? 0 : value);
+    }, 0);
+    
+    const trips = rows.length;
+
+    // Add an empty row then totals rows with units
+    tableBody.push(['', '', '', '', '']);
+    tableBody.push(['', '', 'Totals', 
+      this.formatNumberWithUnits(sumG), 
+      this.formatNumberWithUnits(sumN)
+    ]);
+    tableBody.push(['', '', 'Total Trips', trips.toString(), '']);
+
+autoTable(doc, {
+  head: [['Slip No', 'VNo', 'EDate', 'GWeight', 'NWeight']],
+  body: tableBody.map(row => [
+    row[0], // Slip No
+    row[1], // VNo
+    row[2], // EDate
+    // Format GWeight - remove decimal and commas
+    typeof row[3] === 'number' 
+      ? Math.round(row[3]) // If number, round it
+      : String(row[3]).replace(/[.,]/g, ''), // If string, remove . and ,
+    // Format NWeight - remove decimal and commas
+    typeof row[4] === 'number'
+      ? Math.round(row[4]) // If number, round it
+      : String(row[4]).replace(/[.,]/g, '') // If string, remove . and ,
+  ]),
+  startY: 30,
+  margin: { left: 10, right: 10 }, // Add small margins for centering effect
+  tableWidth: 'auto', // Changed from 'wrap' to 'auto' or use '100%'
+  styles: { 
+    fontSize: 8,
+    cellPadding: 5,
+    font: 'helvetica',
+    lineWidth: 0.1,
+    overflow: 'linebreak',
+    halign: 'center' // Default alignment for all cells
+  },
+  columnStyles: {
+    0: { cellWidth: 20, halign: 'center' },
+    1: { cellWidth: 45, halign: 'center' },
+    2: { cellWidth: 45, halign: 'center' },
+    3: { cellWidth: 35, halign: 'right' },
+    4: { cellWidth: 35, halign: 'right' }
+  },
+  headStyles: { 
+    fillColor: [18, 46, 82], 
+    textColor: 255,
+    fontSize: 9,
+    fontStyle: 'bold',
+    lineWidth: 0.1,
+    halign: 'center'
+  },
+  bodyStyles: {
+    fontSize: 8,
+    lineWidth: 0.1,
+  },
+  alternateRowStyles: {
+    fillColor: [245, 245, 245]
+  },
+  didParseCell: function(data) {
+    if (data.column.index === 3 || data.column.index === 4) {
+      data.cell.styles.halign = 'right';
+      data.cell.styles.font = 'helvetica';
+    }
+    
+    // Style the totals row differently
+    const lastRows = data.table.body.length;
+    const currentRow = data.row.index;
+    if (currentRow >= lastRows - 3) { // Last 3 rows are totals
+      data.cell.styles.fontStyle = 'bold';
+      if (currentRow === lastRows - 2) { // The actual totals row
+        data.cell.styles.fillColor = [220, 230, 241];
+      }
     }
   }
+});
 
-  // Export the limited report to PDF with totals
-  exportReportToPDF(): void {
-    if (!this.filteredRecords.length) { alert('No data to export'); return; }
-
-    try {
-      const rows = this.getReportRows();
-      const doc = new jsPDF();
-
-      doc.setFontSize(14);
-      doc.text('SMC Report', 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 22);
-
-      const tableBody = rows.map(r => [ r['Slip No'], r['VNo'], r['EDate'], (r['GWeight']).toString(), (r['NWeight']).toString() ]);
-
-      // totals
-      const sumG = rows.reduce((s, x) => s + (Number(x['GWeight']) || 0), 0);
-      const sumN = rows.reduce((s, x) => s + (Number(x['NWeight']) || 0), 0);
-      const trips = rows.length;
-
-      // Add an empty row then totals rows
-      tableBody.push(['', '', '', '', '']);
-      tableBody.push(['', '', 'Totals', this.formatNumberWithCommas(sumG.toFixed(2)), this.formatNumberWithCommas(sumN.toFixed(2))]);
-      tableBody.push(['', '', 'Total Trips', trips.toString(), '']);
-
-      autoTable(doc, {
-        head: [['Slip No','VNo','EDate','GWeight (Kg)','NWeight (Kg)']],
-        body: tableBody,
-        startY: 30,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [18,46,82], textColor: 255 }
-      });
-
-      const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.pdf`;
-      doc.save(fileName);
-    } catch (err) {
-      console.error('Error exporting report to PDF', err);
-      alert('Error exporting report to PDF');
-    }
+    const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.pdf`;
+    doc.save(fileName);
+  } catch (err) {
+    console.error('Error exporting report to PDF', err);
+    alert('Error exporting report to PDF');
   }
+}
 
   // Helper method to format numbers with Indian numbering system (10,000 and 1,00,000)
   private formatNumberWithCommas(num: string | number): string {
