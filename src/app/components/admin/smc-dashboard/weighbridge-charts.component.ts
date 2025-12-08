@@ -89,7 +89,11 @@ import { NgChartsModule } from 'ng2-charts';
         <div class="chart-card">
           <h3>Monthly/Daily Net Weight Trend</h3>
           <div class="chart-container">
+            <div *ngIf="!netTrendChartData.labels || netTrendChartData.labels.length === 0" class="no-data-message">
+              No data available for the selected period
+            </div>
             <canvas 
+              *ngIf="netTrendChartData.labels && netTrendChartData.labels.length > 0"
               baseChart
               [data]="netTrendChartData"
               [options]="getWeightTrendChartOptions('Day')"
@@ -102,13 +106,95 @@ import { NgChartsModule } from 'ng2-charts';
         <div class="chart-card">
           <h3>Last 24 Hours Trend</h3>
           <div class="chart-container">
+            <div *ngIf="!last24ChartData.labels || last24ChartData.labels.length === 0" class="no-data-message">
+              No data available for the selected period
+            </div>
             <canvas 
+              *ngIf="last24ChartData.labels && last24ChartData.labels.length > 0"
               baseChart
               [data]="last24ChartData"
               [options]="getWeightTrendChartOptions('Hour')"
               [type]="barChartType"
             >
             </canvas>
+          </div>
+        </div>
+
+        <!-- New Weekly/Monthly Timeframe Chart -->
+        <div class="chart-card timeframe-chart">
+          <div class="timeframe-header">
+            <h3>Timeframe Analysis</h3>
+            <div class="timeframe-controls">
+              <div class="timeframe-date-inputs">
+                <div class="timeframe-date-input-group">
+                  <label>From Date:</label>
+                  <input 
+                    type="date" 
+                    [(ngModel)]="startDate" 
+                    (change)="onDateChange()"
+                    class="input-field"
+                  >
+                </div>
+                <div class="timeframe-date-input-group">
+                  <label>To Date:</label>
+                  <input 
+                    type="date" 
+                    [(ngModel)]="endDate" 
+                    (change)="onDateChange()"
+                    class="input-field"
+                  >
+                </div>
+              </div>
+              <div class="timeframe-dropdown">
+                <label for="timeframe">Timeframe:</label>
+                <select 
+                  id="timeframe" 
+                  [(ngModel)]="selectedTimeframe" 
+                  (change)="onTimeframeChange()"
+                  class="timeframe-select"
+                >
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="MONTHLY">Monthly</option>
+                  <option value="QUARTERLY">Quarterly</option>
+                  <option value="HALF_YEARLY">Half-Yearly</option>
+                  <option value="YEARLY">Yearly</option>
+                </select>
+              </div>
+              <div class="timeframe-date-range">
+                <span class="date-range-label">{{ getTimeframeDateRange() }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="chart-container">
+            <div *ngIf="!timeframeChartData.labels || timeframeChartData.labels.length === 0" class="no-data-message">
+              No data available for the selected period
+            </div>
+            <canvas 
+              *ngIf="timeframeChartData.labels && timeframeChartData.labels.length > 0"
+              baseChart
+              [data]="timeframeChartData"
+              [options]="getTimeframeChartOptions()"
+              [type]="barChartType"
+            >
+            </canvas>
+          </div>
+          <div class="timeframe-summary" *ngIf="timeframeSummary">
+            <div class="timeframe-summary-item">
+              <span class="summary-label">Total Periods:</span>
+              <span class="summary-value">{{ timeframeSummary.totalPeriods }}</span>
+            </div>
+            <div class="timeframe-summary-item">
+              <span class="summary-label">Total Weight:</span>
+              <span class="summary-value">{{ formatWeight(timeframeSummary.totalWeight) }}</span>
+            </div>
+            <div class="timeframe-summary-item">
+              <span class="summary-label">Avg per Period:</span>
+              <span class="summary-value">{{ formatWeight(timeframeSummary.averagePerPeriod) }}</span>
+            </div>
+            <div class="timeframe-summary-item">
+              <span class="summary-label">Total Trips:</span>
+              <span class="summary-value">{{ timeframeSummary.totalTrips }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -266,6 +352,128 @@ import { NgChartsModule } from 'ng2-charts';
       position: relative;
       height: 300px;
       width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .no-data-message {
+      color: #999;
+      font-size: 16px;
+      font-weight: 500;
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    /* Timeframe Chart Styles */
+    .timeframe-chart {
+      grid-column: span 2;
+    }
+
+    .timeframe-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .timeframe-controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .timeframe-date-inputs {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .timeframe-date-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .timeframe-date-input-group label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .timeframe-date-input-group input {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      min-width: 130px;
+    }
+
+    .timeframe-dropdown {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timeframe-dropdown label {
+      font-size: 14px;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .timeframe-select {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      background: white;
+      min-width: 120px;
+    }
+
+    .timeframe-date-range {
+      padding: 6px 12px;
+      background: #e9ecef;
+      border-radius: 4px;
+      border: 1px solid #dee2e6;
+    }
+
+    .date-range-label {
+      font-size: 12px;
+      color: #495057;
+      font-weight: 500;
+    }
+
+    .timeframe-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border-left: 4px solid #28a745;
+    }
+
+    .timeframe-summary-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .summary-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-value {
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
     }
 
     .loading {
@@ -292,6 +500,10 @@ import { NgChartsModule } from 'ng2-charts';
         grid-template-columns: 1fr;
       }
       
+      .timeframe-chart {
+        grid-column: span 1;
+      }
+      
       .chart-card {
         min-width: unset;
       }
@@ -313,6 +525,35 @@ import { NgChartsModule } from 'ng2-charts';
       .summary-cards {
         grid-template-columns: 1fr;
       }
+
+      .timeframe-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .timeframe-controls {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .timeframe-dropdown {
+        width: 100%;
+      }
+
+      .timeframe-select {
+        flex: 1;
+      }
+
+      .timeframe-date-range {
+        width: 100%;
+        text-align: center;
+      }
+
+      .timeframe-summary {
+        grid-template-columns: 1fr;
+      }
     }
   `]
 })
@@ -321,12 +562,17 @@ export class WeighbridgeChartsComponent implements OnInit {
   loading = false;
   error = false;
   errorMessage = '';
-  debugInfo = true; // Set to false in production
+  debugInfo = true;
   
   // Date range properties
   startDate: string;
   endDate: string;
   selectedPeriod: string = 'week';
+
+  // Timeframe properties
+  selectedTimeframe: string = 'WEEKLY';
+  timeframeChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
+  timeframeSummary: any = null;
 
   // Chart data
   netTrendChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
@@ -382,7 +628,6 @@ export class WeighbridgeChartsComponent implements OnInit {
   };
 
   constructor(private smcService: SmcService) {
-    // Initialize with current date
     const today = new Date();
     this.endDate = today.toISOString().split('T')[0];
     const weekAgo = new Date(today);
@@ -422,20 +667,39 @@ export class WeighbridgeChartsComponent implements OnInit {
         this.endDate = new Date().toISOString().split('T')[0];
         break;
       case 'custom':
-        // Keep current dates for custom selection
         break;
     }
     
-    // Reload only the summary and trends that depend on the date range
     this.loadSummary();
     this.loadNetTrend();
+    this.loadTimeframeData();
   }
 
   onDateChange(): void {
     this.selectedPeriod = 'custom';
-    // Reload only the summary and trends that depend on the date range
     this.loadSummary();
     this.loadNetTrend();
+    this.loadTimeframeData();
+  }
+
+  onTimeframeChange(): void {
+    this.loadTimeframeData();
+  }
+
+  getTimeframeDateRange(): string {
+    if (this.startDate === this.endDate) {
+      return `Date: ${this.formatDateDisplay(this.startDate)}`;
+    }
+    return `Date Range: ${this.formatDateDisplay(this.startDate)} to ${this.formatDateDisplay(this.endDate)}`;
+  }
+
+  private formatDateDisplay(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
   }
 
   loadAllCharts(): void {
@@ -448,11 +712,11 @@ export class WeighbridgeChartsComponent implements OnInit {
     this.loading = true;
     this.error = false;
 
-    // Load all charts and summary
     Promise.all([
       this.loadNetTrend(),
       this.loadLast24Trend(),
-      this.loadSummary()
+      this.loadSummary(),
+      this.loadTimeframeData()
     ]).finally(() => {
       this.loading = false;
     });
@@ -462,7 +726,7 @@ export class WeighbridgeChartsComponent implements OnInit {
     return new Promise((resolve) => {
       this.smcService.getNetTrend(this.wbId, this.startDate, this.endDate).subscribe({
         next: (data: any[]) => {
-          console.log('Net Trend Data:', data); // Debug log
+          console.log('Net Trend Data:', data);
           this.netTrendChartData = this.createBarChartData(
             data, 
             'Net Weight (kg)', 
@@ -484,7 +748,7 @@ export class WeighbridgeChartsComponent implements OnInit {
     return new Promise((resolve) => {
       this.smcService.getLast24Trend(this.wbId).subscribe({
         next: (data: any[]) => {
-          console.log('Last 24 Trend Data:', data); // Debug log
+          console.log('Last 24 Trend Data:', data);
           this.last24ChartData = this.createBarChartData(
             data,
             'Net Weight (kg)',
@@ -521,6 +785,231 @@ export class WeighbridgeChartsComponent implements OnInit {
     });
   }
 
+  loadTimeframeData(): Promise<void> {
+    return new Promise((resolve) => {
+      this.smcService.getTimeframeData(
+        this.wbId, 
+        this.startDate, 
+        this.endDate, 
+        this.selectedTimeframe
+      ).subscribe({
+        next: (data: any[]) => {
+          console.log('Timeframe Data:', data);
+          this.timeframeChartData = this.createTimeframeChartData(data);
+          this.calculateTimeframeSummary(data);
+          resolve();
+        },
+        error: (err: any) => {
+          console.error('Error loading timeframe data:', err);
+          this.handleTimeframeError(err);
+          resolve();
+        }
+      });
+    });
+  }
+
+  private createTimeframeChartData(data: any[]): ChartConfiguration['data'] {
+    console.log('Creating timeframe chart data:', data);
+    
+    if (!data || data.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Log what we're receiving for debugging
+    console.log('Raw timeframe data items:', data.map(item => ({
+      periodName: item.periodName,
+      totalNetWeight: item.totalNetWeight,
+      weight: item.weight,
+      netWeight: item.netWeight,
+      value: item.value
+    })));
+
+    // Filter out entries with no weight data (but allow 0 values that are explicitly set)
+    // Only filter if the item has no weight properties at all
+    const filteredData = data.filter(item => {
+      const weight = item.totalNetWeight || item.weight || item.netWeight || item.value;
+      // Include items that have a weight property, even if it's 0
+      return weight !== null && weight !== undefined;
+    });
+
+    console.log(`Filtered timeframe data: ${filteredData.length} periods with data from ${data.length} total`);
+
+    if (filteredData.length === 0) {
+      console.warn('No data found after filtering. Raw data:', data);
+      return { labels: [], datasets: [] };
+    }
+
+    const labels = filteredData.map(item => {
+      if (item.periodName) {
+        return this.formatTimeframeLabel(item.periodName, this.selectedTimeframe);
+      } else if (item.period) {
+        return item.period;
+      } else if (item.date) {
+        return this.formatDateForTimeframe(item.date, this.selectedTimeframe);
+      }
+      return 'Unknown';
+    });
+    
+    const weights = filteredData.map(item => {
+      const weight = item.totalNetWeight || item.weight || item.netWeight || item.value || 0;
+      return weight;
+    });
+    
+    const backgroundColor = this.getTimeframeColor(this.selectedTimeframe);
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: this.getTimeframeLabel(),
+          data: weights,
+          backgroundColor,
+          borderColor: backgroundColor,
+          borderWidth: 1,
+          barPercentage: 0.6,
+          categoryPercentage: 0.8,
+        }
+      ]
+    };
+  }
+
+  private formatTimeframeLabel(label: string, timeframe: string): string {
+    switch (timeframe) {
+      case 'WEEKLY':
+        // Format: "Week 1: 02 Dec to 08 Dec (7 days)" -> "Week 1"
+        const weekMatch = label.match(/Week (\d+):/);
+        return weekMatch ? `Week ${weekMatch[1]}` : label;
+      
+      case 'MONTHLY':
+        // Format: "December 2024" -> "Dec 2024"
+        return label;
+      
+      case 'QUARTERLY':
+        // Format: "Quarter 1, 2024" -> "Q1 2024"
+        const quarterMatch = label.match(/Quarter (\d+), (\d+)/);
+        return quarterMatch ? `Q${quarterMatch[1]} ${quarterMatch[2]}` : label;
+      
+      case 'HALF_YEARLY':
+        // Format: "First Half, 2024" -> "H1 2024"
+        if (label.includes('First Half')) {
+          return `H1 ${label.match(/\d+/)?.[0] || ''}`;
+        } else if (label.includes('Second Half')) {
+          return `H2 ${label.match(/\d+/)?.[0] || ''}`;
+        }
+        return label;
+      
+      case 'YEARLY':
+        // Format: "Year 2024" -> "2024"
+        const yearMatch = label.match(/\d+/);
+        return yearMatch ? yearMatch[0] : label;
+      
+      default:
+        return label;
+    }
+  }
+
+  private formatDateForTimeframe(dateString: string, timeframe: string): string {
+    const date = new Date(dateString);
+    
+    switch (timeframe) {
+      case 'WEEKLY':
+        return date.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric' 
+        });
+      
+      case 'MONTHLY':
+        return date.toLocaleDateString('en-US', { 
+          month: 'short', 
+          year: 'numeric' 
+        });
+      
+      case 'QUARTERLY':
+        const quarter = Math.floor(date.getMonth() / 3) + 1;
+        return `Q${quarter} ${date.getFullYear()}`;
+      
+      case 'HALF_YEARLY':
+        const half = date.getMonth() < 6 ? 'H1' : 'H2';
+        return `${half} ${date.getFullYear()}`;
+      
+      case 'YEARLY':
+        return date.getFullYear().toString();
+      
+      default:
+        return dateString;
+    }
+  }
+
+  private getTimeframeLabel(): string {
+    switch (this.selectedTimeframe) {
+      case 'WEEKLY': return 'Weekly Net Weight';
+      case 'MONTHLY': return 'Monthly Net Weight';
+      case 'QUARTERLY': return 'Quarterly Net Weight';
+      case 'HALF_YEARLY': return 'Half-Yearly Net Weight';
+      case 'YEARLY': return 'Yearly Net Weight';
+      default: return 'Net Weight';
+    }
+  }
+
+  private getTimeframeColor(timeframe: string): string {
+    switch (timeframe) {
+      case 'WEEKLY': return '#28a745';
+      case 'MONTHLY': return '#17a2b8';
+      case 'QUARTERLY': return '#ffc107';
+      case 'HALF_YEARLY': return '#fd7e14';
+      case 'YEARLY': return '#6f42c1';
+      default: return '#28a745';
+    }
+  }
+
+  private calculateTimeframeSummary(data: any[]): void {
+    if (!data || data.length === 0) {
+      this.timeframeSummary = {
+        totalPeriods: 0,
+        totalWeight: 0,
+        averagePerPeriod: 0,
+        totalTrips: 0
+      };
+      return;
+    }
+
+    // Include all periods that have weight data (including 0)
+    const dataWithValues = data.filter(item => {
+      const weight = item.totalNetWeight || item.weight || item.netWeight || item.value;
+      return weight !== null && weight !== undefined;
+    });
+
+    console.log('Data with values for summary:', dataWithValues);
+
+    const totalWeight = dataWithValues.reduce((sum, item) => 
+      sum + (item.totalNetWeight || item.weight || item.netWeight || item.value || 0), 0
+    );
+    
+    const totalTrips = dataWithValues.reduce((sum, item) => 
+      sum + (item.totalEntries || item.trips || 0), 0
+    );
+
+    this.timeframeSummary = {
+      totalPeriods: dataWithValues.length,
+      totalWeight,
+      averagePerPeriod: dataWithValues.length > 0 ? totalWeight / dataWithValues.length : 0,
+      totalTrips
+    };
+  }
+
+  private handleTimeframeError(error: any): void {
+    console.warn('Could not load timeframe data, showing empty state');
+    
+    // Show empty chart instead of fake data
+    this.timeframeChartData = { labels: [], datasets: [] };
+    this.timeframeSummary = {
+      totalPeriods: 0,
+      totalWeight: 0,
+      averagePerPeriod: 0,
+      totalTrips: 0
+    };
+  }
+
   private createBarChartData(
     apiData: any[], 
     label: string, 
@@ -528,20 +1017,23 @@ export class WeighbridgeChartsComponent implements OnInit {
     dataType: 'daily' | 'hourly'
   ): ChartConfiguration['data'] {
     
-    console.log(`Creating ${dataType} chart data:`, apiData); // Debug log
+    console.log(`Creating ${dataType} chart data:`, apiData);
     
-    // Process labels based on data type
-    const labels = apiData.map((item, index) => {
-      // Try different property names that might come from backend
+    // Filter out entries with zero or no weight data
+    const filteredData = apiData.filter(item => {
+      const weight = item.weight || item.netWeight || item.value || item.totalWeight || 0;
+      return weight > 0;
+    });
+
+    console.log(`Filtered data (only non-zero): ${filteredData.length} entries from ${apiData.length}`);
+    
+    const labels = filteredData.map((item, index) => {
       const dateValue = item.dateTime || item.date || item.time || item.day || item.hour || item.label || item.period;
-      console.log(`Item ${index}:`, item, 'Date value:', dateValue); // Debug log
       const formattedLabel = this.formatLabel(dateValue, dataType);
-      console.log(`Formatted label:`, formattedLabel); // Debug log
       return formattedLabel;
     });
     
-    const data = apiData.map(item => {
-      // Try different property names for weight
+    const data = filteredData.map(item => {
       return item.weight || item.netWeight || item.value || item.totalWeight || 0;
     });
 
@@ -562,25 +1054,21 @@ export class WeighbridgeChartsComponent implements OnInit {
   }
   
   private formatLabel(labelString: any, dataType: 'daily' | 'hourly'): string {
-    console.log(`Formatting label for ${dataType}:`, labelString, 'Type:', typeof labelString); // Debug log
+    console.log(`Formatting label for ${dataType}:`, labelString, 'Type:', typeof labelString);
     
     if (!labelString) return 'Unknown';
     
-    // Check if it's already a string that might be a valid date
     if (typeof labelString === 'string') {
-      // Check if it's a date-time string (ISO format like 2025-12-03T14:30:00)
       if (labelString.includes('T')) {
         const date = new Date(labelString);
         if (!isNaN(date.getTime())) {
           if (dataType === 'hourly') {
-            // Format: 2 PM, 3 AM, etc.
             return date.toLocaleTimeString('en-US', { 
               hour: 'numeric',
               hour12: true,
               minute: '2-digit'
             });
           } else {
-            // Format: Dec 3, Nov 28, etc.
             return date.toLocaleDateString('en-US', { 
               month: 'short', 
               day: 'numeric' 
@@ -588,7 +1076,6 @@ export class WeighbridgeChartsComponent implements OnInit {
           }
         }
       }
-      // Check if it's a date string (YYYY-MM-DD)
       else if (/^\d{4}-\d{2}-\d{2}$/.test(labelString)) {
         const date = new Date(labelString + 'T00:00:00');
         if (!isNaN(date.getTime())) {
@@ -598,7 +1085,6 @@ export class WeighbridgeChartsComponent implements OnInit {
           });
         }
       }
-      // Check if it's a time string (HH:MM or HH:MM:SS)
       else if (/^\d{2}:\d{2}/.test(labelString)) {
         const timeParts = labelString.split(':');
         const hour = parseInt(timeParts[0], 10);
@@ -606,32 +1092,26 @@ export class WeighbridgeChartsComponent implements OnInit {
         if (hour === 12) return '12 PM';
         return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
       }
-      // Check if it's just a day number
       else if (/^\d+$/.test(labelString)) {
         const dayNum = parseInt(labelString, 10);
         return `Day ${dayNum}`;
       }
     }
     
-    // If it's a number (like day of month or hour)
     if (typeof labelString === 'number') {
       if (dataType === 'hourly') {
-        // For hours, show as 1 AM, 2 PM, etc.
-        const hour = labelString % 24; // Handle hour wrap-around
+        const hour = labelString % 24;
         if (hour === 0) return '12 AM';
         if (hour === 12) return '12 PM';
         return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
       } else {
-        // For days, just show the day number
         return `Day ${labelString}`;
       }
     }
     
-    // Fallback: convert to string
     return String(labelString);
   }
 
-  // Helper method to get chart options with dynamic X-axis label
   getWeightTrendChartOptions(xAxisLabel: 'Day' | 'Hour'): ChartConfiguration['options'] {
     return {
       ...this.baseChartOptions,
@@ -643,13 +1123,42 @@ export class WeighbridgeChartsComponent implements OnInit {
             text: xAxisLabel
           },
           ticks: {
-            // Ensure labels fit properly
             maxRotation: 45,
             minRotation: 45
           }
         }
       }
     };
+  }
+
+  getTimeframeChartOptions(): ChartConfiguration['options'] {
+    return {
+      ...this.baseChartOptions,
+      scales: {
+        ...(this.baseChartOptions?.scales as any || {}),
+        x: {
+          title: {
+            display: true,
+            text: this.getTimeframeXAxisLabel()
+          },
+          ticks: {
+            maxRotation: 45,
+            minRotation: 45
+          }
+        }
+      }
+    };
+  }
+
+  private getTimeframeXAxisLabel(): string {
+    switch (this.selectedTimeframe) {
+      case 'WEEKLY': return 'Week';
+      case 'MONTHLY': return 'Month';
+      case 'QUARTERLY': return 'Quarter';
+      case 'HALF_YEARLY': return 'Half Year';
+      case 'YEARLY': return 'Year';
+      default: return 'Period';
+    }
   }
 
   private handleError(error: any): void {

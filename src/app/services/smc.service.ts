@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map, catchError, of } from 'rxjs';
+import { Observable, map, catchError, of, tap } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class SmcService {
@@ -106,6 +106,38 @@ getLast24Trend(wbId: string): Observable<any[]> {
     catchError(error => {
       console.error('Error fetching last 24 trend:', error);
       return of(this.getMockTrendData('Last 24 Hours'));
+    })
+  );
+}
+
+getTimeframeData(wbId: string, startDate: string, endDate: string, timeframe: string): Observable<any> {
+  const params = {
+    startDate,
+    endDate,
+    timeframe
+  };
+  const url = `${this.baseUrl}/report/timeframe/${wbId}`;
+  console.log('Calling timeframe API:', {
+    url,
+    params
+  });
+  return this.http.get<any[]>(url, { params }).pipe(
+    tap((data: any) => {
+      console.log('✓ Timeframe API Response received:', data);
+    }),
+    map(data => {
+      return Array.isArray(data) ? data : [];
+    }),
+    catchError(error => {
+      console.error('✗ Timeframe API Error:', {
+        url,
+        params,
+        status: error.status,
+        statusText: error.statusText,
+        message: error.message,
+        error: error.error
+      });
+      return of([]);
     })
   );
 }

@@ -1026,106 +1026,117 @@ exportReportToPDF(): void {
     doc.setFontSize(10);
     doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 22);
 
-    // Format weight values for PDF table (simple format for individual rows)
-    const tableBody = rows.map(r => [
-      r['Slip No'], 
-      r['VNo'], 
-      r['EDate'], 
-      this.formatWeightSimple(r['GWeight']),
-      this.formatWeightSimple(r['NWeight'])
-    ]);
+    // Helper function to format numbers with commas (international convention)
+    const formatWithCommas = (num: number): string => {
+      return num.toLocaleString('en-US', {
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0,
+        useGrouping: true
+      });
+    };
 
-    // Calculate totals
-    const sumG = rows.reduce((s, x) => {
-      const value = parseFloat(x['GWeight'].toString()
-        .replace(/\./g, '')
-        .replace(/,/g, '.'));
-      return s + (isNaN(value) ? 0 : value);
-    }, 0);
+    // Calculate totals in kg and process individual rows
+    let sumG = 0;
+    let sumN = 0;
     
-    const sumN = rows.reduce((s, x) => {
-      const value = parseFloat(x['NWeight'].toString()
-        .replace(/\./g, '')
-        .replace(/,/g, '.'));
-      return s + (isNaN(value) ? 0 : value);
-    }, 0);
+    // Format individual rows with commas
+    const formattedRows = rows.map(row => {
+      // Parse and format GWeight
+      const gWeightStr = row['GWeight'].toString().replace(/,/g, '');
+      const gWeight = parseFloat(gWeightStr);
+      const formattedGWeight = isNaN(gWeight) ? '0' : formatWithCommas(gWeight);
+      sumG += isNaN(gWeight) ? 0 : gWeight;
+      
+      // Parse and format NWeight
+      const nWeightStr = row['NWeight'].toString().replace(/,/g, '');
+      const nWeight = parseFloat(nWeightStr);
+      const formattedNWeight = isNaN(nWeight) ? '0' : formatWithCommas(nWeight);
+      sumN += isNaN(nWeight) ? 0 : nWeight;
+      
+      return {
+        slipNo: row['Slip No'],
+        vNo: row['VNo'],
+        eDate: row['EDate'],
+        gWeight: formattedGWeight, // Comma-formatted
+        nWeight: formattedNWeight  // Comma-formatted
+      };
+    });
     
     const trips = rows.length;
 
-    // Add an empty row then totals rows with units
+    // Create table body with formatted individual rows
+    const tableBody = formattedRows.map(r => [
+      r.slipNo, 
+      r.vNo, 
+      r.eDate, 
+      r.gWeight, // Comma-formatted (e.g., "424,410")
+      r.nWeight  // Comma-formatted (e.g., "424,410")
+    ]);
+
+    // Add an empty row then totals rows with comma-formatted totals
     tableBody.push(['', '', '', '', '']);
     tableBody.push(['', '', 'Totals', 
-      this.formatNumberWithUnits(sumG), 
-      this.formatNumberWithUnits(sumN)
+      formatWithCommas(sumG),  // e.g., "424,410,000"
+      formatWithCommas(sumN)   // e.g., "424,410,000"
     ]);
     tableBody.push(['', '', 'Total Trips', trips.toString(), '']);
 
-autoTable(doc, {
-  head: [['Slip No', 'VNo', 'EDate', 'GWeight', 'NWeight']],
-  body: tableBody.map(row => [
-    row[0], // Slip No
-    row[1], // VNo
-    row[2], // EDate
-    // Format GWeight - remove decimal and commas
-    typeof row[3] === 'number' 
-      ? Math.round(row[3]) // If number, round it
-      : String(row[3]).replace(/[.,]/g, ''), // If string, remove . and ,
-    // Format NWeight - remove decimal and commas
-    typeof row[4] === 'number'
-      ? Math.round(row[4]) // If number, round it
-      : String(row[4]).replace(/[.,]/g, '') // If string, remove . and ,
-  ]),
-  startY: 30,
-  margin: { left: 10, right: 10 }, // Add small margins for centering effect
-  tableWidth: 'auto', // Changed from 'wrap' to 'auto' or use '100%'
-  styles: { 
-    fontSize: 8,
-    cellPadding: 5,
-    font: 'helvetica',
-    lineWidth: 0.1,
-    overflow: 'linebreak',
-    halign: 'center' // Default alignment for all cells
-  },
-  columnStyles: {
-    0: { cellWidth: 20, halign: 'center' },
-    1: { cellWidth: 45, halign: 'center' },
-    2: { cellWidth: 45, halign: 'center' },
-    3: { cellWidth: 35, halign: 'right' },
-    4: { cellWidth: 35, halign: 'right' }
-  },
-  headStyles: { 
-    fillColor: [18, 46, 82], 
-    textColor: 255,
-    fontSize: 9,
-    fontStyle: 'bold',
-    lineWidth: 0.1,
-    halign: 'center'
-  },
-  bodyStyles: {
-    fontSize: 8,
-    lineWidth: 0.1,
-  },
-  alternateRowStyles: {
-    fillColor: [245, 245, 245]
-  },
-  didParseCell: function(data) {
-    if (data.column.index === 3 || data.column.index === 4) {
-      data.cell.styles.halign = 'right';
-      data.cell.styles.font = 'helvetica';
-    }
-    
-    // Style the totals row differently
-    const lastRows = data.table.body.length;
-    const currentRow = data.row.index;
-    if (currentRow >= lastRows - 3) { // Last 3 rows are totals
-      data.cell.styles.fontStyle = 'bold';
-      if (currentRow === lastRows - 2) { // The actual totals row
-        data.cell.styles.fillColor = [220, 230, 241];
+    autoTable(doc, {
+      head: [['Slip No', 'VNo', 'EDate', 'GWeight (kg)', 'NWeight (kg)']],
+      body: tableBody,
+      startY: 30,
+      margin: { left: 10, right: 10 },
+      tableWidth: 'auto',
+      styles: { 
+        fontSize: 8,
+        cellPadding: 5,
+        font: 'helvetica',
+        lineWidth: 0.1,
+        overflow: 'linebreak',
+        halign: 'center'
+      },
+      columnStyles: {
+        0: { cellWidth: 20, halign: 'center' },
+        1: { cellWidth: 45, halign: 'center' },
+        2: { cellWidth: 45, halign: 'center' },
+        3: { cellWidth: 45, halign: 'right' },
+        4: { cellWidth: 45, halign: 'right' }
+      },
+      headStyles: { 
+        fillColor: [18, 46, 82], 
+        textColor: 255,
+        fontSize: 9,
+        fontStyle: 'bold',
+        lineWidth: 0.1,
+        halign: 'center'
+      },
+      bodyStyles: {
+        fontSize: 8,
+        lineWidth: 0.1,
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      didParseCell: function(data) {
+        if (data.column.index === 3 || data.column.index === 4) {
+          data.cell.styles.halign = 'right';
+          data.cell.styles.font = 'helvetica';
+        }
+        
+        // Style the totals rows differently
+        const lastRows = data.table.body.length;
+        const currentRow = data.row.index;
+        const isTotalsRow = currentRow >= lastRows - 3; // Last 3 rows
+        
+        if (isTotalsRow) {
+          data.cell.styles.fontStyle = 'bold';
+          if (currentRow === lastRows - 2) { // The actual totals row
+            data.cell.styles.fillColor = [220, 230, 241];
+          }
+        }
       }
-    }
-  }
-});
-
+    });
+    
     const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.pdf`;
     doc.save(fileName);
   } catch (err) {
@@ -1133,7 +1144,6 @@ autoTable(doc, {
     alert('Error exporting report to PDF');
   }
 }
-
   // Helper method to format numbers with Indian numbering system (10,000 and 1,00,000)
   private formatNumberWithCommas(num: string | number): string {
     const numStr = num.toString();
