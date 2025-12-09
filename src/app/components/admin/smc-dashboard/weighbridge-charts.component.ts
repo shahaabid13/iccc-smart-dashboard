@@ -5,6 +5,8 @@ import { ChartConfiguration, ChartType } from 'chart.js';
 import { FormsModule } from '@angular/forms';
 import { NgChartsModule } from 'ng2-charts';
 import { TimeFrame, TimeFrameDataDTO, TimeFrameRequest } from '../../../services/timeframe.service';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 @Component({
   standalone: true,
@@ -141,13 +143,62 @@ import { TimeFrame, TimeFrameDataDTO, TimeFrameRequest } from '../../../services
                   <option value="YEARLY">Yearly</option>
                 </select>
               </div>
+              <div class="timeframe-dropdown" *ngIf="secondaryFilterOptions.length > 0">
+                <label for="secondary-filter">
+                  {{ selectedTimeframe === 'WEEKLY' ? 'Month' : selectedTimeframe === 'YEARLY' ? 'Fiscal Year' : 'Year' }}:
+                </label>
+                <select 
+                  id="secondary-filter" 
+                  [(ngModel)]="selectedSecondaryFilter" 
+                  (change)="onSecondaryFilterChange()"
+                  class="timeframe-select"
+                >
+                  <option *ngFor="let option of secondaryFilterOptions" [value]="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </div>
               <div class="timeframe-date-range">
                 <span class="date-range-label">{{ getTimeframeDateRange() }}</span>
               </div>
               <div class="timeframe-actions">
-                <button (click)="exportTimeframeData()" class="export-btn" [disabled]="!timeframeChartData.labels?.length">
-                  📊 Export Data
+                <button (click)="openPdfExportDialog()" class="export-btn" [disabled]="!timeframeChartData.labels?.length">
+                  📄 Export to PDF
                 </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- PDF Export Dialog -->
+          <div *ngIf="showPdfExportDialog" class="pdf-export-dialog-overlay" (click)="closePdfExportDialog($event)">
+            <div class="pdf-export-dialog" (click)="$event.stopPropagation()">
+              <div class="dialog-header">
+                <h3>Export to PDF</h3>
+                <button class="close-btn" (click)="closePdfExportDialog()">×</button>
+              </div>
+              <div class="dialog-content">
+                <div class="date-input-group">
+                  <label for="pdf-start-date">From Date:</label>
+                  <input 
+                    id="pdf-start-date"
+                    type="date" 
+                    [(ngModel)]="pdfExportStartDate"
+                    class="input-field"
+                  >
+                </div>
+                <div class="date-input-group">
+                  <label for="pdf-end-date">To Date:</label>
+                  <input 
+                    id="pdf-end-date"
+                    type="date" 
+                    [(ngModel)]="pdfExportEndDate"
+                    class="input-field"
+                  >
+                </div>
+              </div>
+              <div class="dialog-footer">
+                <button (click)="closePdfExportDialog()" class="cancel-btn">Cancel</button>
+                <button (click)="generateAndExportPDF()" class="export-pdf-btn">Generate PDF</button>
               </div>
             </div>
           </div>
@@ -531,6 +582,124 @@ import { TimeFrame, TimeFrameDataDTO, TimeFrameRequest } from '../../../services
       cursor: not-allowed;
     }
 
+    /* PDF Export Dialog */
+    .pdf-export-dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .pdf-export-dialog {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      max-width: 500px;
+      width: 90%;
+      overflow: hidden;
+    }
+
+    .dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid #e0e0e0;
+      background: #f8f9fa;
+    }
+
+    .dialog-header h3 {
+      margin: 0;
+      color: #333;
+      font-size: 18px;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .close-btn:hover {
+      color: #333;
+    }
+
+    .dialog-content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .dialog-content .date-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .dialog-content .date-input-group label {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .dialog-content .input-field {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .dialog-footer {
+      display: flex;
+      gap: 10px;
+      padding: 15px 20px;
+      border-top: 1px solid #e0e0e0;
+      background: #f8f9fa;
+      justify-content: flex-end;
+    }
+
+    .cancel-btn, .export-pdf-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .cancel-btn {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .cancel-btn:hover {
+      background: #d0d0d0;
+    }
+
+    .export-pdf-btn {
+      background: #007bff;
+      color: white;
+    }
+
+    .export-pdf-btn:hover {
+      background: #0056b3;
+    }
+
     /* Tabs */
     .timeframe-tabs {
       margin-bottom: 20px;
@@ -774,6 +943,15 @@ export class WeighbridgeChartsComponent implements OnInit {
   highestWeightPeriod: TimeFrameDataDTO | null = null;
   activeTab: 'chart' | 'table' | 'details' = 'chart';
 
+  // PDF Export properties
+  showPdfExportDialog = false;
+  pdfExportStartDate: string = '';
+  pdfExportEndDate: string = '';
+
+  // Secondary Filter properties (Month/Year based on timeframe)
+  selectedSecondaryFilter: string = '';
+  secondaryFilterOptions: { label: string; value: string }[] = [];
+
   // Chart data
   netTrendChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
   last24ChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
@@ -892,24 +1070,66 @@ export class WeighbridgeChartsComponent implements OnInit {
   }
 
   onTimeframeChange(): void {
+    this.generateSecondaryFilterOptions();
+    this.selectedSecondaryFilter = this.secondaryFilterOptions.length > 0 ? this.secondaryFilterOptions[0].value : '';
+    this.loadTimeframeData();
+  }
+
+  private generateSecondaryFilterOptions(): void {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    this.secondaryFilterOptions = [];
+
+    if (this.selectedTimeframe === 'WEEKLY') {
+      // Generate months from November 2025 to current month
+      const startMonth = 10; // November (0-indexed)
+      const startYear = 2025;
+      
+      for (let year = startYear; year <= currentYear; year++) {
+        const endMonth = year === currentYear ? currentMonth : 11;
+        const start = year === startYear ? startMonth : 0;
+        
+        for (let month = start; month <= endMonth; month++) {
+          const monthName = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          this.secondaryFilterOptions.push({
+            label: monthName,
+            value: `${year}-${String(month + 1).padStart(2, '0')}`
+          });
+        }
+      }
+    } else if (this.selectedTimeframe === 'MONTHLY' || this.selectedTimeframe === 'QUARTERLY' || this.selectedTimeframe === 'HALF_YEARLY') {
+      // Generate years from 2025 to current year
+      for (let year = 2025; year <= currentYear; year++) {
+        this.secondaryFilterOptions.push({
+          label: year.toString(),
+          value: year.toString()
+        });
+      }
+    } else if (this.selectedTimeframe === 'YEARLY') {
+      // Generate fiscal year ranges (e.g., 2025-2026)
+      for (let year = 2025; year <= currentYear; year++) {
+        const fiscalYear = `${year}-${year + 1}`;
+        this.secondaryFilterOptions.push({
+          label: fiscalYear,
+          value: fiscalYear
+        });
+      }
+    }
+  }
+
+  onSecondaryFilterChange(): void {
     this.loadTimeframeData();
   }
 
   getTimeframeDateRange(): string {
     if (this.startDate === this.endDate) {
-      return `Date: ${this.formatDateDisplay(this.startDate)}`;
+      return `Date: ${this.formatDate(this.startDate)}`;
     }
-    return `Date Range: ${this.formatDateDisplay(this.startDate)} to ${this.formatDateDisplay(this.endDate)}`;
+    return `Date Range: ${this.formatDate(this.startDate)} to ${this.formatDate(this.endDate)}`;
   }
 
-  private formatDateDisplay(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      year: 'numeric'
-    });
-  }
+
 
   loadAllCharts(): void {
     if (!this.wbId) {
@@ -1223,6 +1443,228 @@ export class WeighbridgeChartsComponent implements OnInit {
     if (percentage >= 50) return 'Fair';
     return 'Poor';
   }
+
+  openPdfExportDialog(): void {
+    this.pdfExportStartDate = this.startDate;
+    this.pdfExportEndDate = this.endDate;
+    this.showPdfExportDialog = true;
+  }
+
+  closePdfExportDialog(event?: any): void {
+    if (event && event.target !== event.currentTarget) {
+      return;
+    }
+    this.showPdfExportDialog = false;
+  }
+
+  generateAndExportPDF(): void {
+    if (!this.pdfExportStartDate || !this.pdfExportEndDate) {
+      alert('Please select both from and to dates');
+      return;
+    }
+
+    if (new Date(this.pdfExportStartDate) > new Date(this.pdfExportEndDate)) {
+      alert('From date must be before to date');
+      return;
+    }
+
+    // Filter data based on selected date range
+    const rangeStart = new Date(this.pdfExportStartDate);
+    const rangeEnd = new Date(this.pdfExportEndDate);
+    
+    // Generate weekly breakdown for the selected date range
+    const weeklyData = this.generateWeeklyDataForRange(rangeStart, rangeEnd);
+
+    if (weeklyData.length === 0) {
+      alert('No data available for the selected date range');
+      return;
+    }
+
+    this.exportTimeframeDataToPdf(weeklyData);
+    this.closePdfExportDialog();
+  }
+
+  private generateWeeklyDataForRange(startDate: Date, endDate: Date): TimeFrameDataDTO[] {
+    const weeks: TimeFrameDataDTO[] = [];
+    let currentWeekStart = new Date(startDate);
+    let weekNumber = 1;
+    
+    while (currentWeekStart < endDate) {
+      // Calculate the end of this week (7 days later or end date, whichever is earlier)
+      let currentWeekEnd = new Date(currentWeekStart);
+      currentWeekEnd.setDate(currentWeekEnd.getDate() + 6); // 6 days to get 7 day week
+      
+      if (currentWeekEnd > endDate) {
+        currentWeekEnd = new Date(endDate);
+      }
+      
+      // Calculate number of days in this week
+      const daysInWeek = Math.floor((currentWeekEnd.getTime() - currentWeekStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      
+      // Find data that falls within this week
+      const weekData = this.timeframeData.filter(item => {
+        const itemStart = new Date(item.startDate);
+        const itemEnd = new Date(item.endDate);
+        
+        // Check if the item overlaps with this week
+        return itemStart <= currentWeekEnd && itemEnd >= currentWeekStart;
+      });
+      
+      // Aggregate data for this week
+      const aggregatedWeek: TimeFrameDataDTO = {
+        periodName: `Week ${weekNumber} (${daysInWeek} days)`,
+        startDate: currentWeekStart.toISOString().split('T')[0],
+        endDate: currentWeekEnd.toISOString().split('T')[0],
+        totalEntries: weekData.reduce((sum, item) => sum + item.totalEntries, 0),
+        totalNetWeight: weekData.reduce((sum, item) => sum + item.totalNetWeight, 0),
+        totalGrossWeight: weekData.reduce((sum, item) => sum + item.totalGrossWeight, 0),
+        averageNetWeight: 0,
+        averageGrossWeight: 0
+      };
+      
+      // Calculate averages
+      if (aggregatedWeek.totalEntries > 0) {
+        aggregatedWeek.averageNetWeight = aggregatedWeek.totalNetWeight / aggregatedWeek.totalEntries;
+        aggregatedWeek.averageGrossWeight = aggregatedWeek.totalGrossWeight / aggregatedWeek.totalEntries;
+      }
+      
+      weeks.push(aggregatedWeek);
+      
+      // Move to next week
+      currentWeekStart = new Date(currentWeekEnd);
+      currentWeekStart.setDate(currentWeekStart.getDate() + 1);
+      weekNumber++;
+    }
+    
+    return weeks;
+  }
+
+  private exportTimeframeDataToPdf(data: TimeFrameDataDTO[]): void {
+    try {
+      // Create PDF using jsPDF
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let yPosition = 15;
+
+      // Title
+      doc.setFontSize(18);
+      doc.setTextColor(33, 37, 41);
+      doc.text('Timeframe Analysis Report', pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 10;
+
+      // Report info
+      doc.setFontSize(11);
+      doc.setTextColor(100, 100, 100);
+      const dateRange = `From: ${this.formatDate(this.pdfExportStartDate)} to ${this.formatDate(this.pdfExportEndDate)}`;
+      doc.text(dateRange, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 5;
+
+      const timeframeType = `Timeframe: ${this.selectedTimeframe}`;
+      doc.text(timeframeType, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 5;
+
+      const reportDate = `Report Generated: ${new Date().toLocaleString()}`;
+      doc.text(reportDate, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 8;
+
+      // Summary section
+      doc.setFontSize(12);
+      doc.setTextColor(33, 37, 41);
+      doc.text('Summary', 15, yPosition);
+      yPosition += 5;
+
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      const totalTrips = data.reduce((sum, item) => sum + item.totalEntries, 0);
+      const totalNetWeight = data.reduce((sum, item) => sum + item.totalNetWeight, 0);
+      const totalGrossWeight = data.reduce((sum, item) => sum + item.totalGrossWeight, 0);
+      const avgNetWeight = totalTrips > 0 ? totalNetWeight / totalTrips : 0;
+
+      doc.text(`Total Periods: ${data.length}`, 20, yPosition);
+      yPosition += 4;
+      doc.text(`Total Trips: ${totalTrips}`, 20, yPosition);
+      yPosition += 4;
+      doc.text(`Total Net Weight: ${this.formatWeight(totalNetWeight)}`, 20, yPosition);
+      yPosition += 4;
+      doc.text(`Total Gross Weight: ${this.formatWeight(totalGrossWeight)}`, 20, yPosition);
+      yPosition += 4;
+      doc.text(`Average Net Weight per Trip: ${this.formatWeight(avgNetWeight)}`, 20, yPosition);
+      yPosition += 8;
+
+      // Data table
+      const tableColumns = [
+        'Period',
+        'Start Date',
+        'End Date',
+        'Trips',
+        'Net Weight',
+        'Gross Weight',
+        'Avg Net Wt',
+        'Avg Gross Wt'
+      ];
+
+      const tableData = data.map(item => [
+        item.periodName || 'N/A',
+        this.formatDate(item.startDate),
+        this.formatDate(item.endDate),
+        item.totalEntries.toString(),
+        this.formatWeight(item.totalNetWeight),
+        this.formatWeight(item.totalGrossWeight),
+        this.formatWeight(item.averageNetWeight),
+        this.formatWeight(item.averageGrossWeight)
+      ]);
+
+      // Use autoTable plugin with proper typing
+      autoTable(doc, {
+        head: [tableColumns],
+        body: tableData,
+        startY: yPosition,
+        margin: { top: 10, right: 15, bottom: 15, left: 15 },
+        styles: {
+          fontSize: 9,
+          textColor: [33, 37, 41],
+          fillColor: [247, 248, 249],
+          halign: 'center',
+          valign: 'middle'
+        },
+        headStyles: {
+          fillColor: [0, 123, 255],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        columnStyles: {
+          3: { halign: 'right' },
+          4: { halign: 'right' },
+          5: { halign: 'right' },
+          6: { halign: 'right' },
+          7: { halign: 'right' }
+        }
+      });
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      }
+
+      // Save the PDF
+      const fileName = `timeframe_analysis_${this.selectedTimeframe.toLowerCase()}_${this.pdfExportStartDate}_to_${this.pdfExportEndDate}.pdf`;
+      doc.save(fileName);
+      console.log('PDF exported successfully:', fileName);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please check the console for details.');
+    }
+  }
+
+
 
   exportTimeframeData(): void {
     if (!this.timeframeData || this.timeframeData.length === 0) {
