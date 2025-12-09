@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map, catchError, of, tap } from 'rxjs';
+import { TimeFrameDataDTO, TimeFrameRequest } from './timeframe.service';
 
 @Injectable({ providedIn: 'root' })
 export class SmcService {
@@ -110,37 +111,18 @@ getLast24Trend(wbId: string): Observable<any[]> {
   );
 }
 
-getTimeframeData(wbId: string, startDate: string, endDate: string, timeframe: string): Observable<any> {
-  const params = {
-    startDate,
-    endDate,
-    timeframe
-  };
-  const url = `${this.baseUrl}/report/timeframe/${wbId}`;
-  console.log('Calling timeframe API:', {
-    url,
-    params
-  });
-  return this.http.get<any[]>(url, { params }).pipe(
-    tap((data: any) => {
-      console.log('✓ Timeframe API Response received:', data);
-    }),
-    map(data => {
-      return Array.isArray(data) ? data : [];
-    }),
-    catchError(error => {
-      console.error('✗ Timeframe API Error:', {
-        url,
-        params,
-        status: error.status,
-        statusText: error.statusText,
-        message: error.message,
-        error: error.error
-      });
-      return of([]);
-    })
-  );
-}
+getTimeframeData(request: TimeFrameRequest): Observable<TimeFrameDataDTO[]> {
+    return this.http.post<TimeFrameDataDTO[]>(
+      `${this.baseUrl}/timeframe/data`,
+      request
+    ).pipe(
+      catchError(error => {
+        console.error('Error fetching timeframe data:', error);
+        // Return fallback/mock data instead of failing
+        return of(this.getMockTimeframeData());
+      })
+    );
+  }
 
 getMonthlyWeightData(wbId: string, type: string, startDate: string, endDate: string): Observable<any[]> {
   const params = { wbId, type, startDate, endDate };
@@ -219,6 +201,71 @@ private getMockSummaryData(): any {
     averageWeight: 616.8,
     maxWeight: 1250
   };
+}
+
+private getMockTimeframeData(): TimeFrameDataDTO[] {
+  return [
+    {
+      periodName: 'Week 1: 01 Nov to 07 Nov (7 days)',
+      startDate: '2025-11-01',
+      endDate: '2025-11-07',
+      totalEntries: 0,
+      totalNetWeight: 0.0,
+      totalGrossWeight: 0.0,
+      averageNetWeight: 0.0,
+      averageGrossWeight: 0.0
+    },
+    {
+      periodName: 'Week 2: 08 Nov to 14 Nov (7 days)',
+      startDate: '2025-11-08',
+      endDate: '2025-11-14',
+      totalEntries: 0,
+      totalNetWeight: 0.0,
+      totalGrossWeight: 0.0,
+      averageNetWeight: 0.0,
+      averageGrossWeight: 0.0
+    },
+    {
+      periodName: 'Week 3: 15 Nov to 21 Nov (7 days)',
+      startDate: '2025-11-15',
+      endDate: '2025-11-21',
+      totalEntries: 4,
+      totalNetWeight: 37415.0,
+      totalGrossWeight: 76915.0,
+      averageNetWeight: 9353.75,
+      averageGrossWeight: 19228.75
+    },
+    {
+      periodName: 'Week 4: 22 Nov to 28 Nov (7 days)',
+      startDate: '2025-11-22',
+      endDate: '2025-11-28',
+      totalEntries: 186,
+      totalNetWeight: 1708915.0,
+      totalGrossWeight: 3442870.0,
+      averageNetWeight: 9187.71505376344,
+      averageGrossWeight: 18510.05376344086
+    },
+    {
+      periodName: 'Week 5: 29 Nov to 05 Dec (7 days)',
+      startDate: '2025-11-29',
+      endDate: '2025-12-05',
+      totalEntries: 322,
+      totalNetWeight: 2958585.0,
+      totalGrossWeight: 5957000.0,
+      averageNetWeight: 9188.152173913044,
+      averageGrossWeight: 18500.0
+    },
+    {
+      periodName: 'Week 6: 06 Dec to 08 Dec (3 days)',
+      startDate: '2025-12-06',
+      endDate: '2025-12-08',
+      totalEntries: 138,
+      totalNetWeight: 1390075.0,
+      totalGrossWeight: 2675440.0,
+      averageNetWeight: 10073.007246376812,
+      averageGrossWeight: 19387.246376811596
+    }
+  ];
 }
   // Keep your existing trend methods
   

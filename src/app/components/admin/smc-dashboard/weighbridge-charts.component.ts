@@ -4,6 +4,7 @@ import { SmcService } from '../../../services/smc.service';
 import { ChartConfiguration, ChartType } from 'chart.js';
 import { FormsModule } from '@angular/forms';
 import { NgChartsModule } from 'ng2-charts';
+import { TimeFrame, TimeFrameDataDTO, TimeFrameRequest } from '../../../services/timeframe.service';
 
 @Component({
   standalone: true,
@@ -120,31 +121,11 @@ import { NgChartsModule } from 'ng2-charts';
           </div>
         </div>
 
-        <!-- New Weekly/Monthly Timeframe Chart -->
+        <!-- Enhanced Timeframe Analysis Chart -->
         <div class="chart-card timeframe-chart">
           <div class="timeframe-header">
             <h3>Timeframe Analysis</h3>
             <div class="timeframe-controls">
-              <div class="timeframe-date-inputs">
-                <div class="timeframe-date-input-group">
-                  <label>From Date:</label>
-                  <input 
-                    type="date" 
-                    [(ngModel)]="startDate" 
-                    (change)="onDateChange()"
-                    class="input-field"
-                  >
-                </div>
-                <div class="timeframe-date-input-group">
-                  <label>To Date:</label>
-                  <input 
-                    type="date" 
-                    [(ngModel)]="endDate" 
-                    (change)="onDateChange()"
-                    class="input-field"
-                  >
-                </div>
-              </div>
               <div class="timeframe-dropdown">
                 <label for="timeframe">Timeframe:</label>
                 <select 
@@ -163,37 +144,147 @@ import { NgChartsModule } from 'ng2-charts';
               <div class="timeframe-date-range">
                 <span class="date-range-label">{{ getTimeframeDateRange() }}</span>
               </div>
+              <div class="timeframe-actions">
+                <button (click)="exportTimeframeData()" class="export-btn" [disabled]="!timeframeChartData.labels?.length">
+                  📊 Export Data
+                </button>
+              </div>
             </div>
           </div>
-          <div class="chart-container">
-            <div *ngIf="!timeframeChartData.labels || timeframeChartData.labels.length === 0" class="no-data-message">
-              No data available for the selected period
+          
+          <!-- Timeframe Data Tabs -->
+          <div class="timeframe-tabs" *ngIf="timeframeData?.length">
+            <div class="tab-buttons">
+              <button 
+                (click)="activeTab = 'chart'" 
+                [class.active]="activeTab === 'chart'"
+                class="tab-btn"
+              >
+                📈 Chart View
+              </button>
+              <button 
+                (click)="activeTab = 'table'" 
+                [class.active]="activeTab === 'table'"
+                class="tab-btn"
+              >
+                📋 Data Table
+              </button>
+              <button 
+                (click)="activeTab = 'details'" 
+                [class.active]="activeTab === 'details'"
+                class="tab-btn"
+              >
+                🔍 Details
+              </button>
             </div>
-            <canvas 
-              *ngIf="timeframeChartData.labels && timeframeChartData.labels.length > 0"
-              baseChart
-              [data]="timeframeChartData"
-              [options]="getTimeframeChartOptions()"
-              [type]="barChartType"
-            >
-            </canvas>
+            
+            <!-- Chart Tab -->
+            <div class="tab-content" *ngIf="activeTab === 'chart'">
+              <div class="chart-container">
+                <div *ngIf="!timeframeChartData.labels || timeframeChartData.labels.length === 0" class="no-data-message">
+                  No data available for the selected timeframe
+                </div>
+                <canvas 
+                  *ngIf="timeframeChartData.labels && timeframeChartData.labels.length > 0"
+                  baseChart
+                  [data]="timeframeChartData"
+                  [options]="getTimeframeChartOptions()"
+                  [type]="barChartType"
+                >
+                </canvas>
+              </div>
+            </div>
+            
+            <!-- Table Tab -->
+            <div class="tab-content" *ngIf="activeTab === 'table'">
+              <div class="data-table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Period</th>
+                      <th>Start Date</th>
+                      <th>End Date</th>
+                      <th>Total Trips</th>
+                      <th>Total Net Weight</th>
+                      <th>Total Gross Weight</th>
+                      <th>Avg Net Weight</th>
+                      <th>Avg Gross Weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let item of timeframeData" [class.highlight]="item.totalNetWeight === maxWeight">
+                      <td>{{ item.periodName }}</td>
+                      <td>{{ formatDate(item.startDate) }}</td>
+                      <td>{{ formatDate(item.endDate) }}</td>
+                      <td>{{ item.totalEntries }}</td>
+                      <td>{{ formatWeight(item.totalNetWeight) }}</td>
+                      <td>{{ formatWeight(item.totalGrossWeight) }}</td>
+                      <td>{{ formatWeight(item.averageNetWeight) }}</td>
+                      <td>{{ formatWeight(item.averageGrossWeight) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <!-- Details Tab -->
+            <div class="tab-content" *ngIf="activeTab === 'details'">
+              <div class="details-container">
+                <div class="details-grid">
+                  <div class="detail-item">
+                    <div class="detail-label">Total Periods Analyzed</div>
+                    <div class="detail-value">{{ timeframeData.length || 0 }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">Date Range Covered</div>
+                    <div class="detail-value">{{ getDateRangeCovered() }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">Highest Weight Period</div>
+                    <div class="detail-value">{{ highestWeightPeriod?.periodName || 'N/A' }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">Highest Weight Value</div>
+                    <div class="detail-value">{{ formatWeight(highestWeightPeriod?.totalNetWeight || 0) }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">Average Period Duration</div>
+                    <div class="detail-value">{{ calculateAverageDuration() }} days</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">Data Consistency</div>
+                    <div class="detail-value">{{ calculateDataConsistency() }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="timeframe-summary" *ngIf="timeframeSummary">
+          
+          <!-- Timeframe Summary -->
+          <div class="timeframe-summary" *ngIf="timeframeData?.length">
             <div class="timeframe-summary-item">
-              <span class="summary-label">Total Periods:</span>
-              <span class="summary-value">{{ timeframeSummary.totalPeriods }}</span>
+              <span class="summary-label">Total Periods</span>
+              <span class="summary-value">{{ timeframeData.length }}</span>
             </div>
             <div class="timeframe-summary-item">
-              <span class="summary-label">Total Weight:</span>
-              <span class="summary-value">{{ formatWeight(timeframeSummary.totalWeight) }}</span>
+              <span class="summary-label">Total Net Weight</span>
+              <span class="summary-value">{{ formatWeight(calculateTotalNetWeight()) }}</span>
             </div>
             <div class="timeframe-summary-item">
-              <span class="summary-label">Avg per Period:</span>
-              <span class="summary-value">{{ formatWeight(timeframeSummary.averagePerPeriod) }}</span>
+              <span class="summary-label">Total Gross Weight</span>
+              <span class="summary-value">{{ formatWeight(calculateTotalGrossWeight()) }}</span>
             </div>
             <div class="timeframe-summary-item">
-              <span class="summary-label">Total Trips:</span>
-              <span class="summary-value">{{ timeframeSummary.totalTrips }}</span>
+              <span class="summary-label">Total Trips</span>
+              <span class="summary-value">{{ calculateTotalTrips() }}</span>
+            </div>
+            <div class="timeframe-summary-item">
+              <span class="summary-label">Avg Net Weight/Trip</span>
+              <span class="summary-value">{{ formatWeight(calculateAvgNetWeightPerTrip()) }}</span>
+            </div>
+            <div class="timeframe-summary-item">
+              <span class="summary-label">Period with Max Weight</span>
+              <span class="summary-value">{{ (highestWeightPeriod?.periodName || '').split(':')[0] || 'N/A' }}</span>
             </div>
           </div>
         </div>
@@ -386,32 +477,6 @@ import { NgChartsModule } from 'ng2-charts';
       flex-wrap: wrap;
     }
 
-    .timeframe-date-inputs {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-    }
-
-    .timeframe-date-input-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .timeframe-date-input-group label {
-      font-size: 12px;
-      font-weight: bold;
-      color: #555;
-    }
-
-    .timeframe-date-input-group input {
-      padding: 6px 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 13px;
-      min-width: 130px;
-    }
-
     .timeframe-dropdown {
       display: flex;
       align-items: center;
@@ -446,6 +511,122 @@ import { NgChartsModule } from 'ng2-charts';
       font-weight: 500;
     }
 
+    .timeframe-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .export-btn {
+      padding: 6px 12px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .export-btn:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+
+    /* Tabs */
+    .timeframe-tabs {
+      margin-bottom: 20px;
+    }
+
+    .tab-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      background: #f8f9fa;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tab-btn.active {
+      background: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
+
+    .tab-content {
+      background: #f8f9fa;
+      border-radius: 4px;
+      padding: 15px;
+    }
+
+    /* Data Table */
+    .data-table-container {
+      overflow-x: auto;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .data-table th {
+      background: #007bff;
+      color: white;
+      padding: 8px;
+      text-align: left;
+      font-weight: bold;
+    }
+
+    .data-table td {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .data-table tbody tr:hover {
+      background: #f0f8ff;
+    }
+
+    .data-table tr.highlight {
+      background: #fff3cd;
+    }
+
+    /* Details Grid */
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .detail-item {
+      background: white;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #17a2b8;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .detail-value {
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    /* Timeframe Summary */
     .timeframe-summary {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -554,6 +735,22 @@ import { NgChartsModule } from 'ng2-charts';
       .timeframe-summary {
         grid-template-columns: 1fr;
       }
+
+      .tab-buttons {
+        flex-direction: column;
+      }
+
+      .tab-btn {
+        width: 100%;
+      }
+
+      .data-table {
+        font-size: 10px;
+      }
+
+      .details-grid {
+        grid-template-columns: 1fr;
+      }
     }
   `]
 })
@@ -572,7 +769,10 @@ export class WeighbridgeChartsComponent implements OnInit {
   // Timeframe properties
   selectedTimeframe: string = 'WEEKLY';
   timeframeChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
-  timeframeSummary: any = null;
+  timeframeData: TimeFrameDataDTO[] = [];
+  maxWeight: number = 0;
+  highestWeightPeriod: TimeFrameDataDTO | null = null;
+  activeTab: 'chart' | 'table' | 'details' = 'chart';
 
   // Chart data
   netTrendChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
@@ -620,6 +820,15 @@ export class WeighbridgeChartsComponent implements OnInit {
             } else {
               label += value + ' kg';
             }
+            
+            // Add additional information for timeframe chart
+            if (context.datasetIndex === 0 && context.dataIndex !== undefined) {
+              const period = this.timeframeData?.[context.dataIndex];
+              if (period) {
+                label += ` (${period.totalEntries} trips)`;
+              }
+            }
+            
             return label;
           }
         }
@@ -631,7 +840,7 @@ export class WeighbridgeChartsComponent implements OnInit {
     const today = new Date();
     this.endDate = today.toISOString().split('T')[0];
     const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 7);
+    weekAgo.setDate(weekAgo.getDate() - 30); // Changed to 30 days for better initial view
     this.startDate = weekAgo.toISOString().split('T')[0];
   }
 
@@ -737,7 +946,7 @@ export class WeighbridgeChartsComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error loading net trend:', err);
-          this.handleError(err);
+          // Don't set global error flag, just resolve
           resolve();
         }
       });
@@ -759,7 +968,7 @@ export class WeighbridgeChartsComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error loading last 24 trend:', err);
-          this.handleError(err);
+          // Don't set global error flag, just resolve
           resolve();
         }
       });
@@ -778,7 +987,7 @@ export class WeighbridgeChartsComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error loading summary:', err);
-          this.handleError(err);
+          // Don't set global error flag, just resolve
           resolve();
         }
       });
@@ -787,227 +996,269 @@ export class WeighbridgeChartsComponent implements OnInit {
 
   loadTimeframeData(): Promise<void> {
     return new Promise((resolve) => {
-      this.smcService.getTimeframeData(
-        this.wbId, 
-        this.startDate, 
-        this.endDate, 
-        this.selectedTimeframe
-      ).subscribe({
-        next: (data: any[]) => {
-          console.log('Timeframe Data:', data);
-          this.timeframeChartData = this.createTimeframeChartData(data);
-          this.calculateTimeframeSummary(data);
+      this.loading = true;
+      
+      // Create TimeFrameRequest object
+      const request: TimeFrameRequest = {
+        wbId: this.wbId,
+        startDate: this.startDate,
+        endDate: this.endDate,
+        timeframe: this.selectedTimeframe as TimeFrame
+      };
+
+      // Call the timeframe service
+      this.smcService.getTimeframeData(request).subscribe({
+        next: (data: TimeFrameDataDTO[]) => {
+          console.log('Timeframe Data from API:', data);
+          this.timeframeData = data;
+          
+          // Prepare chart data
+          this.prepareTimeframeChartData(data);
+          
+          // Calculate max weight and highest period
+          this.calculateTimeframeMetrics();
+          
           resolve();
         },
-        error: (err: any) => {
+        error: (err) => {
           console.error('Error loading timeframe data:', err);
-          this.handleTimeframeError(err);
+          // Don't set global error flag, just resolve
+          this.timeframeData = [];
+          this.timeframeChartData = { labels: [], datasets: [] };
           resolve();
+        },
+        complete: () => {
+          this.loading = false;
         }
       });
     });
   }
 
-  private createTimeframeChartData(data: any[]): ChartConfiguration['data'] {
-    console.log('Creating timeframe chart data:', data);
-    
+  private prepareTimeframeChartData(data: TimeFrameDataDTO[]): void {
     if (!data || data.length === 0) {
-      return { labels: [], datasets: [] };
+      this.timeframeChartData = { labels: [], datasets: [] };
+      return;
     }
 
-    // Log what we're receiving for debugging
-    console.log('Raw timeframe data items:', data.map(item => ({
-      periodName: item.periodName,
-      totalNetWeight: item.totalNetWeight,
-      weight: item.weight,
-      netWeight: item.netWeight,
-      value: item.value
-    })));
+    // Filter out periods with no data
+    const validData = data.filter(period => 
+      period.totalEntries > 0 || period.totalNetWeight > 0
+    );
 
-    // Filter out entries with no weight data (but allow 0 values that are explicitly set)
-    // Only filter if the item has no weight properties at all
-    const filteredData = data.filter(item => {
-      const weight = item.totalNetWeight || item.weight || item.netWeight || item.value;
-      // Include items that have a weight property, even if it's 0
-      return weight !== null && weight !== undefined;
-    });
-
-    console.log(`Filtered timeframe data: ${filteredData.length} periods with data from ${data.length} total`);
-
-    if (filteredData.length === 0) {
-      console.warn('No data found after filtering. Raw data:', data);
-      return { labels: [], datasets: [] };
+    if (validData.length === 0) {
+      this.timeframeChartData = { labels: [], datasets: [] };
+      return;
     }
 
-    const labels = filteredData.map(item => {
-      if (item.periodName) {
-        return this.formatTimeframeLabel(item.periodName, this.selectedTimeframe);
-      } else if (item.period) {
-        return item.period;
-      } else if (item.date) {
-        return this.formatDateForTimeframe(item.date, this.selectedTimeframe);
-      }
-      return 'Unknown';
+    const labels = validData.map(period => {
+      // Extract shorter label for chart display
+      return this.extractShortLabel(period.periodName);
     });
-    
-    const weights = filteredData.map(item => {
-      const weight = item.totalNetWeight || item.weight || item.netWeight || item.value || 0;
-      return weight;
-    });
-    
+
+    const netWeights = validData.map(period => period.totalNetWeight || 0);
+    const grossWeights = validData.map(period => period.totalGrossWeight || 0);
+    const tripCounts = validData.map(period => period.totalEntries || 0);
+
     const backgroundColor = this.getTimeframeColor(this.selectedTimeframe);
 
-    return {
+    // Create datasets for the chart
+    this.timeframeChartData = {
       labels,
       datasets: [
         {
-          label: this.getTimeframeLabel(),
-          data: weights,
+          label: 'Net Weight',
+          data: netWeights,
           backgroundColor,
           borderColor: backgroundColor,
-          borderWidth: 1,
-          barPercentage: 0.6,
+          borderWidth: 2,
+          barPercentage: 0.7,
           categoryPercentage: 0.8,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Number of Trips',
+          data: tripCounts,
+          backgroundColor: 'rgba(108, 117, 125, 0.3)',
+          borderColor: 'rgba(108, 117, 125, 1)',
+          borderWidth: 1,
+          type: 'line',
+          yAxisID: 'y1',
+          tension: 0.4,
+          fill: false
         }
       ]
     };
   }
 
-  private formatTimeframeLabel(label: string, timeframe: string): string {
-    switch (timeframe) {
+  private extractShortLabel(periodName: string): string {
+    if (!periodName) return 'Unknown';
+    
+    switch (this.selectedTimeframe) {
       case 'WEEKLY':
-        // Format: "Week 1: 02 Dec to 08 Dec (7 days)" -> "Week 1"
-        const weekMatch = label.match(/Week (\d+):/);
-        return weekMatch ? `Week ${weekMatch[1]}` : label;
+        // Format: "Week 1: 02 Dec to 08 Dec (7 days)" -> "W1"
+        const weekMatch = periodName.match(/Week (\d+)/);
+        return weekMatch ? `W${weekMatch[1]}` : periodName;
       
       case 'MONTHLY':
-        // Format: "December 2024" -> "Dec 2024"
-        return label;
+        // Format: "December 2024" -> "Dec'24"
+        const monthMatch = periodName.match(/(\w+) (\d+)/);
+        if (monthMatch) {
+          const month = monthMatch[1].substring(0, 3);
+          const year = monthMatch[2].substring(2);
+          return `${month}'${year}`;
+        }
+        return periodName;
       
       case 'QUARTERLY':
-        // Format: "Quarter 1, 2024" -> "Q1 2024"
-        const quarterMatch = label.match(/Quarter (\d+), (\d+)/);
-        return quarterMatch ? `Q${quarterMatch[1]} ${quarterMatch[2]}` : label;
+        // Format: "Quarter 1, 2024" -> "Q1'24"
+        const quarterMatch = periodName.match(/Quarter (\d+), (\d+)/);
+        if (quarterMatch) {
+          const quarter = quarterMatch[1];
+          const year = quarterMatch[2].substring(2);
+          return `Q${quarter}'${year}`;
+        }
+        return periodName;
       
       case 'HALF_YEARLY':
-        // Format: "First Half, 2024" -> "H1 2024"
-        if (label.includes('First Half')) {
-          return `H1 ${label.match(/\d+/)?.[0] || ''}`;
-        } else if (label.includes('Second Half')) {
-          return `H2 ${label.match(/\d+/)?.[0] || ''}`;
+        // Format: "First Half, 2024" -> "H1'24"
+        if (periodName.includes('First Half')) {
+          const yearMatch = periodName.match(/\d+/);
+          const year = yearMatch ? yearMatch[0].substring(2) : '';
+          return `H1'${year}`;
+        } else if (periodName.includes('Second Half')) {
+          const yearMatch = periodName.match(/\d+/);
+          const year = yearMatch ? yearMatch[0].substring(2) : '';
+          return `H2'${year}`;
         }
-        return label;
+        return periodName;
       
       case 'YEARLY':
         // Format: "Year 2024" -> "2024"
-        const yearMatch = label.match(/\d+/);
-        return yearMatch ? yearMatch[0] : label;
+        const yearMatch = periodName.match(/\d+/);
+        return yearMatch ? yearMatch[0] : periodName;
       
       default:
-        return label;
+        return periodName;
     }
   }
 
-  private formatDateForTimeframe(dateString: string, timeframe: string): string {
-    const date = new Date(dateString);
-    
-    switch (timeframe) {
-      case 'WEEKLY':
-        return date.toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric' 
-        });
-      
-      case 'MONTHLY':
-        return date.toLocaleDateString('en-US', { 
-          month: 'short', 
-          year: 'numeric' 
-        });
-      
-      case 'QUARTERLY':
-        const quarter = Math.floor(date.getMonth() / 3) + 1;
-        return `Q${quarter} ${date.getFullYear()}`;
-      
-      case 'HALF_YEARLY':
-        const half = date.getMonth() < 6 ? 'H1' : 'H2';
-        return `${half} ${date.getFullYear()}`;
-      
-      case 'YEARLY':
-        return date.getFullYear().toString();
-      
-      default:
-        return dateString;
+  private calculateTimeframeMetrics(): void {
+    if (!this.timeframeData || this.timeframeData.length === 0) {
+      this.maxWeight = 0;
+      this.highestWeightPeriod = null;
+      return;
     }
-  }
 
-  private getTimeframeLabel(): string {
-    switch (this.selectedTimeframe) {
-      case 'WEEKLY': return 'Weekly Net Weight';
-      case 'MONTHLY': return 'Monthly Net Weight';
-      case 'QUARTERLY': return 'Quarterly Net Weight';
-      case 'HALF_YEARLY': return 'Half-Yearly Net Weight';
-      case 'YEARLY': return 'Yearly Net Weight';
-      default: return 'Net Weight';
-    }
+    // Find period with maximum net weight
+    this.maxWeight = Math.max(...this.timeframeData.map(p => p.totalNetWeight || 0));
+    this.highestWeightPeriod = this.timeframeData.find(p => p.totalNetWeight === this.maxWeight) || null;
   }
 
   private getTimeframeColor(timeframe: string): string {
     switch (timeframe) {
-      case 'WEEKLY': return '#28a745';
-      case 'MONTHLY': return '#17a2b8';
-      case 'QUARTERLY': return '#ffc107';
-      case 'HALF_YEARLY': return '#fd7e14';
-      case 'YEARLY': return '#6f42c1';
+      case 'WEEKLY': return '#28a745'; // Green
+      case 'MONTHLY': return '#007bff'; // Blue
+      case 'QUARTERLY': return '#ffc107'; // Yellow
+      case 'HALF_YEARLY': return '#fd7e14'; // Orange
+      case 'YEARLY': return '#6f42c1'; // Purple
       default: return '#28a745';
     }
   }
 
-  private calculateTimeframeSummary(data: any[]): void {
-    if (!data || data.length === 0) {
-      this.timeframeSummary = {
-        totalPeriods: 0,
-        totalWeight: 0,
-        averagePerPeriod: 0,
-        totalTrips: 0
-      };
+  // Helper methods for calculations
+  calculateTotalNetWeight(): number {
+    if (!this.timeframeData) return 0;
+    return this.timeframeData.reduce((sum, period) => sum + (period.totalNetWeight || 0), 0);
+  }
+
+  calculateTotalGrossWeight(): number {
+    if (!this.timeframeData) return 0;
+    return this.timeframeData.reduce((sum, period) => sum + (period.totalGrossWeight || 0), 0);
+  }
+
+  calculateTotalTrips(): number {
+    if (!this.timeframeData) return 0;
+    return this.timeframeData.reduce((sum, period) => sum + (period.totalEntries || 0), 0);
+  }
+
+  calculateAvgNetWeightPerTrip(): number {
+    const totalTrips = this.calculateTotalTrips();
+    if (totalTrips === 0) return 0;
+    return this.calculateTotalNetWeight() / totalTrips;
+  }
+
+  getDateRangeCovered(): string {
+    if (!this.timeframeData || this.timeframeData.length === 0) {
+      return 'No data';
+    }
+    
+    const firstPeriod = this.timeframeData[0];
+    const lastPeriod = this.timeframeData[this.timeframeData.length - 1];
+    
+    return `${this.formatDate(firstPeriod.startDate)} to ${this.formatDate(lastPeriod.endDate)}`;
+  }
+
+  calculateAverageDuration(): number {
+    if (!this.timeframeData || this.timeframeData.length === 0) return 0;
+    
+    const totalDays = this.timeframeData.reduce((sum, period) => {
+      const start = new Date(period.startDate);
+      const end = new Date(period.endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive
+      return sum + diffDays;
+    }, 0);
+    
+    return Math.round(totalDays / this.timeframeData.length);
+  }
+
+  calculateDataConsistency(): string {
+    if (!this.timeframeData || this.timeframeData.length === 0) return 'No data';
+    
+    const periodsWithData = this.timeframeData.filter(p => p.totalEntries > 0).length;
+    const percentage = (periodsWithData / this.timeframeData.length) * 100;
+    
+    if (percentage >= 90) return 'Excellent';
+    if (percentage >= 70) return 'Good';
+    if (percentage >= 50) return 'Fair';
+    return 'Poor';
+  }
+
+  exportTimeframeData(): void {
+    if (!this.timeframeData || this.timeframeData.length === 0) {
+      alert('No data to export');
       return;
     }
 
-    // Include all periods that have weight data (including 0)
-    const dataWithValues = data.filter(item => {
-      const weight = item.totalNetWeight || item.weight || item.netWeight || item.value;
-      return weight !== null && weight !== undefined;
-    });
-
-    console.log('Data with values for summary:', dataWithValues);
-
-    const totalWeight = dataWithValues.reduce((sum, item) => 
-      sum + (item.totalNetWeight || item.weight || item.netWeight || item.value || 0), 0
-    );
+    const csvContent = this.convertToCSV(this.timeframeData);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
     
-    const totalTrips = dataWithValues.reduce((sum, item) => 
-      sum + (item.totalEntries || item.trips || 0), 0
-    );
-
-    this.timeframeSummary = {
-      totalPeriods: dataWithValues.length,
-      totalWeight,
-      averagePerPeriod: dataWithValues.length > 0 ? totalWeight / dataWithValues.length : 0,
-      totalTrips
-    };
+    link.setAttribute('href', url);
+    link.setAttribute('download', `timeframe_data_${this.selectedTimeframe.toLowerCase()}_${this.startDate}_${this.endDate}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
-  private handleTimeframeError(error: any): void {
-    console.warn('Could not load timeframe data, showing empty state');
+  private convertToCSV(data: TimeFrameDataDTO[]): string {
+    const headers = ['Period', 'Start Date', 'End Date', 'Total Trips', 'Total Net Weight', 'Total Gross Weight', 'Avg Net Weight', 'Avg Gross Weight'];
+    const rows = data.map(item => [
+      item.periodName,
+      item.startDate,
+      item.endDate,
+      item.totalEntries,
+      item.totalNetWeight,
+      item.totalGrossWeight,
+      item.averageNetWeight,
+      item.averageGrossWeight
+    ]);
     
-    // Show empty chart instead of fake data
-    this.timeframeChartData = { labels: [], datasets: [] };
-    this.timeframeSummary = {
-      totalPeriods: 0,
-      totalWeight: 0,
-      averagePerPeriod: 0,
-      totalTrips: 0
-    };
+    return [headers, ...rows].map(row => 
+      row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
   }
 
   private createBarChartData(
@@ -1135,7 +1386,35 @@ export class WeighbridgeChartsComponent implements OnInit {
     return {
       ...this.baseChartOptions,
       scales: {
-        ...(this.baseChartOptions?.scales as any || {}),
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Weight (kg)'
+          },
+          ticks: {
+            callback: (value) => {
+              const numValue = Number(value);
+              if (numValue >= 1000) {
+                return (numValue / 1000).toFixed(1) + ' tons';
+              }
+              return numValue + ' kg';
+            }
+          }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Number of Trips'
+          },
+          grid: {
+            drawOnChartArea: false,
+          },
+          beginAtZero: true
+        },
         x: {
           title: {
             display: true,
@@ -1144,6 +1423,37 @@ export class WeighbridgeChartsComponent implements OnInit {
           ticks: {
             maxRotation: 45,
             minRotation: 45
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              const value = Number(context.parsed.y);
+              
+              if (context.datasetIndex === 0) {
+                // Weight dataset
+                if (value >= 1000) {
+                  label += (value / 1000).toFixed(2) + ' tons';
+                } else {
+                  label += value + ' kg';
+                }
+              } else {
+                // Trip count dataset
+                label += value + ' trips';
+              }
+              
+              return label;
+            }
           }
         }
       }
@@ -1164,14 +1474,25 @@ export class WeighbridgeChartsComponent implements OnInit {
   private handleError(error: any): void {
     this.error = true;
     this.errorMessage = error?.message || 'Failed to load chart data';
+    this.loading = false;
   }
 
   formatWeight(weight: number): string {
-    if (!weight) return '0 kg';
+    if (!weight && weight !== 0) return '0 kg';
     if (weight >= 1000) {
       return (weight / 1000).toFixed(1) + ' tons';
     }
-    return weight + ' kg';
+    return Math.round(weight) + ' kg';
+  }
+
+  formatDate(dateString: string | Date): string {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   }
 
   getPeriodLabel(): string {
