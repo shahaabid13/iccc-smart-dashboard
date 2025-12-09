@@ -1123,6 +1123,27 @@ export class WeighbridgeChartsComponent implements OnInit {
   }
 
   getTimeframeDateRange(): string {
+    // If secondary filter is selected, show the range for that selection
+    if (this.selectedSecondaryFilter && this.secondaryFilterOptions.length > 0) {
+      if (this.selectedTimeframe === 'WEEKLY') {
+        // For weekly: show the month range
+        const [year, month] = this.selectedSecondaryFilter.split('-');
+        const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const monthName = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const firstDay = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const lastDay = new Date(parseInt(year), parseInt(month), 0);
+        return `${firstDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to ${lastDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      } else if (this.selectedTimeframe === 'YEARLY') {
+        // For yearly: show the fiscal year range
+        const [startYear, endYear] = this.selectedSecondaryFilter.split('-');
+        return `${startYear}-${endYear}`;
+      } else {
+        // For monthly, quarterly, half-yearly: show the year
+        return `Year: ${this.selectedSecondaryFilter}`;
+      }
+    }
+    
+    // Fallback to the original date range
     if (this.startDate === this.endDate) {
       return `Date: ${this.formatDate(this.startDate)}`;
     }
@@ -1230,10 +1251,13 @@ export class WeighbridgeChartsComponent implements OnInit {
       this.smcService.getTimeframeData(request).subscribe({
         next: (data: TimeFrameDataDTO[]) => {
           console.log('Timeframe Data from API:', data);
-          this.timeframeData = data;
+          
+          // Filter data based on secondary filter selection
+          const filteredData = this.filterDataBySecondarySelection(data);
+          this.timeframeData = filteredData;
           
           // Prepare chart data
-          this.prepareTimeframeChartData(data);
+          this.prepareTimeframeChartData(filteredData);
           
           // Calculate max weight and highest period
           this.calculateTimeframeMetrics();
@@ -1254,30 +1278,54 @@ export class WeighbridgeChartsComponent implements OnInit {
     });
   }
 
+  private filterDataBySecondarySelection(data: TimeFrameDataDTO[]): TimeFrameDataDTO[] {
+    if (!this.selectedSecondaryFilter || this.selectedTimeframe !== 'WEEKLY') {
+      return data;
+    }
+
+    // For WEEKLY timeframe, filter by selected month
+    const [year, month] = this.selectedSecondaryFilter.split('-');
+    const selectedYear = parseInt(year);
+    const selectedMonth = parseInt(month);
+
+    // Get the first and last day of the selected month
+    const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
+    const monthEnd = new Date(selectedYear, selectedMonth, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+
+    return data.filter(item => {
+      const itemStart = new Date(item.startDate);
+      const itemEnd = new Date(item.endDate);
+      
+      // Check if period overlaps with the selected month
+      // Period overlaps if: itemStart <= monthEnd AND itemEnd >= monthStart
+      return itemStart <= monthEnd && itemEnd >= monthStart;
+    });
+  }
+
   private prepareTimeframeChartData(data: TimeFrameDataDTO[]): void {
     if (!data || data.length === 0) {
       this.timeframeChartData = { labels: [], datasets: [] };
       return;
     }
 
-    // Filter out periods with no data
-    const validData = data.filter(period => 
-      period.totalEntries > 0 || period.totalNetWeight > 0
-    );
-
-    if (validData.length === 0) {
-      this.timeframeChartData = { labels: [], datasets: [] };
-      return;
-    }
-
-    const labels = validData.map(period => {
-      // Extract shorter label for chart display
-      return this.extractShortLabel(period.periodName);
+    // Include ALL periods, even those with zero trips (don't filter them out)
+    const allData = data.sort((a, b) => {
+      const dateA = new Date(a.startDate).getTime();
+      const dateB = new Date(b.startDate).getTime();
+      return dateA - dateB;
     });
 
-    const netWeights = validData.map(period => period.totalNetWeight || 0);
-    const grossWeights = validData.map(period => period.totalGrossWeight || 0);
-    const tripCounts = validData.map(period => period.totalEntries || 0);
+    const labels = allData.map(period => {
+      // Extract short label and calculate days
+      const shortLabel = this.extractShortLabel(period.periodName);
+      const daysInPeriod = this.calculateDaysInPeriod(period.startDate, period.endDate);
+      return `${shortLabel}\n(${daysInPeriod}d)`;
+    });
+
+    const netWeights = allData.map(period => period.totalNetWeight || 0);
+    const grossWeights = allData.map(period => period.totalGrossWeight || 0);
+    const tripCounts = allData.map(period => period.totalEntries || 0);
 
     const backgroundColor = this.getTimeframeColor(this.selectedTimeframe);
 
@@ -1308,6 +1356,14 @@ export class WeighbridgeChartsComponent implements OnInit {
         }
       ]
     };
+  }
+
+  private calculateDaysInPeriod(startDate: any, endDate: any): number {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+    return diffDays;
   }
 
   private extractShortLabel(periodName: string): string {
