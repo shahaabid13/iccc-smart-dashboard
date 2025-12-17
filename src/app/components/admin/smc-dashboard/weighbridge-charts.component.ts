@@ -67,10 +67,19 @@ import autoTable from 'jspdf-autotable';
       </div>
 
       <div *ngIf="summaryData" class="summary-cards">
+       <div class="summary-card">
+          <div class="card-icon">📊</div>
+          <div class="card-content">
+            <h3>Total Net Weight (All Time)</h3>
+            <div class="card-value">{{ formatWeight(allTimeNetWeight) }}</div>
+            <div class="card-label">Cumulative weight since data start</div>
+            <div class="card-period">Nov 21, 2025 to Current</div>
+          </div>
+        </div>
         <div class="summary-card">
           <div class="card-icon">⚖️</div>
           <div class="card-content">
-            <h3>Total Net Weight</h3>
+            <h3>Net Weight</h3>
             <div class="card-value">{{ formatWeight(summaryData.totalNetWeight) }}</div>
             <div class="card-label">Weight for selected period</div>
             <div class="card-period">{{ getPeriodLabel() }}</div>
@@ -86,6 +95,8 @@ import autoTable from 'jspdf-autotable';
             <div class="card-period">{{ getPeriodLabel() }}</div>
           </div>
         </div>
+
+       
       </div>
 
       <div class="charts-grid" *ngIf="!loading && !error">
@@ -958,6 +969,7 @@ export class WeighbridgeChartsComponent implements OnInit {
 
   // Summary data
   summaryData: any = null;
+  allTimeNetWeight: number = 0;
 
   // Chart types
   barChartType: ChartType = 'bar';
@@ -1166,7 +1178,8 @@ export class WeighbridgeChartsComponent implements OnInit {
       this.loadNetTrend(),
       this.loadLast24Trend(),
       this.loadSummary(),
-      this.loadTimeframeData()
+      this.loadTimeframeData(),
+      this.loadAllTimeSummary()
     ]).finally(() => {
       this.loading = false;
     });
@@ -1229,6 +1242,32 @@ export class WeighbridgeChartsComponent implements OnInit {
         error: (err) => {
           console.error('Error loading summary:', err);
           // Don't set global error flag, just resolve
+          resolve();
+        }
+      });
+    });
+  }
+
+  loadAllTimeSummary(): Promise<void> {
+    return new Promise((resolve) => {
+      // Load data from Nov 21, 2025 to current date
+      const allTimeStartDate = '2025-11-21';
+      const today = new Date();
+      const allTimeEndDate = today.toISOString().split('T')[0];
+      
+      const startIso = `${allTimeStartDate}T00:00:00`;
+      const endIso = `${allTimeEndDate}T23:59:59`;
+
+      this.smcService.getSummary(startIso, endIso, this.wbId).subscribe({
+        next: (data: any) => {
+          this.allTimeNetWeight = data?.totalNetWeight || 0;
+          console.log('All-time net weight loaded:', this.allTimeNetWeight);
+          resolve();
+        },
+        error: (err) => {
+          console.error('Error loading all-time summary:', err);
+          // Set to 0 if there's an error, don't fail the whole load
+          this.allTimeNetWeight = 0;
           resolve();
         }
       });
