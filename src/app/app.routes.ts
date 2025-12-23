@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 import { AdminGuard } from './guards/admin.guard';
+import { AnprAnalyticsTableComponent } from './components/admin/anpr-analytics-table.component';
+import { AnprAnalyticsChartsComponent } from './components/admin/anpr-analytics-charts.component';
 
 
 export const routes: Routes = [
@@ -44,6 +46,19 @@ export const routes: Routes = [
   path: 'devices/:deviceId/history',
   loadComponent: () => import('./components/devices/device-history/device-history.component')
     .then(m => m.DeviceHistoryComponent),
+},
+{
+  path: 'anpr',
+  children: [
+    {
+      path: 'analytics-table',
+      component: AnprAnalyticsTableComponent
+    },
+    {
+      path: 'analytics-charts',
+      component: AnprAnalyticsChartsComponent
+    }
+  ]
 },
 
 	{

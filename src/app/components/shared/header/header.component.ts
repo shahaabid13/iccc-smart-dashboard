@@ -111,6 +111,32 @@ import { Subject, takeUntil } from 'rxjs';
             </a>
           </div>
         </div>
+
+        <!-- ANPR Analytics Dropdown -->
+        <div class="nav-section" *ngIf="!isSidebarCollapsed">
+          <div class="section-label">ANPR Analytics</div>
+        </div>
+        
+        <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
+          <div class="dropdown-header" (click)="toggleDropdown('anpr')">
+            <span class="dropdown-icon">📹</span>
+            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">ANPR Analytics</span>
+            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
+              {{ openDropdown === 'anpr' ? '▲' : '▼' }}
+            </span>
+          </div>
+          
+          <div class="dropdown-content" *ngIf="openDropdown === 'anpr' && !isSidebarCollapsed">
+            <a routerLink="/anpr/analytics-table" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📋</span>
+              <span>Analytics Table</span>
+            </a>
+            <a routerLink="/anpr/analytics-charts" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📊</span>
+              <span>Analytics Charts</span>
+            </a>
+          </div>
+        </div>
       </nav>
 
       <!-- Sidebar Footer -->
