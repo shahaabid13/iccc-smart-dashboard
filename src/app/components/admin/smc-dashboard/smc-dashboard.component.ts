@@ -90,6 +90,7 @@ import autoTable from 'jspdf-autotable';
             <ul class="dropdown-menu" *ngIf="reportDropdownOpen">
               <li><button class="dropdown-item" (click)="exportReportToExcel(); toggleReportDropdown(false)">Report as Excel</button></li>
               <li><button class="dropdown-item" (click)="exportReportToPDF(); toggleReportDropdown(false)">Report as PDF</button></li>
+              <li><button class="dropdown-item" (click)="exportDailyDataReportToPDF(); toggleReportDropdown(false)">Daily Data Report (PDF)</button></li>
             </ul>
           </div>
 
@@ -1195,6 +1196,181 @@ exportReportToPDF(): void {
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     } catch {
       return dateString;
+    }
+  }
+
+  // ==================== DAILY DATA REPORT METHOD ====================
+  /**
+   * Export daily data report to PDF with data organized by date
+   * Shows: S.No, Date (day-month-year), Trips, Net Weight
+   * One row per date with totals
+   */
+  exportDailyDataReportToPDF(): void {
+    if (!this.filteredRecords.length) {
+      alert('No data to export');
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+      
+      // Helper function to format numbers with commas
+      const formatWithCommas = (num: number): string => {
+        return num.toLocaleString('en-US', {
+          maximumFractionDigits: 0,
+          minimumFractionDigits: 0,
+          useGrouping: true
+        });
+      };
+
+      // Helper function to format date as DD-MMM-YYYY
+      const formatDateAsDDMMMYYYY = (dateStr: string): string => {
+        try {
+          const date = new Date(dateStr);
+          return date.toLocaleDateString('en-US', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          });
+        } catch {
+          return dateStr;
+        }
+      };
+
+      // Group records by date and aggregate
+      const recordsByDate = new Map<string, {netWeight: number, trips: number, formattedDate: string}>();
+      
+      this.filteredRecords.forEach(record => {
+        const formattedDate = formatDateAsDDMMMYYYY(record.edate);
+        const nWeight = parseFloat(record.nweight.toString().replace(/,/g, '')) || 0;
+        
+        if (!recordsByDate.has(formattedDate)) {
+          recordsByDate.set(formattedDate, { netWeight: 0, trips: 0, formattedDate: formattedDate });
+        }
+        
+        const dayData = recordsByDate.get(formattedDate)!;
+        dayData.netWeight += nWeight;
+        dayData.trips += 1;
+      });
+
+      // Sort dates in descending order (newest first)
+      const sortedDates = Array.from(recordsByDate.keys()).sort((a, b) => {
+        const dateA = new Date(a);
+        const dateB = new Date(b);
+        return dateB.getTime() - dateA.getTime(); // Descending order
+      });
+
+      // Calculate overall totals
+      let overallNetWeight = 0;
+      let overallTrips = 0;
+
+      // Build table rows (one row per date)
+      const tableBody: any[] = [];
+      
+      sortedDates.forEach((date, index) => {
+        const dayData = recordsByDate.get(date)!;
+        overallNetWeight += dayData.netWeight;
+        overallTrips += dayData.trips;
+
+        tableBody.push([
+          (index + 1).toString(),
+          date,
+          dayData.trips.toString(),
+          formatWithCommas(dayData.netWeight)
+        ]);
+      });
+
+      // Add totals row
+      tableBody.push([
+        '',
+        'TOTALS',
+        overallTrips.toString(),
+        formatWithCommas(overallNetWeight)
+      ]);
+
+      // Set up PDF
+      doc.setFontSize(14);
+      doc.setTextColor(40);
+      doc.text('SMC Daily Data Report', 14, 15);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 22);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 28);
+
+      // Calculate center position for table
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const tableWidth = 150;
+      const leftMargin = (pageWidth - tableWidth) / 2;
+
+      // Create main table centered on the page
+      autoTable(doc, {
+        head: [['S.No', 'Date', 'Trips', 'Net Weight (kg)']],
+        body: tableBody,
+        startY: 35,
+        margin: { left: leftMargin, right: leftMargin },
+        tableWidth: 150,
+        styles: { 
+          fontSize: 9,
+          cellPadding: 5,
+          font: 'helvetica',
+          lineWidth: 0.1,
+          overflow: 'linebreak',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { cellWidth: 25, halign: 'center' },
+          1: { cellWidth: 45, halign: 'center' },
+          2: { cellWidth: 25, halign: 'center' },
+          3: { cellWidth: 55, halign: 'right' }
+        },
+        headStyles: { 
+          fillColor: [18, 46, 82], 
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold',
+          lineWidth: 0.1,
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 9,
+          lineWidth: 0.1,
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        didParseCell: function(data) {
+          // Right align net weight column
+          if (data.column.index === 3) {
+            data.cell.styles.halign = 'right';
+          }
+          
+          // Bold and style the totals row (last row)
+          if (data.row.index === data.table.body.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [220, 230, 241];
+          }
+        }
+      });
+
+      // Add footer with page numbers
+      const pageCount = doc.getNumberOfPages();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      }
+
+      // Save the PDF
+      const fileName = `SMC_Daily_Data_Report_${this.getDateRangeLabel().replace(/ /g, '_')}_${new Date().getTime()}.pdf`;
+      doc.save(fileName);
+      console.log('✅ Daily data report exported to PDF successfully');
+    } catch (error) {
+      console.error('❌ Error exporting daily data report to PDF', error);
+      alert('Error exporting daily data report to PDF. Please check the console for details.');
     }
   }
 }

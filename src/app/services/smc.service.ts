@@ -21,23 +21,42 @@ export class SmcService {
   getAllWeighbridgeData(wbId: string): Observable<any[]> {
     const url = `${this.baseUrl}/report/data/all/${wbId}`;
     
-    return this.http.get<any[]>(url).pipe(
+    return this.http.get<any>(url).pipe(
+      tap(response => console.log('🔵 Raw API Response:', response)),
       map(response => {
-        // Handle different response formats
+        let dataArray: any[] = [];
+        
+        // Handle different response formats from backend
         if (Array.isArray(response)) {
-          return response;
+          // Response is already an array
+          dataArray = response;
         } else if (response && typeof response === 'object') {
-          // If it's a single object, wrap in array
-          return [response];
-        } else {
-          // If response format is unexpected, return empty array
-          console.warn('Unexpected API response format:', response);
-          return [];
+          // Response might be wrapped in an object with data/records/result property
+          if (Array.isArray(response.data)) {
+            dataArray = response.data;
+          } else if (Array.isArray(response.records)) {
+            dataArray = response.records;
+          } else if (Array.isArray(response.result)) {
+            dataArray = response.result;
+          } else if (Array.isArray(response.items)) {
+            dataArray = response.items;
+          } else if (response && typeof response === 'object' && !Array.isArray(response)) {
+            // Single object response, wrap in array
+            dataArray = [response];
+          }
         }
+        
+        // Log the parsed data
+        console.log('✅ Parsed Data Array:', dataArray?.length || 0, 'records');
+        if (dataArray.length > 0) {
+          console.log('📊 Sample record:', dataArray[0]);
+        }
+        
+        return dataArray || [];
       }),
       catchError(error => {
-        console.error('API Error:', error);
-        // Return fallback data for development
+        console.error('❌ API Error:', error);
+        console.warn('⚠️ Using fallback data');
         return of(this.getFallbackData());
       })
     );
@@ -152,7 +171,13 @@ getLast24HoursData(wbId: string): Observable<any[]> {
 getSummary(start: string, end: string, wbId: string): Observable<any> {
   // backend summary/day endpoint expects full ISO datetimes for start/end
   const params = { start, end, wbId };
-  return this.http.get<any>(`${this.baseUrl}/report/summary/day`, { params }).pipe(
+  const url = `${this.baseUrl}/report/summary/day`;
+  console.log('🔵 API Request - getSummary:', { url, params });
+  
+  return this.http.get<any>(url, { params }).pipe(
+    tap(data => {
+      console.log('✅ API Response - getSummary:', data);
+    }),
     map(data => {
       // Expected response shape: { totalTrips, totalNetWeight }
       const totalTrips = data?.totalTrips ?? data?.totalVehicles ?? 0;
@@ -166,7 +191,8 @@ getSummary(start: string, end: string, wbId: string): Observable<any> {
       };
     }),
     catchError(error => {
-      console.error('Error fetching summary:', error);
+      console.error('❌ API Error - getSummary:', error);
+      console.log('⚠️ Returning mock data instead');
       return of(this.getMockSummaryData());
     })
   );

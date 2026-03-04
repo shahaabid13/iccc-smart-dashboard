@@ -135,6 +135,10 @@ import { Subject, takeUntil } from 'rxjs';
               <span class="item-icon">📊</span>
               <span>Analytics Charts</span>
             </a>
+            <a routerLink="/anpr/bus-analytics" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">🚌</span>
+              <span>Bus Analytics</span>
+            </a>
           </div>
         </div>
       </nav>

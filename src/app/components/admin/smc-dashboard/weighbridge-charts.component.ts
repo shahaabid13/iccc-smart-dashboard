@@ -7,6 +7,7 @@ import { NgChartsModule } from 'ng2-charts';
 import { TimeFrame, TimeFrameDataDTO, TimeFrameRequest } from '../../../services/timeframe.service';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 @Component({
   standalone: true,
@@ -54,6 +55,16 @@ import autoTable from 'jspdf-autotable';
             <button (click)="setPeriod('week')" [class.active]="selectedPeriod === 'week'">This Week</button>
             <button (click)="setPeriod('month')" [class.active]="selectedPeriod === 'month'">This Month</button>
             <button (click)="setPeriod('custom')" [class.active]="selectedPeriod === 'custom'">Custom</button>
+          </div>
+
+          <!-- Report Buttons -->
+          <div class="report-buttons">
+            <button (click)="exportReportToExcel()" class="report-btn excel-btn" title="Download report as Excel">
+              <span class="btn-icon">📊</span> Export Excel Report
+            </button>
+            <button (click)="exportReportToPDF()" class="report-btn pdf-btn" title="Download report as PDF">
+              <span class="btn-icon">📄</span> Export PDF Report
+            </button>
           </div>
         </div>
       </div>
@@ -946,6 +957,10 @@ export class WeighbridgeChartsComponent implements OnInit {
   endDate: string;
   selectedPeriod: string = 'week';
 
+  // Weighbridge data properties (for report generation)
+  allWeighbridgeData: any[] = [];
+  filteredRecords: any[] = [];
+
   // Timeframe properties
   selectedTimeframe: string = 'WEEKLY';
   timeframeChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
@@ -1069,6 +1084,13 @@ export class WeighbridgeChartsComponent implements OnInit {
         break;
     }
     
+    // Filter records if data is already loaded
+    if (this.allWeighbridgeData && this.allWeighbridgeData.length > 0) {
+      console.log('\n📌 Period changed to:', period);
+      console.log('New date range:', this.startDate, 'to', this.endDate);
+      this.filterRecordsByDateRange();
+    }
+    
     this.loadSummary();
     this.loadNetTrend();
     this.loadTimeframeData();
@@ -1076,6 +1098,14 @@ export class WeighbridgeChartsComponent implements OnInit {
 
   onDateChange(): void {
     this.selectedPeriod = 'custom';
+    
+    // Filter records if data is already loaded
+    if (this.allWeighbridgeData && this.allWeighbridgeData.length > 0) {
+      console.log('\n📌 Custom dates changed');
+      console.log('New date range:', this.startDate, 'to', this.endDate);
+      this.filterRecordsByDateRange();
+    }
+    
     this.loadSummary();
     this.loadNetTrend();
     this.loadTimeframeData();
@@ -1171,6 +1201,11 @@ export class WeighbridgeChartsComponent implements OnInit {
       return;
     }
 
+    console.log('\n========== LOADING DATA ==========');
+    console.log('🔵 WB ID:', this.wbId);
+    console.log('📅 Date Range:', this.startDate, 'to', this.endDate);
+    console.log('================================\n');
+
     this.loading = true;
     this.error = false;
 
@@ -1179,7 +1214,8 @@ export class WeighbridgeChartsComponent implements OnInit {
       this.loadLast24Trend(),
       this.loadSummary(),
       this.loadTimeframeData(),
-      this.loadAllTimeSummary()
+      this.loadAllTimeSummary(),
+      this.loadAllWeighbridgeRecords()
     ]).finally(() => {
       this.loading = false;
     });
@@ -1272,6 +1308,117 @@ export class WeighbridgeChartsComponent implements OnInit {
         }
       });
     });
+  }
+
+  /**
+   * Load all weighbridge records for report generation
+   */
+  loadAllWeighbridgeRecords(): Promise<void> {
+    return new Promise((resolve) => {
+      console.log('\n📊 === LOADING ALL WEIGHBRIDGE RECORDS ===');
+      console.log('WB ID:', this.wbId);
+      
+      this.smcService.getAllWeighbridgeData(this.wbId).subscribe({
+        next: (data: any[]) => {
+          this.allWeighbridgeData = data || [];
+          console.log('✅ Total records loaded:', this.allWeighbridgeData.length);
+          
+          if (this.allWeighbridgeData.length > 0) {
+            console.log('\n📋 FIRST RECORD STRUCTURE:');
+            const firstRecord = this.allWeighbridgeData[0];
+            console.log('Full first record:', JSON.stringify(firstRecord, null, 2));
+            console.log('\n🗂️ AVAILABLE FIELDS:');
+            console.log(Object.keys(firstRecord));
+            
+            // Log specific fields
+            console.log('\n🔍 KEY FIELDS IN FIRST RECORD:');
+            console.log('  id:', firstRecord.id);
+            console.log('  vno:', firstRecord.vno);
+            console.log('  edate:', firstRecord.edate);
+            console.log('  gdate:', firstRecord.gdate);
+            console.log('  gweight:', firstRecord.gweight);
+            console.log('  nweight:', firstRecord.nweight);
+          }
+          
+          console.log('\n=== STARTING DATE FILTER ===\n');
+          // Apply current date filter to filteredRecords
+          this.filterRecordsByDateRange();
+          resolve();
+        },
+        error: (err) => {
+          console.error('❌ Error loading all weighbridge data:', err);
+          this.allWeighbridgeData = [];
+          this.filteredRecords = [];
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Filter records by date range (for report generation)
+   */
+  filterRecordsByDateRange(): void {
+    console.log('\n🔍 === FILTERING BY DATE RANGE ===');
+    console.log('Filter Date Range:', this.startDate, 'to', this.endDate);
+    console.log('Total records to filter:', this.allWeighbridgeData?.length || 0);
+    
+    if (!this.allWeighbridgeData || this.allWeighbridgeData.length === 0) {
+      console.warn('⚠️  No data available for filtering');
+      this.filteredRecords = [];
+      return;
+    }
+
+    // Filter records by date range (matching SMC Dashboard approach)
+    this.filteredRecords = this.allWeighbridgeData.filter((record, index) => {
+      const recordDate = this.getRecordDate(record);
+      
+      if (!recordDate) {
+        console.log(`Record ${index}: ❌ NO VALID DATE - Skipping`);
+        return false;
+      }
+
+      // Check if date is within range
+      if (this.startDate && recordDate < new Date(this.startDate)) {
+        return false;
+      }
+      if (this.endDate && recordDate > new Date(this.endDate + 'T23:59:59')) {
+        return false;
+      }
+      
+      console.log(`Record ${index}: ✅ INCLUDED`);
+      console.log('  Slip No:', record.id?.slipno);
+      console.log('  VNo:', record.vno);
+      console.log('  Record Date:', recordDate.toISOString());
+      console.log('  GWeight:', record.gweight);
+      console.log('  NWeight:', record.nweight);
+      
+      return true;
+    });
+
+    console.log('\n✅ === FILTER COMPLETE ===');
+    console.log('Total filtered records:', this.filteredRecords.length);
+    console.log('=========================\n');
+  }
+
+  /**
+   * Extract date from record (handles multiple possible date fields)
+   */
+  getRecordDate(record: any): Date | null {
+    // Try multiple possible date field names
+    const dateStr = record.edate || record.gdate || record.entryDate || record.date;
+    
+    if (!dateStr) {
+      return null;
+    }
+
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return null;
+      return date;
+    } catch {
+      return null;
+    }
   }
 
   loadTimeframeData(): Promise<void> {
@@ -2037,5 +2184,317 @@ export class WeighbridgeChartsComponent implements OnInit {
       return this.startDate;
     }
     return `${this.startDate} to ${this.endDate}`;
+  }
+
+  // ==================== REPORT GENERATION METHODS ====================
+
+  /**
+   * Export weighbridge data as an Excel report with totals
+   */
+  exportReportToExcel(): void {
+    if (!this.summaryData) {
+      alert('No data to export. Please load data first.');
+      return;
+    }
+
+    try {
+      const reportRows = this.getReportRows();
+      
+      if (reportRows.length === 0) {
+        alert('No data available for export');
+        return;
+      }
+
+      // Build array-of-arrays: header + data rows
+      const header = ['WB ID', 'Date', 'Time', 'Net Weight (kg)', 'Gross Weight (kg)'];
+      
+      // Format rows
+      const body = reportRows.map(r => [
+        r['wbId'] || 'N/A',
+        r['date'] || 'N/A',
+        r['time'] || 'N/A',
+        this.formatWeightSimple(r['netWeight']),
+        this.formatWeightSimple(r['grossWeight'])
+      ]);
+
+      // Calculate totals
+      const sumNetWeight = reportRows.reduce((s, x) => {
+        const value = parseFloat(x['netWeight'].toString().replace(/\./g, '').replace(/,/g, '.'));
+        return s + (isNaN(value) ? 0 : value);
+      }, 0);
+      
+      const sumGrossWeight = reportRows.reduce((s, x) => {
+        const value = parseFloat(x['grossWeight'].toString().replace(/\./g, '').replace(/,/g, '.'));
+        return s + (isNaN(value) ? 0 : value);
+      }, 0);
+
+      // Add summary rows
+      body.push(['', '', '', '', '']);
+      body.push(['', '', 'TOTALS', 
+        this.formatNumberWithUnits(sumNetWeight),
+        this.formatNumberWithUnits(sumGrossWeight)
+      ]);
+      body.push(['', '', 'Total Records', reportRows.length.toString(), '']);
+
+      const aoa = [header, ...body];
+      const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Set column widths
+      worksheet['!cols'] = [
+        { wch: 20 },  // WB ID
+        { wch: 15 },  // Date
+        { wch: 12 },  // Time
+        { wch: 18 },  // Net Weight
+        { wch: 18 }   // Gross Weight
+      ];
+
+      const workbook: XLSX.WorkBook = { 
+        Sheets: { 'Report': worksheet }, 
+        SheetNames: ['Report'] 
+      };
+      
+      const fileName = `Weighbridge_Report_${this.getDateRangeLabel().replace(/ /g, '_')}_${new Date().getTime()}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      
+      console.log('✅ Report exported to Excel successfully');
+    } catch (err) {
+      console.error('❌ Error exporting report to Excel', err);
+      alert('Error exporting report to Excel');
+    }
+  }
+
+  /**
+   * Export weighbridge data as a PDF report with totals
+   */
+  exportReportToPDF(): void {
+    if (!this.summaryData) {
+      alert('No data to export. Please load data first.');
+      return;
+    }
+
+    try {
+      const reportRows = this.getReportRows();
+      
+      if (reportRows.length === 0) {
+        alert('No data available for export');
+        return;
+      }
+
+      const doc = new jsPDF();
+
+      // Add title and header info
+      doc.setFontSize(14);
+      doc.setTextColor(40);
+      doc.text('Weighbridge Analytics Report', 14, 15);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Weighbridge ID: ${this.wbId}`, 14, 22);
+      doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 28);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 34);
+
+      // Calculate totals
+      let sumNetWeight = 0;
+      let sumGrossWeight = 0;
+      
+      const formattedRows = reportRows.map(row => {
+        const netWt = parseFloat(row['netWeight'].toString().replace(/\./g, '').replace(/,/g, '.')) || 0;
+        const grossWt = parseFloat(row['grossWeight'].toString().replace(/\./g, '').replace(/,/g, '.')) || 0;
+        
+        sumNetWeight += netWt;
+        sumGrossWeight += grossWt;
+        
+        return [
+          row['wbId'] || 'N/A',
+          row['date'] || 'N/A',
+          row['time'] || 'N/A',
+          this.formatNumberForPDF(netWt),
+          this.formatNumberForPDF(grossWt)
+        ];
+      });
+
+      // Add totals row
+      formattedRows.push(['', '', 'TOTALS', 
+        this.formatNumberForPDF(sumNetWeight),
+        this.formatNumberForPDF(sumGrossWeight)
+      ]);
+      formattedRows.push(['', '', 'Total Records', reportRows.length.toString(), '']);
+
+      // Create table
+      autoTable(doc, {
+        head: [['WB ID', 'Date', 'Time', 'Net Weight (kg)', 'Gross Weight (kg)']],
+        body: formattedRows,
+        startY: 40,
+        margin: { left: 10, right: 10 },
+        tableWidth: 'auto',
+        styles: {
+          fontSize: 8,
+          cellPadding: 4,
+          font: 'helvetica',
+          lineWidth: 0.1,
+          overflow: 'linebreak',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { cellWidth: 25, halign: 'center' },
+          1: { cellWidth: 25, halign: 'center' },
+          2: { cellWidth: 20, halign: 'center' },
+          3: { cellWidth: 30, halign: 'right' },
+          4: { cellWidth: 30, halign: 'right' }
+        },
+        headStyles: {
+          fillColor: [18, 46, 82],
+          textColor: 255,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        alternateRowStyles: {
+          fillColor: [240, 240, 240]
+        }
+      });
+
+      const fileName = `Weighbridge_Report_${this.getDateRangeLabel().replace(/ /g, '_')}_${new Date().getTime()}.pdf`;
+      doc.save(fileName);
+      
+      console.log('✅ Report exported to PDF successfully');
+    } catch (err) {
+      console.error('❌ Error exporting report to PDF', err);
+      alert('Error exporting report to PDF');
+    }
+  }
+
+  /**
+   * Get report rows from trend data
+   */
+  private getReportRows(): any[] {
+    // Extract data from netTrendChartData if available
+    const reportRows: any[] = [];
+    
+    // This would ideally come from the raw API data, but for now we'll construct from available data
+    if (this.netTrendChartData.labels && this.netTrendChartData.datasets.length > 0) {
+      const labels = this.netTrendChartData.labels as string[];
+      const netWeightData = this.netTrendChartData.datasets[0].data as number[];
+      
+      labels.forEach((label, index) => {
+        reportRows.push({
+          'wbId': this.wbId,
+          'date': label,
+          'time': '',
+          'netWeight': netWeightData[index] || 0,
+          'grossWeight': 0 // We don't have gross weight in the current implementation
+        });
+      });
+    }
+    
+    return reportRows;
+  }
+
+  /**
+   * Helper method to format numbers with dots for thousands and optional decimals
+   */
+  formatNumberWithUnits(num: number | string): string {
+    const cleanNum = num.toString()
+      .replace(/\./g, '')
+      .replace(/,/g, '.')
+      .replace(/[^\d.-]/g, '');
+    
+    const numberValue = parseFloat(cleanNum);
+    
+    if (isNaN(numberValue)) return '0';
+    
+    // For millions (1,000,000 and above)
+    if (Math.abs(numberValue) >= 1000000) {
+      const millions = numberValue / 1000000;
+      const formatted = millions % 1 === 0 ? 
+        Math.floor(millions).toString() : 
+        millions.toFixed(2).replace('.', ',');
+      
+      const parts = formatted.split(',');
+      if (parts[0].length > 3) {
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      }
+      
+      return parts.join(',') + ' M';
+    }
+    
+    // For thousands (1,000 and above, below 1,000,000)
+    if (Math.abs(numberValue) >= 1000) {
+      const formatted = numberValue % 1 === 0 ? 
+        Math.floor(numberValue).toString() : 
+        numberValue.toFixed(2).replace('.', ',');
+      
+      const parts = formatted.split(',');
+      if (parts[0].length > 3) {
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      }
+      
+      return parts.join(',') + ' K';
+    }
+    
+    // For numbers below 1000
+    if (numberValue % 1 === 0) {
+      return Math.floor(numberValue).toString();
+    } else {
+      return numberValue.toFixed(2).replace('.', ',');
+    }
+  }
+
+  /**
+   * Helper method to format individual weight values (no units for individual rows)
+   */
+  formatWeightSimple(weight: string | number): string {
+    if (!weight && weight !== 0) return '0';
+    
+    const cleanWeight = weight.toString()
+      .replace(/\./g, '')
+      .replace(/,/g, '.')
+      .replace(/[^\d.-]/g, '');
+    
+    const weightNum = parseFloat(cleanWeight);
+    
+    if (isNaN(weightNum)) return '0';
+    
+    // No decimal places for whole numbers
+    if (weightNum % 1 === 0) {
+      const intPart = Math.floor(Math.abs(weightNum)).toString();
+      const sign = weightNum < 0 ? '-' : '';
+      
+      // Add thousand separators
+      if (intPart.length > 3) {
+        return sign + intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      }
+      return sign + intPart;
+    }
+    
+    // With decimal places
+    const formatted = weightNum.toFixed(2).replace('.', ',');
+    const parts = formatted.split(',');
+    
+    // Add thousand separators to integer part
+    if (parts[0].replace('-', '').length > 3) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    
+    return parts.join(',');
+  }
+
+  /**
+   * Helper method to format numbers for PDF display
+   */
+  private formatNumberForPDF(num: number): string {
+    return num.toLocaleString('en-US', {
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+      useGrouping: true
+    });
+  }
+
+  /**
+   * Get date range label for file names and reports
+   */
+  private getDateRangeLabel(): string {
+    if (!this.startDate && !this.endDate) return 'AllDates';
+    if (this.startDate === this.endDate) return this.startDate;
+    return `${this.startDate}_to_${this.endDate}`;
   }
 }

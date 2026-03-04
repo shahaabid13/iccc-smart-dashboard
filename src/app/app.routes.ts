@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { AdminGuard } from './guards/admin.guard';
 import { AnprAnalyticsTableComponent } from './components/admin/anpr-analytics-table.component';
 import { AnprAnalyticsChartsComponent } from './components/admin/anpr-analytics-charts.component';
+import { BusAnalyticsComponent } from './components/admin/bus-analytics.component';
 
 
 export const routes: Routes = [
@@ -57,6 +58,10 @@ export const routes: Routes = [
     {
       path: 'analytics-charts',
       component: AnprAnalyticsChartsComponent
+    },
+    {
+      path: 'bus-analytics',
+      component: BusAnalyticsComponent
     }
   ]
 },
