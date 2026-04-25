@@ -4,6 +4,7 @@ import { HeaderComponent } from './components/shared/header/header.component';
 import { WeighbridgeChartsComponent } from './components/admin/smc-dashboard/weighbridge-charts.component';
 import { CommonModule } from '@angular/common';
 import { SidebarService } from './services/sidebar.service';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -14,13 +15,14 @@ import { SidebarService } from './services/sidebar.service';
 export class App {
   protected readonly title = signal('inventory-management');
 
-  constructor(private sidebarService: SidebarService) {
+  constructor(private sidebarService: SidebarService, private authService: AuthService) {
+
     // Effect to update content wrapper padding based on sidebar state
     effect(() => {
       const isCollapsed = this.sidebarService.sidebarCollapsed();
       const isMobile = this.sidebarService.isMobile();
       const contentWrapper = document.querySelector('.content-wrapper');
-      
+
       if (contentWrapper) {
         if (isMobile) {
           (contentWrapper as HTMLElement).style.paddingLeft = '0';

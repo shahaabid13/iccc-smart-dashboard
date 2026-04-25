@@ -16,7 +16,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatOptionModule } from '@angular/material/core';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 
 @Component({
   standalone: true,
@@ -33,7 +32,6 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
     MatCardModule,
     MatAutocompleteModule,
     MatOptionModule,
-    MatPaginatorModule,
   ],
   template: `
     <div class="page-container">
@@ -154,16 +152,36 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
               <td mat-cell *matCellDef="let item">{{ item.locationName || 'N/A' }}</td>
             </ng-container>
 
-            <!-- Serial Number -->
-            <ng-container matColumnDef="serialNumber">
-              <th mat-header-cell *matHeaderCellDef>Serial No.</th>
-              <td mat-cell *matCellDef="let item">{{ item.serialNumber || 'N/A' }}</td>
+            <!-- Coordinates -->
+            <ng-container matColumnDef="coordinates">
+              <th mat-header-cell *matHeaderCellDef>Coordinates</th>
+              <td mat-cell *matCellDef="let d" class="coordinates-cell">
+                <div *ngIf="d.latitude && d.longitude; else noCoords">
+                  <small>Lat: {{ d.latitude | number:'1.4-4' }}</small><br>
+                  <small>Lng: {{ d.longitude | number:'1.4-4' }}</small>
+                </div>
+                <ng-template #noCoords>
+                  <span class="no-data">No coordinates</span>
+                </ng-template>
+              </td>
+            </ng-container>
+
+            <!-- Approach Road -->
+            <ng-container matColumnDef="approachRoad">
+              <th mat-header-cell *matHeaderCellDef>Approach Road</th>
+              <td mat-cell *matCellDef="let item">{{ item.approachRoad || 'N/A' }}</td>
             </ng-container>
 
             <!-- Device Type -->
             <ng-container matColumnDef="deviceType">
               <th mat-header-cell *matHeaderCellDef>Device Type</th>
-              <td mat-cell *matCellDef="let item">{{ item.deviceType || 'N/A' }}</td>
+              <td mat-cell *matCellDef="let item">{{ getDisplayDeviceType(item) }}</td>
+            </ng-container>
+
+            <!-- Serial Number -->
+            <ng-container matColumnDef="serialNumber">
+              <th mat-header-cell *matHeaderCellDef>Serial No.</th>
+              <td mat-cell *matCellDef="let item">{{ item.serialNumber || 'N/A' }}</td>
             </ng-container>
 
             <!-- Status -->
@@ -192,26 +210,6 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
               </td>
             </ng-container>
 
-            <!-- Approach Road -->
-            <ng-container matColumnDef="approachRoad">
-              <th mat-header-cell *matHeaderCellDef>Approach Road</th>
-              <td mat-cell *matCellDef="let item">{{ item.approachRoad || 'N/A' }}</td>
-            </ng-container>
-
-            <!-- Coordinates -->
-          <ng-container matColumnDef="coordinates">
-              <th mat-header-cell *matHeaderCellDef>Coordinates</th>
-              <td mat-cell *matCellDef="let d" class="coordinates-cell">
-                <div *ngIf="d.latitude && d.longitude; else noCoords">
-                  <small>Lat: {{ d.latitude | number:'1.4-4' }}</small><br>
-                  <small>Lng: {{ d.longitude | number:'1.4-4' }}</small>
-                </div>
-                <ng-template #noCoords>
-                  <span class="no-data">No coordinates</span>
-                </ng-template>
-              </td>
-            </ng-container>
-
             <!-- Actions (only for admin) -->
             <ng-container *ngIf="isAdmin" matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef>Actions</th>
@@ -236,16 +234,44 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
         </div>
 
         <!-- Pagination -->
-        <mat-paginator
-          *ngIf="filteredItems.length > 0"
-          [length]="filteredItems.length"
-          [pageSize]="pageSize"
-          [pageIndex]="pageIndex"
-          [pageSizeOptions]="[10, 25, 50, 100]"
-          (page)="onPageChange($event)"
-          showFirstLastButtons
-          class="paginator">
-        </mat-paginator>
+        <div class="pagination-container" *ngIf="filteredItems.length > pageSize">
+          <div class="pagination-controls">
+            <div class="pagination-wrapper">
+              <button
+                mat-icon-button
+                [disabled]="pageIndex === 0"
+                (click)="previousPage()"
+                class="pagination-nav-btn">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+
+              <div class="pagination-pages">
+                <button
+                  *ngFor="let page of getVisiblePages()"
+                  mat-button
+                  [class.active]="page.number === pageIndex + 1"
+                  [class.ellipsis]="page.isEllipsis"
+                  (click)="!page.isEllipsis && goToPage(page.number)"
+                  class="pagination-page-btn"
+                  [disabled]="page.isEllipsis">
+                  {{ page.display }}
+                </button>
+              </div>
+
+              <button
+                mat-icon-button
+                [disabled]="pageIndex === totalPages - 1"
+                (click)="nextPage()"
+                class="pagination-nav-btn">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+
+            <div class="pagination-info">
+              Page {{ pageIndex + 1 }} of {{ totalPages }} • {{ filteredItems.length }} total devices
+            </div>
+          </div>
+        </div>
       </mat-card>
     </div>
   `,
@@ -506,9 +532,75 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 
       .paginator {
         border-radius: 8px;
-        background: #fafafa;
         border: 1px solid #e0e0e0;
         width: 100%;
+        background-color: #ffffff !important;
+      }
+
+      .pagination-container {
+        margin-top: 16px;
+        padding: 16px;
+        background: #ffffff;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+      }
+
+      .pagination-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .pagination-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .pagination-nav-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .pagination-pages {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .pagination-page-btn {
+        min-width: 36px;
+        height: 36px;
+        padding: 0;
+        font-size: 14px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+      }
+
+      .pagination-page-btn.active {
+        background-color: #5687b8 !important;
+        color: #ffffff !important;
+        font-weight: 600;
+      }
+
+      .pagination-page-btn:not(.active):not(.ellipsis):hover:not([disabled]) {
+        background-color: #f0f0f0;
+      }
+
+      .pagination-page-btn.ellipsis {
+        min-width: auto;
+        cursor: default;
+      }
+
+      .pagination-info {
+        text-align: center;
+        font-size: 13px;
+        color: #666;
+        font-weight: 500;
       }
 
       /* Responsive Design */
@@ -566,6 +658,9 @@ export class InventoryListComponent implements OnInit {
   isAdmin = false;
   displayedColumns: string[] = [];
 
+  // Map to store display device types with numbering
+  deviceTypeMap = new Map<string, string>();
+
   // Pagination
   pageSize = 10;
   pageIndex = 0;
@@ -592,7 +687,21 @@ export class InventoryListComponent implements OnInit {
   private loadInventory() {
     this.inventory.getAll().subscribe({
       next: (data) => {
-        this.items = data || [];
+        this.items = (data || []).sort((a, b) => {
+          const locA = (a.locationName || '').toLowerCase();
+          const locB = (b.locationName || '').toLowerCase();
+
+          // Primary sort: by Location Name
+          const locCompare = locA.localeCompare(locB);
+          if (locCompare !== 0) {
+            return locCompare;
+          }
+
+          // Secondary sort: by Approach Road (within same location)
+          const roadA = (a.approachRoad || '').toLowerCase();
+          const roadB = (b.approachRoad || '').toLowerCase();
+          return roadA.localeCompare(roadB);
+        });
         this.applyFilters();
       },
       error: (error) => {
@@ -607,13 +716,13 @@ export class InventoryListComponent implements OnInit {
   private setDisplayedColumns() {
     const baseColumns = [
       'locationName',
-      'serialNumber',
+      'coordinates',
+      'approachRoad',
       'deviceType',
+      'serialNumber',
       'status',
       'poles',
-      'ecbPresent',
-      'approachRoad',
-      'coordinates'
+      'ecbPresent'
     ];
 
     if (this.isAdmin) {
@@ -634,12 +743,6 @@ export class InventoryListComponent implements OnInit {
     this.selectedStatus = '';
     this.pageIndex = 0;
     this.applyFilters();
-  }
-
-  onPageChange(event: PageEvent) {
-    this.pageIndex = event.pageIndex;
-    this.pageSize = event.pageSize;
-    this.updatePaginatedItems();
   }
 
   /** Apply Filters */
@@ -665,8 +768,59 @@ export class InventoryListComponent implements OnInit {
       return matchesQuery && matchesLocation && matchesType && matchesStatus;
     });
 
+    // Apply numbering for duplicate device types within same location
+    this.applyDeviceTypeNumbering(this.filteredItems);
+
     this.pageIndex = 0; // Reset to first page when filters change
     this.updatePaginatedItems();
+  }
+
+  /** Apply numbering to duplicate device types within the same location and approach road */
+  private applyDeviceTypeNumbering(items: InventoryItem[]) {
+    this.deviceTypeMap.clear();
+    const deviceTypeCountByLocationRoad = new Map<string, Map<string, number>>();
+
+    items.forEach((item) => {
+      const location = item.locationName || 'Unknown';
+      const approachRoad = item.approachRoad || 'Unknown';
+      const baseDeviceType = item.deviceType || 'Unknown';
+
+      // Create a composite key for location + approach road
+      const locationRoadKey = `${location}|||${approachRoad}`;
+
+      if (!deviceTypeCountByLocationRoad.has(locationRoadKey)) {
+        deviceTypeCountByLocationRoad.set(locationRoadKey, new Map());
+      }
+
+      const typeCountMap = deviceTypeCountByLocationRoad.get(locationRoadKey)!;
+      const currentCount = (typeCountMap.get(baseDeviceType) || 0) + 1;
+      typeCountMap.set(baseDeviceType, currentCount);
+
+      // Generate unique key for this item
+      const itemKey = `${item.id || item.serialNumber}`;
+
+      // Only number if there are duplicates in this location+road combination
+      const displayType = currentCount > 1 || this.hasMoreDuplicatesInGroup(items, location, approachRoad, baseDeviceType)
+        ? `${baseDeviceType} ${currentCount}`
+        : baseDeviceType;
+
+      this.deviceTypeMap.set(itemKey, displayType);
+    });
+  }
+
+  /** Check if a device type appears more than once in a location+approach road group */
+  private hasMoreDuplicatesInGroup(items: InventoryItem[], location: string, approachRoad: string, deviceType: string): boolean {
+    return items.filter(
+      item => item.locationName === location &&
+               item.approachRoad === approachRoad &&
+               item.deviceType === deviceType
+    ).length > 1;
+  }
+
+  /** Get display device type for an item */
+  getDisplayDeviceType(item: InventoryItem): string {
+    const itemKey = `${item.id || item.serialNumber}`;
+    return this.deviceTypeMap.get(itemKey) || item.deviceType || 'N/A';
   }
 
   private updatePaginatedItems() {
@@ -706,11 +860,98 @@ export class InventoryListComponent implements OnInit {
 
   /** Count devices with poles */
   getPolesCount(): number {
-    return this.items.filter(device => device.poles).length;
+    const uniquePoles = new Set(
+      this.items
+        .filter(device => device.poles)
+        .map(device => {
+          const locationName = (device.locationName || '').toLowerCase().trim();
+          const approachRoad = (device.approachRoad || '').toLowerCase().trim();
+          return `${locationName}|${approachRoad}`;
+        })
+    );
+    return uniquePoles.size;
   }
 
-  /** Count devices with ECB present */
+  /** Count unique locations with ECB present */
+  /** Deduplicates by locationName + approachRoad with normalized strings */
   getECBCount(): number {
-    return this.items.filter(device => device.ecbPresent).length;
+    const uniqueECB = new Set(
+      this.items
+        .filter(device => device.ecbPresent)
+        .map(device => {
+          const locationName = (device.locationName || '').toLowerCase().trim();
+          const approachRoad = (device.approachRoad || '').toLowerCase().trim();
+          return `${locationName}|${approachRoad}`;
+        })
+    );
+    return uniqueECB.size;
+  }
+
+  /** Get total number of pages */
+  get totalPages(): number {
+    return Math.ceil(this.filteredItems.length / this.pageSize);
+  }
+
+  /** Get visible page numbers for pagination */
+  getVisiblePages(): Array<{ number: number; display: string; isEllipsis: boolean }> {
+    const pages: Array<{ number: number; display: string; isEllipsis: boolean }> = [];
+    const maxVisible = 5;
+    const currentPage = this.pageIndex + 1;
+
+    if (this.totalPages <= maxVisible) {
+      for (let i = 1; i <= this.totalPages; i++) {
+        pages.push({ number: i, display: i.toString(), isEllipsis: false });
+      }
+    } else {
+      const halfVisible = Math.floor(maxVisible / 2);
+
+      if (currentPage <= halfVisible + 1) {
+        for (let i = 1; i <= maxVisible; i++) {
+          pages.push({ number: i, display: i.toString(), isEllipsis: false });
+        }
+        pages.push({ number: 0, display: '...', isEllipsis: true });
+        pages.push({ number: this.totalPages, display: this.totalPages.toString(), isEllipsis: false });
+      } else if (currentPage >= this.totalPages - halfVisible) {
+        pages.push({ number: 1, display: '1', isEllipsis: false });
+        pages.push({ number: 0, display: '...', isEllipsis: true });
+        for (let i = this.totalPages - maxVisible + 1; i <= this.totalPages; i++) {
+          pages.push({ number: i, display: i.toString(), isEllipsis: false });
+        }
+      } else {
+        pages.push({ number: 1, display: '1', isEllipsis: false });
+        pages.push({ number: 0, display: '...', isEllipsis: true });
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push({ number: i, display: i.toString(), isEllipsis: false });
+        }
+        pages.push({ number: 0, display: '...', isEllipsis: true });
+        pages.push({ number: this.totalPages, display: this.totalPages.toString(), isEllipsis: false });
+      }
+    }
+
+    return pages;
+  }
+
+  /** Go to specific page */
+  goToPage(pageNumber: number): void {
+    if (pageNumber >= 1 && pageNumber <= this.totalPages) {
+      this.pageIndex = pageNumber - 1;
+      this.updatePaginatedItems();
+    }
+  }
+
+  /** Go to next page */
+  nextPage(): void {
+    if (this.pageIndex < this.totalPages - 1) {
+      this.pageIndex++;
+      this.updatePaginatedItems();
+    }
+  }
+
+  /** Go to previous page */
+  previousPage(): void {
+    if (this.pageIndex > 0) {
+      this.pageIndex--;
+      this.updatePaginatedItems();
+    }
   }
 }

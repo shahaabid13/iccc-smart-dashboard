@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private readonly baseUrl = 'http://localhost:8080/api'; // 🔹 Update if your backend URL changes
+  private readonly baseUrl = '/api'; // 🔹 Update if your backend URL changes
 
   constructor(private http: HttpClient) {}
 

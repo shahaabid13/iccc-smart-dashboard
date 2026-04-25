@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class ExcelService {
-  private apiUrl = 'http://localhost:8080/api/excel'; // ✅ adjust if backend URL differs
+  private apiUrl = '/api/excel'; // ✅ adjust if backend URL differs
 
   constructor(private http: HttpClient) {}
 

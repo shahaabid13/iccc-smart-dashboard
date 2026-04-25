@@ -201,20 +201,13 @@ export class LoginComponent {
       this.submitting = true;
 
       this.authService.login(username, password).subscribe({
-        next: (res) => {
-          // ✅ Store JWT token
-          localStorage.setItem('token', res.token);
-          localStorage.setItem('role', res.role);
-
-          // ✅ Notify AuthService
-
-          // ✅ Navigate by role
-          if (res.role === 'ADMIN') {
-            this.router.navigate(['/admin/dashboard']);
-          } else {
-            this.router.navigate(['/inventory']);
-          }
-        },
+       next: (res) => {
+  if (res.role === 'ADMIN') {
+    this.router.navigate(['/admin/dashboard']);
+  } else {
+    this.router.navigate(['/inventory']);
+  }
+},
         error: () => {
           alert('❌ Invalid username or password');
           this.submitting = false;

@@ -27,67 +27,54 @@ export const routes: Routes = [
 		path: 'charts',
 		loadComponent: () => import('./components/admin/smc-dashboard/weighbridge-charts.component').then((m) => m.WeighbridgeChartsComponent),
 	},
-  {
-    path: 'smc',
-    loadComponent: () => import('./components/admin/smc-dashboard/smc-dashboard.component').then((m) => m.SmcDashboardComponent),
-  },
-  {
-  path: 'admin/excel-upload',
-  loadComponent: () =>
-    import('./components/admin/excel-upload/excel-upload.component').then(
-      (m) => m.ExcelUploadComponent
-    ),
-},
-
+	{
+		path: 'smc',
+		loadComponent: () => import('./components/admin/smc-dashboard/smc-dashboard.component').then((m) => m.SmcDashboardComponent),
+	},
+	{
+		path: 'admin/excel-upload',
+		loadComponent: () =>
+			import('./components/admin/excel-upload/excel-upload.component').then(
+				(m) => m.ExcelUploadComponent
+			),
+	},
 	{
 		path: 'devices/search',
 		loadComponent: () => import('./components/devices/device-search/device-search.component').then((m) => m.DeviceSearchComponent),
 	},
-  {
-  path: 'devices/:deviceId/history',
-  loadComponent: () => import('./components/devices/device-history/device-history.component')
-    .then(m => m.DeviceHistoryComponent),
-},
-{
-  path: 'anpr',
-  children: [
-    {
-      path: 'analytics-table',
-      component: AnprAnalyticsTableComponent
-    },
-    {
-      path: 'analytics-charts',
-      component: AnprAnalyticsChartsComponent
-    },
-    {
-      path: 'bus-analytics',
-      component: BusAnalyticsComponent
-    }
-  ]
-},
-
+	{
+		path: 'devices/:deviceId/history',
+		loadComponent: () => import('./components/devices/device-history/device-history.component')
+			.then(m => m.DeviceHistoryComponent),
+	},
+	{
+		path: 'anpr',
+		children: [
+			{
+				path: 'analytics-table',
+				component: AnprAnalyticsTableComponent
+			},
+			{
+				path: 'analytics-charts',
+				component: AnprAnalyticsChartsComponent
+			},
+			{
+				path: 'bus-analytics',
+				component: BusAnalyticsComponent
+			}
+		]
+	},
 	{
 		path: 'maintenance/request',
 		loadComponent: () => import('./components/maintenance/maintenance-request/maintenance-request.component').then((m) => m.MaintenanceRequestComponent),
-	},
-	{
-		path: 'admin/excel-upload',
-		loadComponent: () => import('./components/admin/excel-upload/excel-upload.component').then((m) => m.ExcelUploadComponent),
-		canActivate: [AdminGuard],
 	},
 	{
 		path: 'admin/dashboard',
 		loadComponent: () => import('./components/admin/dashboard/dashboard.component').then((m) => m.DashboardComponent),
 		canActivate: [AdminGuard],
 	},
-  {
-  path: 'devices/:deviceId/history',
-  loadComponent: () => import('./components/devices/device-history/device-history.component')
-    .then(m => m.DeviceHistoryComponent),
-},
-
-   {
-    path: 'admin/all-requests',
+	{
+		path: 'admin/all-requests',
 		loadComponent: () => import('./components/admin/all-requests/all-requests').then((m) => m.AllRequestsComponent),
 	},
 	{
@@ -101,11 +88,11 @@ export const routes: Routes = [
 		canActivate: [AdminGuard],
 	},
 	{
-		path: 'pages-not-found', 
+		path: 'pages-not-found',
 		loadComponent: () => import('./components/shared/header/page-not-found.component').then((m) => m.PageNotFoundComponent),
 	},
 	{
-		path: 'coming-soon', 
+		path: 'coming-soon',
 		loadComponent: () => import('./components/shared/header/coming-soon.component').then((m) => m.ComingSoonComponent),
 	},
 	// fallback

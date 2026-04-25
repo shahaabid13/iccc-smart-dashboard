@@ -26,7 +26,7 @@ export class AuthService {
   /** ------------------------
    * API BASE URL
    * ------------------------- */
-  private apiUrl = 'http://localhost:8080/api/auth'; // ✅ Spring Boot backend
+  private apiUrl = '/api/auth'; // ✅ Spring Boot backend
 
   /** ------------------------
    * USER STATE MANAGEMENT
@@ -87,10 +87,14 @@ export class AuthService {
   /** ------------------------
    * LOGOUT FUNCTION
    * ------------------------- */
-  logout(): void {
-    localStorage.clear();
-    this.currentUserSubject.next(null);
-  }
+ // ✅ FIX - Only clear admin-specific keys
+logout(): void {
+  localStorage.removeItem('token');
+  localStorage.removeItem('role');
+  localStorage.removeItem('username');
+  localStorage.removeItem('currentUser');
+  this.currentUserSubject.next(null);
+}
 
   /** ------------------------
    * TOKEN + ROLE MANAGEMENT
@@ -125,7 +129,7 @@ export class AuthService {
   isAdmin(): boolean {
     return this.getRole()?.toLowerCase() === 'admin';
   }
-  
+
 
   getCurrentUser(): User | null {
     return this.currentUserSubject.value;
@@ -134,5 +138,19 @@ export class AuthService {
   setCurrentUser(user: User): void {
     localStorage.setItem('currentUser', JSON.stringify(user));
     this.currentUserSubject.next(user);
+  }
+
+  /**
+   * DEVELOPMENT ONLY: Auto-generate a test token for development/testing
+   * This bypasses the need to login to test the weighbridge module
+   */
+  initializeDevToken(): void {
+    if (!this.getToken()) {
+      const devToken = 'dev-test-token-' + Date.now();
+      localStorage.setItem('token', devToken);
+      localStorage.setItem('role', 'admin');
+      console.log('✅ [DEV] Test token created for weighbridge testing');
+      console.log('   Token:', devToken);
+    }
   }
 }

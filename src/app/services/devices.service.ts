@@ -21,7 +21,7 @@ export interface Device {
 }
 @Injectable({ providedIn: 'root' })
 export class DevicesService {
-  private apiUrl = 'http://localhost:8080/api/devices';
+  private apiUrl = '/api/devices';
   constructor(private api: ApiService , private http: HttpClient) {}
 
   /** ✅ Get all devices */

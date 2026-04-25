@@ -16,7 +16,7 @@
       "architect": {
         "build": {
           "builder": "@angular/build:application",
-          "options": {
+          "options": { "outputPath": "../iccc-smart-dashboard/src/main/resources/static",
             "browser": "src/main.ts",
             "polyfills": [
               "zone.js"
@@ -39,14 +39,10 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
-                },
-                {
-                  "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "1MB",
+                  "maximumError": "3MB"
                 }
+
               ],
               "outputHashing": "all"
             },

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map, catchError, of, tap } from 'rxjs';
 import { TimeFrameDataDTO, TimeFrameRequest } from './timeframe.service';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class SmcService {
@@ -11,7 +12,8 @@ export class SmcService {
     throw new Error('Method not implemented.');
   }
   // Updated API base URL for the new endpoint
-  private readonly baseUrl = 'http://localhost:8080/api/weighbridge';
+  // private readonly baseUrl = '/api/weighbridge';
+  private baseUrl = environment.swmApiUrl;
 
   constructor(private http: HttpClient) {}
 
@@ -20,12 +22,12 @@ export class SmcService {
    */
   getAllWeighbridgeData(wbId: string): Observable<any[]> {
     const url = `${this.baseUrl}/report/data/all/${wbId}`;
-    
+
     return this.http.get<any>(url).pipe(
       tap(response => console.log('🔵 Raw API Response:', response)),
       map(response => {
         let dataArray: any[] = [];
-        
+
         // Handle different response formats from backend
         if (Array.isArray(response)) {
           // Response is already an array
@@ -45,13 +47,13 @@ export class SmcService {
             dataArray = [response];
           }
         }
-        
+
         // Log the parsed data
         console.log('✅ Parsed Data Array:', dataArray?.length || 0, 'records');
         if (dataArray.length > 0) {
           console.log('📊 Sample record:', dataArray[0]);
         }
-        
+
         return dataArray || [];
       }),
       catchError(error => {
@@ -173,7 +175,7 @@ getSummary(start: string, end: string, wbId: string): Observable<any> {
   const params = { start, end, wbId };
   const url = `${this.baseUrl}/report/summary/day`;
   console.log('🔵 API Request - getSummary:', { url, params });
-  
+
   return this.http.get<any>(url, { params }).pipe(
     tap(data => {
       console.log('✅ API Response - getSummary:', data);
@@ -294,7 +296,7 @@ private getMockTimeframeData(): TimeFrameDataDTO[] {
   ];
 }
   // Keep your existing trend methods
-  
+
 
   /**
    * Updated fallback mock data to match the new API response structure

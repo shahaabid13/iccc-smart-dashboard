@@ -394,7 +394,7 @@ import autoTable from 'jspdf-autotable';
     display: flex;
     gap: 32px;
     align-items: center;
-    
+
   }
 
   .action-btn {
@@ -480,7 +480,7 @@ import autoTable from 'jspdf-autotable';
     padding: 20px 24px 16px 24px;
     background: #f8f9fa;
     border-bottom: 1px solid #e9ecef;
-    
+
   }
 
   .table-info {
@@ -492,7 +492,7 @@ import autoTable from 'jspdf-autotable';
   .table-actions {
     display: flex;
     gap: 12px;
-    
+
   }
 
   .view-toggle {
@@ -1241,13 +1241,33 @@ export class DashboardComponent implements OnInit {
     ).length;
   }
 
-  /** Count devices with poles */
+  /** Count unique poles (one pole per location + approach road combination) */
+  /** Deduplicates devices by locationName + approachRoad with normalized strings */
   getPolesCount(): number {
-    return this.devices.filter(device => device.poles).length;
+    const uniquePoles = new Set(
+      this.devices
+        .filter(device => device.poles)
+        .map(device => {
+          const locationName = (device.locationName || '').toLowerCase().trim();
+          const approachRoad = (device.approachRoad || '').toLowerCase().trim();
+          return `${locationName}|${approachRoad}`;
+        })
+    );
+    return uniquePoles.size;
   }
 
-  /** Count devices with ECB present */
+  /** Count unique locations with ECB present */
+  /** Deduplicates by locationName + approachRoad with normalized strings */
   getECBCount(): number {
-    return this.devices.filter(device => device.ecbPresent).length;
+    const uniqueECB = new Set(
+      this.devices
+        .filter(device => device.ecbPresent)
+        .map(device => {
+          const locationName = (device.locationName || '').toLowerCase().trim();
+          const approachRoad = (device.approachRoad || '').toLowerCase().trim();
+          return `${locationName}|${approachRoad}`;
+        })
+    );
+    return uniqueECB.size;
   }
 }

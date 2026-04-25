@@ -8,7 +8,7 @@ export class InventoryService {
   getByAgency(userAgency: string) {
     throw new Error('Method not implemented.');
   }
-  private apiUrl = 'http://localhost:8080/api/devices';
+  private apiUrl = '/api/devices';
 
   constructor(private http: HttpClient) {}
 

@@ -1000,7 +1000,7 @@ export class BusAnalyticsComponent implements OnInit {
   routePerformanceChartOptions: ChartConfiguration['options'] = {};
 
   private http = inject(HttpClient);
-  private baseUrl = 'http://localhost:8080/api';
+  private baseUrl = '/api';
 
   constructor() {
     const today = new Date();

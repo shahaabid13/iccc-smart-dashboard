@@ -427,8 +427,8 @@ export class MaintenanceRequestComponent {
   form: FormGroup;
   submitting = false;
   fetchingDetails = false;
-  private baseUrl = 'http://localhost:8080/api/maintenance/requests';
-  private deviceBaseUrl = 'http://localhost:8080/api/devices'; // FIXED: Base URL without the endpoint
+  private baseUrl = '/api/maintenance/requests';
+  private deviceBaseUrl = '/api/devices'; // FIXED: Base URL without the endpoint
 
   // Request types from your Java enum
   requestTypes = [

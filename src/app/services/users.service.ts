@@ -5,7 +5,7 @@ import { ApiService } from './api.service';
 @Injectable({ providedIn: 'root' })
 export class UsersService {
   constructor(private api: ApiService) {}
-  private apiUrl = 'http://localhost:8080/api/auth';
+  private apiUrl = '/api/auth';
 
   createUser(params: Record<string, any>): Observable<any> {
     // backend expects query params according to the spec

@@ -635,7 +635,7 @@ export class DeviceHistoryComponent implements OnInit {
   /** Fetch device history from backend API */
   loadHistory(deviceId: string) {
     this.loading = true;
-    this.http.get<any[]>(`http://localhost:8080/api/history/device/${deviceId}`).subscribe({
+    this.http.get<any[]>(`/api/history/device/${deviceId}`).subscribe({
       next: (data) => {
         // Process the data to handle custom date format
         this.history = (data || []).map(item => ({
@@ -708,7 +708,7 @@ export class DeviceHistoryComponent implements OnInit {
 
   /** Fetch current device information */
   loadDeviceInfo(deviceId: string) {
-    this.http.get<any>(`http://localhost:8080/api/devices/${deviceId}`).subscribe({
+    this.http.get<any>(`/api/devices/${deviceId}`).subscribe({
       next: (data) => {
         this.deviceInfo = data;
       },

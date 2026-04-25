@@ -201,7 +201,7 @@ export class DeviceSearchComponent {
     if (this.type) params.append('type', this.type);
     if (this.status) params.append('status', this.status);
 
-    const url = `http://localhost:8080/api/devices/search?${params.toString()}`;
+    const url = `/api/devices/search?${params.toString()}`;
 
     this.http.get<InventoryItem[]>(url).subscribe({
       next: (data) => {

@@ -177,7 +177,7 @@ export class AllRequestsComponent implements OnInit {
   actionInProgress: number | null = null;
   selectedStatus: string = 'all';
 
-  private apiUrl = 'http://localhost:8080/api/maintenance/requests';
+  private apiUrl = '/api/maintenance/requests';
 
   constructor(
     private snackBar: MatSnackBar,

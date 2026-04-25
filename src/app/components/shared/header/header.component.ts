@@ -30,7 +30,7 @@ import { Subject, takeUntil } from 'rxjs';
         <div class="nav-section" *ngIf="!isSidebarCollapsed">
           <div class="section-label">Inventory Management System</div>
         </div>
-        
+
         <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
           <div class="dropdown-header" (click)="toggleDropdown('inventory')">
             <span class="dropdown-icon">📦</span>
@@ -39,7 +39,7 @@ import { Subject, takeUntil } from 'rxjs';
               {{ openDropdown === 'inventory' ? '▲' : '▼' }}
             </span>
           </div>
-          
+
           <div class="dropdown-content" *ngIf="openDropdown === 'inventory' && !isSidebarCollapsed">
             <a routerLink="/inventory" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
               <span class="item-icon">📋</span>
@@ -64,7 +64,7 @@ import { Subject, takeUntil } from 'rxjs';
         <div class="nav-section" *ngIf="!isSidebarCollapsed">
           <div class="section-label">SWM</div>
         </div>
-        
+
         <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
           <div class="dropdown-header" (click)="toggleDropdown('swm')">
             <span class="dropdown-icon">♻️</span>
@@ -73,7 +73,7 @@ import { Subject, takeUntil } from 'rxjs';
               {{ openDropdown === 'swm' ? '▲' : '▼' }}
             </span>
           </div>
-          
+
           <div class="dropdown-content" *ngIf="openDropdown === 'swm' && !isSidebarCollapsed">
             <a routerLink="/smc" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
               <span class="item-icon">📊</span>
@@ -90,7 +90,7 @@ import { Subject, takeUntil } from 'rxjs';
         <div class="nav-section" *ngIf="!isSidebarCollapsed">
           <div class="section-label">PBS</div>
         </div>
-        
+
         <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
           <div class="dropdown-header" (click)="toggleDropdown('pbs')">
             <span class="dropdown-icon">🏢</span>
@@ -99,7 +99,7 @@ import { Subject, takeUntil } from 'rxjs';
               {{ openDropdown === 'pbs' ? '▲' : '▼' }}
             </span>
           </div>
-          
+
           <div class="dropdown-content" *ngIf="openDropdown === 'pbs' && !isSidebarCollapsed">
             <a routerLink="/coming-soon" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
               <span class="item-icon">A</span>
@@ -116,7 +116,7 @@ import { Subject, takeUntil } from 'rxjs';
         <div class="nav-section" *ngIf="!isSidebarCollapsed">
           <div class="section-label">ANPR Analytics</div>
         </div>
-        
+
         <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
           <div class="dropdown-header" (click)="toggleDropdown('anpr')">
             <span class="dropdown-icon">📹</span>
@@ -125,7 +125,7 @@ import { Subject, takeUntil } from 'rxjs';
               {{ openDropdown === 'anpr' ? '▲' : '▼' }}
             </span>
           </div>
-          
+
           <div class="dropdown-content" *ngIf="openDropdown === 'anpr' && !isSidebarCollapsed">
             <a routerLink="/anpr/analytics-table" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
               <span class="item-icon">📋</span>
@@ -648,7 +648,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
     // Check mobile on init
     this.checkMobile();
-    
+
     // Listen for window resize
     window.addEventListener('resize', () => this.checkMobile());
   }

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/components/shared/header/coming-soon.component.ts"],
+  "sourcesContent": ["\n    .coming-root{display:flex;align-items:center;justify-content:center;min-height:60vh;padding:40px}\n    .coming-card{max-width:720px;width:100%;background:#fff;border-radius:12px;padding:28px 32px;box-shadow:0 8px 30px rgba(22,42,80,0.06);text-align:center}\n    .coming-badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#f0f7ff;color:#0066cc;font-weight:700;margin-bottom:12px}\n    .coming-title{font-size:20px;color:#122e52;margin-bottom:8px}\n    .coming-desc{color:#556;margin-bottom:18px}\n    .coming-actions{display:flex;gap:12px;justify-content:center}\n    .btn{display:inline-block;padding:10px 16px;border-radius:8px;text-decoration:none;color:#fff;background:#122e52}\n    .btn-outline{background:transparent;color:#122e52;border:1px solid #122e52}\n    "],
+  "mappings": ";AACI,CAAA;AAAa,WAAA;AAAa,eAAA;AAAmB,mBAAA;AAAuB,cAAA;AAAgB,WAAA;;AACpF,CAAA;AAAa,aAAA;AAAgB,SAAA;AAAW,cAAA;AAAgB,iBAAA;AAAmB,WAAA,KAAA;AAAkB,cAAA,EAAA,IAAA,KAAA,KAAA,EAAA,EAAA,EAAA,EAAA,EAAA,EAAA;AAA0C,cAAA;;AACvI,CAAA;AAAc,WAAA;AAAqB,WAAA,IAAA;AAAiB,iBAAA;AAAoB,cAAA;AAAmB,SAAA;AAAc,eAAA;AAAgB,iBAAA;;AACzH,CAAA;AAAc,aAAA;AAAe,SAAA;AAAc,iBAAA;;AAC3C,CAAA;AAAa,SAAA;AAAW,iBAAA;;AACxB,CAAA;AAAgB,WAAA;AAAa,OAAA;AAAS,mBAAA;;AACtC,CAAA;AAAK,WAAA;AAAqB,WAAA,KAAA;AAAkB,iBAAA;AAAkB,mBAAA;AAAqB,SAAA;AAAW,cAAA;;AAC9F,CAAA;AAAa,cAAA;AAAuB,SAAA;AAAc,UAAA,IAAA,MAAA;;",
+  "names": []
+}
