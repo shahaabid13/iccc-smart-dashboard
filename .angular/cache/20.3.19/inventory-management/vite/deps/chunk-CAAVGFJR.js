@@ -1,4 +1,7 @@
 import {
+  BidiModule
+} from "./chunk-ROOJJXE4.js";
+import {
   _CdkPrivateStyleLoader
 } from "./chunk-H4R5HMHL.js";
 import {
@@ -6,9 +9,6 @@ import {
   coerceElement,
   coerceNumberProperty
 } from "./chunk-FAXPWP2Z.js";
-import {
-  BidiModule
-} from "./chunk-ROOJJXE4.js";
 import {
   APP_ID,
   CSP_NONCE,
@@ -3156,4 +3156,4 @@ export {
   MATERIAL_SANITY_CHECKS,
   MatCommonModule
 };
-//# sourceMappingURL=chunk-N5HAMFJJ.js.map
+//# sourceMappingURL=chunk-CAAVGFJR.js.map
