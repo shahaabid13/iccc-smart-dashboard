@@ -1,0 +1,45 @@
+<div class="analytics-dashboard" #reportSection>
+
+  <h2>PBS Analytics Dashboard</h2>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <h3>Total Fleet</h3>
+      <p>{{ getTotalFleet() }}</p>
+    </div>
+
+    <div class="kpi-card">
+      <h3>Available Bikes</h3>
+      <p>{{ getTotalAvailable() }}</p>
+    </div>
+
+    <div class="kpi-card">
+      <h3>Utilization</h3>
+      <p>{{ getUtilization() }}%</p>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Status Distribution</h3>
+      <canvas baseChart [data]="pieChartData" chartType="pie"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <h3>Fleet Usage</h3>
+      <canvas baseChart [data]="doughnutChartData" chartType="doughnut"></canvas>
+    </div>
+
+    <div class="chart-card full">
+      <h3>Top Stations</h3>
+      <canvas baseChart [data]="barChartData" chartType="bar"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<div class="report-actions">
+  <button (click)="downloadReport()">Download Daily Report (PDF)</button>
+</div>

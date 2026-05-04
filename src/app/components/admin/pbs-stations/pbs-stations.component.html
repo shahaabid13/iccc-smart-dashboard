@@ -1,0 +1,410 @@
+<div class="pbs-dashboard">
+  <mat-toolbar class="topbar" color="primary">
+    <div class="brand">
+      <div class="logo-shell" [style.background-color]="primaryColor">
+        <mat-icon>directions_bike</mat-icon>
+      </div>
+      <div>
+        <div class="company-name">{{ companyName }}</div>
+        <div class="subtitle">Bike Station Operations</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="update-chip">
+        <mat-icon>schedule</mat-icon>
+        Last updated:
+        <span>{{ lastUpdated ? (lastUpdated | date: 'short') : 'N/A' }}</span>
+      </div>
+      <button mat-stroked-button color="accent" (click)="refreshData()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+      <button mat-flat-button color="warn" (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        Logout
+      </button>
+    </div>
+  </mat-toolbar>
+
+  <section class="kpi-row" *ngIf="isAuthenticated && !hasError">
+    <mat-card class="kpi-card">
+      <div class="kpi-icon primary">
+        <mat-icon>directions_bike</mat-icon>
+      </div>
+      <div class="kpi-copy">
+        <span class="kpi-value">{{ getTotalAvailable() }}</span>
+        <span class="kpi-label">Total Bikes Available</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="kpi-card">
+      <div class="kpi-icon secondary">
+        <mat-icon>inventory_2</mat-icon>
+      </div>
+      <div class="kpi-copy">
+        <span class="kpi-value">{{ getTotalFleet() }}</span>
+        <span class="kpi-label">Total Fleet</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="kpi-card">
+      <div class="kpi-icon success">
+        <mat-icon>location_on</mat-icon>
+      </div>
+      <div class="kpi-copy">
+        <span class="kpi-value">{{ getActiveStationsCount() }}</span>
+        <span class="kpi-label">Active Stations</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="kpi-card">
+      <div class="kpi-icon warning">
+        <mat-icon>pedal_bike</mat-icon>
+      </div>
+      <div class="kpi-copy">
+        <span class="kpi-value">{{ getTotalOnTrip() }}</span>
+        <span class="kpi-label">Bikes On Trip</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="kpi-card">
+      <div class="kpi-icon info">
+        <mat-icon>trending_up</mat-icon>
+      </div>
+      <div class="kpi-copy">
+        <span class="kpi-value">{{ getUtilizationRate() }}%</span>
+        <span class="kpi-label">Utilization Rate</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="kpi-card">
+      <div class="kpi-icon neutral">
+        <mat-icon>location_city</mat-icon>
+      </div>
+      <div class="kpi-copy">
+        <span class="kpi-value">{{ filteredStations.length }}</span>
+        <span class="kpi-label">Total Stations</span>
+      </div>
+    </mat-card>
+  </section>
+
+  <section class="filter-bar" *ngIf="isAuthenticated && !hasError">
+    <div class="filter-row">
+      <mat-form-field appearance="fill" class="filter-field search-field">
+        <mat-label>Search station</mat-label>
+        <input
+          matInput
+          placeholder="Name or number"
+          [(ngModel)]="searchQuery"
+          (input)="applyFilters()"
+        />
+        <button matSuffix mat-icon-button aria-label="Clear search" *ngIf="searchQuery" (click)="searchQuery=''; applyFilters()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Min bikes available</mat-label>
+        <mat-select [(ngModel)]="minBikesFilter" (selectionChange)="applyFilters()">
+          <mat-option *ngFor="let option of minBikesOptions" [value]="option">
+            {{ option }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Status</mat-label>
+        <mat-select [(ngModel)]="statusFilter" (selectionChange)="applyFilters()">
+          <mat-option value="">All statuses</mat-option>
+          <mat-option *ngFor="let status of statusOptions" [value]="status.value">
+            {{ status.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Sort by</mat-label>
+        <mat-select [(ngModel)]="sortField" (selectionChange)="applyFilters()">
+          <mat-option *ngFor="let option of sortOptions" [value]="option.value">
+            {{ option.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-icon-button class="sort-direction" (click)="toggleSortDir()" matTooltip="Toggle sort direction">
+        <mat-icon>{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+      </button>
+
+      <div class="results-badge">
+        <mat-icon>badge</mat-icon>
+        <span>{{ filteredStations.length }} results</span>
+      </div>
+    </div>
+
+    <div class="view-switcher">
+      <button
+        mat-stroked-button
+        [color]="viewMode === 'table' ? 'primary' : undefined"
+        (click)="viewMode = 'table'"
+      >
+        <mat-icon>table_chart</mat-icon>
+        Table
+      </button>
+      <button
+        mat-stroked-button
+        [color]="viewMode === 'grid' ? 'primary' : undefined"
+        (click)="viewMode = 'grid'"
+      >
+        <mat-icon>grid_view</mat-icon>
+        Cards
+      </button>
+      <button mat-button color="warn" (click)="clearFilters()">
+        <mat-icon>filter_alt_off</mat-icon>
+        Clear filters
+      </button>
+    </div>
+  </section>
+
+  <section class="state-panel" *ngIf="!isAuthenticated">
+    <mat-card class="state-card warning-card">
+      <mat-icon>lock</mat-icon>
+      <h2>Not authenticated</h2>
+      <p>Please login to view bike station analytics and refresh the dashboard.</p>
+      <button mat-flat-button color="primary" (click)="loadData()">Login</button>
+    </mat-card>
+  </section>
+
+  <section class="state-panel" *ngIf="hasError && isAuthenticated">
+    <mat-card class="state-card error-card">
+      <mat-icon>error_outline</mat-icon>
+      <h2>Unable to load stations</h2>
+      <p>{{ errorMessage || 'Something went wrong while fetching station data.' }}</p>
+      <button mat-flat-button color="primary" (click)="refreshData()">Retry</button>
+    </mat-card>
+  </section>
+
+  <section class="state-panel" *ngIf="!isLoading && isAuthenticated && !hasError && !filteredStations.length">
+    <mat-card class="state-card empty-card">
+      <mat-icon>hourglass_empty</mat-icon>
+      <h2>No stations match your filters</h2>
+      <p>Try updating the search, status filter, or minimum bikes available.</p>
+      <button mat-flat-button color="primary" (click)="clearFilters()">Reset filters</button>
+    </mat-card>
+  </section>
+
+  <section class="content-area" *ngIf="isAuthenticated && !hasError && filteredStations.length">
+    <div class="data-panel">
+      <div class="table-wrapper" *ngIf="viewMode === 'table'">
+        <table mat-table [dataSource]="pagedStations" class="mat-elevation-z1">
+
+          <!-- Station -->
+          <ng-container matColumnDef="stationName">
+            <th mat-header-cell *matHeaderCellDef (click)="setSort('stationName')" class="sortable">
+              <div class="sortable-inner">
+                <span>Station</span>
+                <mat-icon *ngIf="sortField === 'stationName'">
+                  {{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let station">
+              <div class="station-cell">
+                <span class="station-title">{{ station.stationName }}</span>
+                <span class="station-subtitle">#{{ station.stationNumber }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Available -->
+          <ng-container matColumnDef="available">
+            <th mat-header-cell *matHeaderCellDef (click)="setSort('bikesAvailable')" class="sortable">
+              <div class="sortable-inner">
+                <span>Available</span>
+                <mat-icon *ngIf="sortField === 'bikesAvailable'">
+                  {{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let station">
+              <div class="metric-cell">
+                <strong>{{ station.bikesAvailable }}</strong>
+                <mat-progress-bar
+                  class="mini-bar"
+                  [value]="getAvailabilityValue(station)"
+                  [color]="getAvailabilityColor(station)">
+                </mat-progress-bar>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Total -->
+          <ng-container matColumnDef="total">
+            <th mat-header-cell *matHeaderCellDef (click)="setSort('bikesTotal')" class="sortable">
+              <div class="sortable-inner">
+                <span>Total</span>
+                <mat-icon *ngIf="sortField === 'bikesTotal'">
+                  {{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let station">{{ station.bikesTotal }}</td>
+          </ng-container>
+
+          <!-- On Trip -->
+          <ng-container matColumnDef="onTrip">
+            <th mat-header-cell *matHeaderCellDef (click)="setSort('reportOnTripBikes')" class="sortable">
+              <div class="sortable-inner">
+                <span>On Trip</span>
+                <mat-icon *ngIf="sortField === 'reportOnTripBikes'">
+                  {{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let station">{{ station.reportOnTripBikes }}</td>
+          </ng-container>
+
+          <!-- Utilization -->
+          <ng-container matColumnDef="utilization">
+            <th mat-header-cell *matHeaderCellDef (click)="setSort('availabilityPercentage')" class="sortable">
+              <div class="sortable-inner">
+                <span>Utilization %</span>
+                <mat-icon *ngIf="sortField === 'availabilityPercentage'">
+                  {{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let station">
+              <div class="metric-cell">
+                <strong>{{ station.availabilityPercentage }}%</strong>
+                <mat-progress-bar
+                  class="mini-bar"
+                  mode="determinate"
+                  [value]="getAvailabilityValue(station)"
+                  [color]="getAvailabilityColor(station)">
+                </mat-progress-bar>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Coordinates -->
+          <ng-container matColumnDef="coordinates">
+            <th mat-header-cell *matHeaderCellDef>
+              <span>Coordinates</span>
+            </th>
+            <td mat-cell *matCellDef="let station">
+              {{ formatCoordinates(station) }}
+            </td>
+          </ng-container>
+
+          <!-- Status -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>
+              <span>Status</span>
+            </th>
+            <td mat-cell *matCellDef="let station">
+              <span class="status-chip" [style.background]="station.statusColor">
+                {{ station.statusLabel }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Actions -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>
+              <span>Actions</span>
+            </th>
+            <td mat-cell *matCellDef="let station">
+              <button mat-icon-button matTooltip="View station">
+                <mat-icon>visibility</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Navigate">
+                <mat-icon>place</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        </table>
+      </div>
+
+      <div class="card-grid" *ngIf="viewMode === 'grid'">
+        <mat-card class="station-card" *ngFor="let station of pagedStations">
+          <div class="card-top">
+            <div>
+              <h3>{{ station.stationName }}</h3>
+              <span class="station-number">#{{ station.stationNumber }}</span>
+            </div>
+            <span class="status-chip" [style.background]="station.statusColor">
+              {{ station.statusLabel }}
+            </span>
+          </div>
+
+          <div class="card-metrics">
+            <div class="metric-block">
+              <span class="metric-label">Available</span>
+              <strong>{{ station.bikesAvailable }}</strong>
+            </div>
+            <div class="metric-block">
+              <span class="metric-label">Total</span>
+              <strong>{{ station.bikesTotal }}</strong>
+            </div>
+            <div class="metric-block">
+              <span class="metric-label">On Trip</span>
+              <strong>{{ station.reportOnTripBikes }}</strong>
+            </div>
+          </div>
+
+          <div class="progress-group">
+            <span>Utilization</span>
+            <mat-progress-bar
+              [value]="getAvailabilityValue(station)"
+              [color]="getAvailabilityColor(station)"
+            ></mat-progress-bar>
+            <span class="progress-label">{{ station.availabilityPercentage }}%</span>
+          </div>
+        </mat-card>
+      </div>
+
+      <div class="pagination-bar">
+        <div class="pagination-controls">
+          <button mat-icon-button (click)="goToPage(1)" [disabled]="currentPage === 1">
+            <mat-icon>first_page</mat-icon>
+          </button>
+          <button mat-icon-button (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+
+          <ng-container *ngFor="let page of getPageNumbers()">
+            <button
+              mat-button
+              [color]="page === currentPage ? 'primary' : undefined"
+              (click)="goToPage(page)"
+            >
+              {{ page }}
+            </button>
+          </ng-container>
+
+          <button mat-icon-button (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+          <button mat-icon-button (click)="goToPage(totalPages)" [disabled]="currentPage === totalPages">
+            <mat-icon>last_page</mat-icon>
+          </button>
+        </div>
+
+        <div class="page-size-control">
+          <span>Rows per page</span>
+          <mat-form-field appearance="fill" class="page-size-field">
+            <mat-select [(ngModel)]="pageSize" (selectionChange)="onPageSizeChange()">
+              <mat-option *ngFor="let option of pageSizeOptions" [value]="option">
+                {{ option }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

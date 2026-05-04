@@ -95,6 +95,14 @@ export const routes: Routes = [
 		path: 'coming-soon',
 		loadComponent: () => import('./components/shared/header/coming-soon.component').then((m) => m.ComingSoonComponent),
 	},
+	{
+		path: 'pbs/stations',
+		loadComponent: () => import('./components/admin/pbs-stations/pbs-stations.component').then((m) => m.PbsStationsComponent),
+	},
+	{
+		path: 'pbs/analytics',
+		loadComponent: () => import('./components/admin/pbs-analytics/pbs-analytics.component').then((m) => m.PbsAnalyticsComponent),
+	},
 	// fallback
 	{ path: '**', redirectTo: 'inventory' },
 ];

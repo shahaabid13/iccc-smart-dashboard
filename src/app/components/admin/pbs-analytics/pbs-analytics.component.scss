@@ -1,0 +1,68 @@
+.analytics-dashboard {
+  padding: 1.5rem;
+  background: #f4f6fb;
+}
+
+h2 {
+  margin-bottom: 1rem;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+  background: white;
+  padding: 1rem;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+
+  h3 {
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+
+  p {
+    font-size: 1.5rem;
+    font-weight: bold;
+  }
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.chart-card {
+  background: white;
+  padding: 1rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+
+  canvas {
+    max-height: 250px;
+  }
+}
+
+.chart-card.full {
+  grid-column: span 2;
+}
+
+.report-actions {
+  margin-top: 1rem;
+  text-align: right;
+
+  button {
+    background: #0f6cff;
+    color: white;
+    border: none;
+    padding: 0.7rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+}

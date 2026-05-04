@@ -65,10 +65,26 @@ export class SmcService {
   }
 // Add these methods to your SmcService class
 
-getNetTrend(wbId: string, startDate: string, endDate: string): Observable<any[]> {
+getNetTrend(wbId: string, startDate?: string, endDate?: string): Observable<any[]> {
+  if (startDate && endDate) {
+    const params = { start: startDate, end: endDate, wbId };
+    return this.http.get<any>(`${this.baseUrl}/report/summary`, { params }).pipe(
+      map(data => {
+        const weight = data?.totalNetWeight ?? data?.totalWeight ?? 0;
+        return [{
+          dateTime: `${startDate} to ${endDate}`,
+          weight
+        }];
+      }),
+      catchError(error => {
+        console.error('Error fetching custom-range net trend via summary:', error);
+        return of([{ dateTime: `${startDate} to ${endDate}`, weight: 0 }]);
+      })
+    );
+  }
+
   return this.http.get<any[]>(`${this.baseUrl}/report/trend/net/${wbId}`).pipe(
     map(data => {
-      // Transform backend response to chart-friendly format
       return Array.isArray(data) ? data.map((item: any) => ({
         dateTime: item.dateTime || item.date || item.timestamp,
         netWeight: item.netWeight || item.weight || 0
@@ -81,10 +97,26 @@ getNetTrend(wbId: string, startDate: string, endDate: string): Observable<any[]>
   );
 }
 
-getGrossTrend(wbId: string, startDate: string, endDate: string): Observable<any[]> {
+getGrossTrend(wbId: string, startDate?: string, endDate?: string): Observable<any[]> {
+  if (startDate && endDate) {
+    const params = { start: startDate, end: endDate, wbId };
+    return this.http.get<any>(`${this.baseUrl}/report/summary`, { params }).pipe(
+      map(data => {
+        const weight = data?.totalGrossWeight ?? data?.totalWeight ?? 0;
+        return [{
+          dateTime: `${startDate} to ${endDate}`,
+          weight
+        }];
+      }),
+      catchError(error => {
+        console.error('Error fetching custom-range gross trend via summary:', error);
+        return of([{ dateTime: `${startDate} to ${endDate}`, weight: 0 }]);
+      })
+    );
+  }
+
   return this.http.get<any[]>(`${this.baseUrl}/report/trend/gross/${wbId}`).pipe(
     map(data => {
-      // Transform backend response to chart-friendly format
       return Array.isArray(data) ? data.map((item: any) => ({
         dateTime: item.dateTime || item.date || item.timestamp,
         grossWeight: item.grossWeight || item.weight || 0
@@ -117,7 +149,24 @@ getVehicleTrend(wbId: string): Observable<any[]> {
   );
 }
 
-getLast24Trend(wbId: string): Observable<any[]> {
+getLast24Trend(wbId: string, startDate?: string, endDate?: string): Observable<any[]> {
+  if (startDate && endDate) {
+    const params = { start: startDate, end: endDate, wbId };
+    return this.http.get<any>(`${this.baseUrl}/report/summary`, { params }).pipe(
+      map(data => {
+        const weight = data?.totalNetWeight ?? data?.totalWeight ?? 0;
+        return [{
+          dateTime: `${startDate} to ${endDate}`,
+          weight
+        }];
+      }),
+      catchError(error => {
+        console.error('Error fetching custom-range last 24 trend via summary:', error);
+        return of([{ dateTime: `${startDate} to ${endDate}`, weight: 0 }]);
+      })
+    );
+  }
+
   return this.http.get<any[]>(`${this.baseUrl}/report/trend/last24/${wbId}`).pipe(
     map(data => {
       return Array.isArray(data) ? data.map((item: any) => ({
@@ -173,7 +222,7 @@ getLast24HoursData(wbId: string): Observable<any[]> {
 getSummary(start: string, end: string, wbId: string): Observable<any> {
   // backend summary/day endpoint expects full ISO datetimes for start/end
   const params = { start, end, wbId };
-  const url = `${this.baseUrl}/report/summary/day`;
+  const url = `${this.baseUrl}/report/summary`;
   console.log('🔵 API Request - getSummary:', { url, params });
 
   return this.http.get<any>(url, { params }).pipe(

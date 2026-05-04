@@ -481,7 +481,7 @@ export class SmcDashboardComponent implements OnInit {
   apiUnavailable = false;
 
   // Filter properties
-  selectedPeriod: string = 'week';
+  selectedPeriod: string = 'all';
   fromDate: string = '';
   toDate: string = '';
 
@@ -503,12 +503,17 @@ export class SmcDashboardComponent implements OnInit {
   }
 
   initializeDates(): void {
-    const today = new Date();
-    this.toDate = today.toISOString().split('T')[0];
-    
-    const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    this.fromDate = weekAgo.toISOString().split('T')[0];
+    if (this.selectedPeriod === 'all') {
+      this.fromDate = '';
+      this.toDate = '';
+    } else {
+      const today = new Date();
+      this.toDate = today.toISOString().split('T')[0];
+      
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      this.fromDate = weekAgo.toISOString().split('T')[0];
+    }
   }
 
   load() {
@@ -606,7 +611,7 @@ export class SmcDashboardComponent implements OnInit {
   }
 
   resetFilters(): void {
-    this.selectedPeriod = 'week';
+    this.selectedPeriod = 'all';
     this.initializeDates();
     this.applyFilters();
   }

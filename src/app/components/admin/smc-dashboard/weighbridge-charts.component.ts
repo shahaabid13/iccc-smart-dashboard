@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SmcService } from '../../../services/smc.service';
 import { ChartConfiguration, ChartType } from 'chart.js';
@@ -19,18 +19,36 @@ import * as XLSX from 'xlsx';
 
       <div class="controls">
         <div class="control-group">
-          <label for="wbId">Weighbridge ID:</label>
-          <input 
-            id="wbId" 
-            type="text" 
-            [(ngModel)]="wbId" 
-            placeholder="Enter WB ID"
-            class="input-field"
-          >
-          <button (click)="loadAllCharts()" class="load-btn">Load Data</button>
+          <label for="wbId">Weighbridge:</label>
+          <ng-container *ngIf="(weighbridgeOptions?.length ?? 0) > 0; else wbTextInput">
+            <select
+              id="wbId"
+              [(ngModel)]="selectedWbId"
+              (change)="onWeighbridgeChange()"
+              class="input-field"
+            >
+              <option *ngFor="let option of weighbridgeOptions" [value]="option.id">
+                {{ option.label }}
+              </option>
+            </select>
+          </ng-container>
+          <ng-template #wbTextInput>
+            <input
+              id="wbId"
+              type="text"
+              [(ngModel)]="wbId"
+              placeholder="Enter WB ID"
+              class="input-field"
+            >
+          </ng-template>
+
+          <div class="filter-actions">
+            <button (click)="loadCharts()" class="load-btn">Apply</button>
+            <button type="button" (click)="resetFilters()" class="reset-btn">Reset</button>
+          </div>
         </div>
         
-        <div class="date-controls" *ngIf="summaryData">
+        <div class="date-controls">
           <div class="date-input-group">
             <label>From Date:</label>
             <input 
@@ -57,15 +75,6 @@ import * as XLSX from 'xlsx';
             <button (click)="setPeriod('custom')" [class.active]="selectedPeriod === 'custom'">Custom</button>
           </div>
 
-          <!-- Report Buttons -->
-          <div class="report-buttons">
-            <button (click)="exportReportToExcel()" class="report-btn excel-btn" title="Download report as Excel">
-              <span class="btn-icon">📊</span> Export Excel Report
-            </button>
-            <button (click)="exportReportToPDF()" class="report-btn pdf-btn" title="Download report as PDF">
-              <span class="btn-icon">📄</span> Export PDF Report
-            </button>
-          </div>
         </div>
       </div>
 
@@ -74,7 +83,7 @@ import * as XLSX from 'xlsx';
       <div *ngIf="error" class="error">
         <h3>Failed to load chart data</h3>
         <p>{{ errorMessage }}</p>
-        <button (click)="loadAllCharts()" class="retry-btn">Retry</button>
+        <button (click)="loadCharts()" class="retry-btn">Retry</button>
       </div>
 
       <div *ngIf="summaryData" class="summary-cards">
@@ -385,6 +394,13 @@ import * as XLSX from 'xlsx';
       gap: 5px;
     }
 
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
     .date-controls {
       display: flex;
       gap: 15px;
@@ -431,7 +447,7 @@ import * as XLSX from 'xlsx';
       font-size: 14px;
     }
 
-    .load-btn, .retry-btn {
+    .load-btn, .retry-btn, .reset-btn {
       background: #007bff;
       color: white;
       border: none;
@@ -441,8 +457,16 @@ import * as XLSX from 'xlsx';
       font-size: 14px;
     }
 
+    .reset-btn {
+      background: #6c757d;
+    }
+
     .load-btn:hover, .retry-btn:hover {
       background: #0056b3;
+    }
+
+    .reset-btn:hover {
+      background: #5a6268;
     }
 
     /* Enhanced Summary Cards */
@@ -945,17 +969,21 @@ import * as XLSX from 'xlsx';
     }
   `]
 })
-export class WeighbridgeChartsComponent implements OnInit {
+export class WeighbridgeChartsComponent implements OnInit, OnChanges {
   wbId = 'SRNGR_LANDFILL_WB1';
+  @Input() selectedWbId: string = '';
+  @Input() startDate: string = '';
+  @Input() endDate: string = '';
+  @Input() weighbridgeOptions: { id: string; label: string }[] = [];
+
   loading = false;
   error = false;
   errorMessage = '';
   debugInfo = true;
   
   // Date range properties
-  startDate: string;
-  endDate: string;
-  selectedPeriod: string = 'week';
+  selectedPeriod: string = 'all';
+  private readonly allTimeStartDate: string = '2025-11-21';
 
   // Weighbridge data properties (for report generation)
   allWeighbridgeData: any[] = [];
@@ -965,6 +993,10 @@ export class WeighbridgeChartsComponent implements OnInit {
   selectedTimeframe: string = 'WEEKLY';
   timeframeChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
   timeframeData: TimeFrameDataDTO[] = [];
+
+  get effectiveWbId(): string {
+    return this.selectedWbId || this.wbId;
+  }
   maxWeight: number = 0;
   highestWeightPeriod: TimeFrameDataDTO | null = null;
   activeTab: 'chart' | 'table' | 'details' = 'chart';
@@ -1043,14 +1075,47 @@ export class WeighbridgeChartsComponent implements OnInit {
 
   constructor(private smcService: SmcService) {
     const today = new Date();
-    this.endDate = today.toISOString().split('T')[0];
-    const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 30); // Changed to 30 days for better initial view
-    this.startDate = weekAgo.toISOString().split('T')[0];
+    this.endDate = this.endDate || today.toISOString().split('T')[0];
+    this.startDate = this.startDate || this.allTimeStartDate;
   }
 
   ngOnInit(): void {
-    this.loadAllCharts();
+    if (this.selectedWbId) {
+      this.wbId = this.selectedWbId;
+    }
+    this.loadCharts();
+  }
+
+  private initializeDates(): void {
+    const today = new Date();
+    this.endDate = today.toISOString().split('T')[0];
+    this.startDate = this.allTimeStartDate;
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    const selectedWbIdChange = changes['selectedWbId'];
+    const startDateChange = changes['startDate'];
+    const endDateChange = changes['endDate'];
+
+    if (selectedWbIdChange && selectedWbIdChange.currentValue) {
+      this.wbId = selectedWbIdChange.currentValue;
+    }
+
+    if (startDateChange || endDateChange || selectedWbIdChange) {
+      if (startDateChange && startDateChange.currentValue) {
+        this.startDate = startDateChange.currentValue;
+      }
+      if (endDateChange && endDateChange.currentValue) {
+        this.endDate = endDateChange.currentValue;
+      }
+      if (
+        (startDateChange && !startDateChange.firstChange) ||
+        (endDateChange && !endDateChange.firstChange) ||
+        (selectedWbIdChange && !selectedWbIdChange.firstChange)
+      ) {
+        this.loadCharts();
+      }
+    }
   }
 
   setPeriod(period: string): void {
@@ -1080,6 +1145,10 @@ export class WeighbridgeChartsComponent implements OnInit {
         this.startDate = monthAgo.toISOString().split('T')[0];
         this.endDate = new Date().toISOString().split('T')[0];
         break;
+      case 'all':
+        this.startDate = this.allTimeStartDate;
+        this.endDate = today.toISOString().split('T')[0];
+        break;
       case 'custom':
         break;
     }
@@ -1099,16 +1168,26 @@ export class WeighbridgeChartsComponent implements OnInit {
   onDateChange(): void {
     this.selectedPeriod = 'custom';
     
-    // Filter records if data is already loaded
     if (this.allWeighbridgeData && this.allWeighbridgeData.length > 0) {
       console.log('\n📌 Custom dates changed');
       console.log('New date range:', this.startDate, 'to', this.endDate);
       this.filterRecordsByDateRange();
     }
-    
-    this.loadSummary();
-    this.loadNetTrend();
-    this.loadTimeframeData();
+
+    this.loadCharts();
+  }
+
+  onWeighbridgeChange(): void {
+    if (this.selectedWbId) {
+      this.wbId = this.selectedWbId;
+    }
+    this.loadCharts();
+  }
+
+  resetFilters(): void {
+    this.selectedPeriod = 'all';
+    this.initializeDates();
+    this.loadCharts();
   }
 
   onTimeframeChange(): void {
@@ -1194,15 +1273,16 @@ export class WeighbridgeChartsComponent implements OnInit {
 
 
 
-  loadAllCharts(): void {
-    if (!this.wbId) {
+  loadCharts(): void {
+    const wbId = this.effectiveWbId;
+    if (!wbId) {
       this.error = true;
       this.errorMessage = 'Please enter a Weighbridge ID';
       return;
     }
 
     console.log('\n========== LOADING DATA ==========');
-    console.log('🔵 WB ID:', this.wbId);
+    console.log('🔵 WB ID:', wbId);
     console.log('📅 Date Range:', this.startDate, 'to', this.endDate);
     console.log('================================\n');
 
@@ -1222,13 +1302,14 @@ export class WeighbridgeChartsComponent implements OnInit {
   }
 
   loadNetTrend(): Promise<void> {
+    const wbId = this.effectiveWbId;
     return new Promise((resolve) => {
-      this.smcService.getNetTrend(this.wbId, this.startDate, this.endDate).subscribe({
+      this.smcService.getNetTrend(wbId, this.startDate, this.endDate).subscribe({
         next: (data: any[]) => {
           console.log('Net Trend Data:', data);
           this.netTrendChartData = this.createBarChartData(
-            data, 
-            'Net Weight (kg)', 
+            data,
+            'Net Weight (kg)',
             '#007bff',
             'daily'
           );
@@ -1244,8 +1325,9 @@ export class WeighbridgeChartsComponent implements OnInit {
   }
 
   loadLast24Trend(): Promise<void> {
+    const wbId = this.effectiveWbId;
     return new Promise((resolve) => {
-      this.smcService.getLast24Trend(this.wbId).subscribe({
+      this.smcService.getLast24Trend(wbId, this.startDate, this.endDate).subscribe({
         next: (data: any[]) => {
           console.log('Last 24 Trend Data:', data);
           this.last24ChartData = this.createBarChartData(
@@ -1266,11 +1348,12 @@ export class WeighbridgeChartsComponent implements OnInit {
   }
 
   loadSummary(): Promise<void> {
+    const wbId = this.effectiveWbId;
     return new Promise((resolve) => {
       const startIso = this.startDate.includes('T') ? this.startDate : `${this.startDate}T00:00:00`;
       const endIso = this.endDate.includes('T') ? this.endDate : `${this.endDate}T23:59:59`;
 
-      this.smcService.getSummary(startIso, endIso, this.wbId).subscribe({
+      this.smcService.getSummary(startIso, endIso, wbId).subscribe({
         next: (data: any) => {
           this.summaryData = data;
           resolve();
@@ -1294,7 +1377,7 @@ export class WeighbridgeChartsComponent implements OnInit {
       const startIso = `${allTimeStartDate}T00:00:00`;
       const endIso = `${allTimeEndDate}T23:59:59`;
 
-      this.smcService.getSummary(startIso, endIso, this.wbId).subscribe({
+      this.smcService.getSummary(startIso, endIso, this.effectiveWbId).subscribe({
         next: (data: any) => {
           this.allTimeNetWeight = data?.totalNetWeight || 0;
           console.log('All-time net weight loaded:', this.allTimeNetWeight);
@@ -1314,11 +1397,12 @@ export class WeighbridgeChartsComponent implements OnInit {
    * Load all weighbridge records for report generation
    */
   loadAllWeighbridgeRecords(): Promise<void> {
+    const wbId = this.effectiveWbId;
     return new Promise((resolve) => {
       console.log('\n📊 === LOADING ALL WEIGHBRIDGE RECORDS ===');
-      console.log('WB ID:', this.wbId);
+      console.log('WB ID:', wbId);
       
-      this.smcService.getAllWeighbridgeData(this.wbId).subscribe({
+      this.smcService.getAllWeighbridgeData(wbId).subscribe({
         next: (data: any[]) => {
           this.allWeighbridgeData = data || [];
           console.log('✅ Total records loaded:', this.allWeighbridgeData.length);
@@ -1427,7 +1511,7 @@ export class WeighbridgeChartsComponent implements OnInit {
       
       // Create TimeFrameRequest object
       const request: TimeFrameRequest = {
-        wbId: this.wbId,
+        wbId: this.effectiveWbId,
         startDate: this.startDate,
         endDate: this.endDate,
         timeframe: this.selectedTimeframe as TimeFrame

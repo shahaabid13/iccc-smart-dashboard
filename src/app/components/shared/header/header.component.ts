@@ -101,13 +101,13 @@ import { Subject, takeUntil } from 'rxjs';
           </div>
 
           <div class="dropdown-content" *ngIf="openDropdown === 'pbs' && !isSidebarCollapsed">
-            <a routerLink="/coming-soon" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">A</span>
-              <span>Option A</span>
+            <a routerLink="/pbs/stations" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">🚲</span>
+              <span>Bike Stations</span>
             </a>
-            <a routerLink="/coming-soon" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">B</span>
-              <span>Option B</span>
+            <a routerLink="/pbs/analytics" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📊</span>
+              <span>Analytics</span>
             </a>
           </div>
         </div>
