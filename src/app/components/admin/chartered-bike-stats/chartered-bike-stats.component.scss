@@ -1,0 +1,315 @@
+.stats-container {
+  padding: 24px;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+
+  .header-card {
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    .header-content {
+      h1 {
+        margin: 0 0 8px 0;
+        font-size: 24px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: #666;
+        font-size: 14px;
+      }
+    }
+  }
+
+  .error-card {
+    margin-bottom: 16px;
+    background-color: #ffebee;
+    border-left: 4px solid #f44336;
+
+    .error-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #c62828;
+
+      mat-icon {
+        color: #f44336;
+      }
+
+      button {
+        margin-left: auto;
+      }
+    }
+  }
+
+  .filters-card {
+    margin-bottom: 24px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+    .filter-form {
+      padding: 16px;
+    }
+
+    .filter-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+
+      .filter-field {
+        width: 100%;
+      }
+    }
+
+    .button-row {
+      display: flex;
+      gap: 12px;
+
+      button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    }
+  }
+
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px;
+    gap: 16px;
+
+    p {
+      font-size: 16px;
+      color: #666;
+    }
+  }
+
+  .stats-display {
+    margin-top: 24px;
+
+    .main-stats-card {
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+      .stats-header {
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #e0e0e0;
+
+        h2 {
+          margin: 0 0 8px 0;
+          font-size: 20px;
+          font-weight: 600;
+          color: #333;
+        }
+
+        .period {
+          font-size: 12px;
+          color: #999;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 16px;
+
+        .stat-card {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 16px;
+          background-color: #f9f9f9;
+          border-radius: 8px;
+          transition: transform 0.2s, box-shadow 0.2s;
+
+          &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+          }
+
+          .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            flex-shrink: 0;
+
+            mat-icon {
+              font-size: 24px;
+              width: 24px;
+              height: 24px;
+            }
+
+            &.min {
+              background: linear-gradient(135deg, #f44336, #e91e63);
+            }
+
+            &.avg {
+              background: linear-gradient(135deg, #2196f3, #1976d2);
+            }
+
+            &.max {
+              background: linear-gradient(135deg, #4caf50, #388e3c);
+            }
+
+            &.trend {
+              background: linear-gradient(135deg, #ff9800, #f57c00);
+            }
+
+            &.rack {
+              background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+            }
+
+            &.data {
+              background: linear-gradient(135deg, #00bcd4, #0097a7);
+            }
+          }
+
+          .stat-info {
+            flex: 1;
+
+            .stat-label {
+              font-size: 12px;
+              color: #999;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin-bottom: 4px;
+            }
+
+            .stat-value {
+              font-size: 24px;
+              font-weight: 700;
+              color: #333;
+            }
+          }
+        }
+      }
+    }
+
+    .chart-card {
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      padding: 24px;
+
+      h3 {
+        margin: 0 0 16px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .chart-container {
+        height: 300px;
+        position: relative;
+      }
+    }
+
+    .rack-stats-card {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      padding: 24px;
+
+      h3 {
+        margin: 0 0 16px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .rack-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+
+        .rack-stat {
+          text-align: center;
+          padding: 16px;
+          background-color: #f9f9f9;
+          border-radius: 8px;
+
+          .rack-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+          }
+
+          .rack-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #9c27b0;
+          }
+        }
+      }
+    }
+  }
+
+  .empty-card {
+    text-align: center;
+    padding: 80px 24px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+    .empty-content {
+      .empty-icon {
+        font-size: 64px;
+        width: 64px;
+        height: 64px;
+        color: #ccc;
+        margin: 0 auto 16px;
+      }
+
+      h3 {
+        font-size: 20px;
+        color: #666;
+        margin: 0 0 8px;
+      }
+
+      p {
+        color: #999;
+        margin: 0;
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-container {
+    padding: 16px;
+
+    .filters-card {
+      .filter-row {
+        grid-template-columns: 1fr;
+      }
+
+      .button-row {
+        button {
+          flex: 1;
+        }
+      }
+    }
+
+    .stats-display {
+      .main-stats-card {
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+
+          .stat-card {
+            flex-direction: column;
+            text-align: center;
+          }
+        }
+      }
+    }
+  }
+}

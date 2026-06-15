@@ -1,5 +1,6 @@
 import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { BaseChartDirective, NgChartsModule } from 'ng2-charts';
 import { ChartConfiguration } from 'chart.js';
 import jsPDF from 'jspdf';
@@ -11,14 +12,81 @@ import { CharteredBikeStationUI } from '../../../models/chartered-bike';
 @Component({
   selector: 'app-pbs-analytics',
   standalone: true,
-  imports: [CommonModule, NgChartsModule],
+  imports: [CommonModule, FormsModule, NgChartsModule],
   templateUrl: './pbs-analytics.component.html',
   styleUrls: ['./pbs-analytics.component.scss'],
 })
 export class PbsAnalyticsComponent implements OnInit {
   stations: CharteredBikeStationUI[] = [];
+  statusSummary: Array<{ label: string; count: number; color: string }> = [];
+  atRiskStations: CharteredBikeStationUI[] = [];
+  selectedPeriod: 'today' | 'week' | 'month' | 'all' | 'custom' = 'all';
+  fromDate = '';
+  toDate = '';
 
   @ViewChild('reportSection') reportSection!: ElementRef;
+
+  pieChartData!: ChartConfiguration<'pie'>['data'];
+  doughnutChartData!: ChartConfiguration<'doughnut'>['data'];
+  barChartData!: ChartConfiguration<'bar'>['data'];
+
+  pieChartOptions: ChartConfiguration<'pie'>['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { boxWidth: 12, usePointStyle: true, padding: 16 },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const label = context.label ?? '';
+            const value = context.raw as number;
+            return `${label}: ${value} stations`;
+          },
+        },
+      },
+    },
+  };
+
+  doughnutChartOptions: ChartConfiguration<'doughnut'>['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true } },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const label = context.label ?? '';
+            const value = context.raw as number;
+            return `${label}: ${value} bikes`;
+          },
+        },
+      },
+    },
+  };
+
+  barChartOptions: ChartConfiguration<'bar'>['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context) => `${context.dataset.label}: ${context.parsed.y ?? context.parsed}`,
+        },
+      },
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#6b7280' } },
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(15, 108, 255, 0.12)' },
+        ticks: { color: '#6b7280' },
+      },
+    },
+  };
 
   constructor(private service: CharteredBikeService) {}
 
@@ -51,10 +119,6 @@ export class PbsAnalyticsComponent implements OnInit {
 
   // ================= CHART DATA =================
 
-  pieChartData!: ChartConfiguration<'pie'>['data'];
-  doughnutChartData!: ChartConfiguration<'doughnut'>['data'];
-  barChartData!: ChartConfiguration<'bar'>['data'];
-
   prepareCharts() {
     const statusCounts: Record<string, number> = {
       Available: 0,
@@ -68,12 +132,25 @@ export class PbsAnalyticsComponent implements OnInit {
       statusCounts[label] = (statusCounts[label] ?? 0) + 1;
     });
 
+    this.statusSummary = [
+      { label: 'Available', count: statusCounts['Available'], color: '#4CAF50' },
+      { label: 'Moderate', count: statusCounts['Moderate'], color: '#FFC107' },
+      { label: 'Low Stock', count: statusCounts['Low Stock'], color: '#FF9800' },
+      { label: 'Empty', count: statusCounts['Empty'], color: '#F44336' },
+    ];
+
+    this.atRiskStations = [...this.stations]
+      .filter((s) => s.statusLabel === 'Low Stock' || s.statusLabel === 'Empty')
+      .sort((a, b) => (a.availabilityPercentage || 0) - (b.availabilityPercentage || 0))
+      .slice(0, 5);
+
     this.pieChartData = {
-      labels: Object.keys(statusCounts),
+      labels: this.statusSummary.map((item) => item.label),
       datasets: [
         {
-          data: Object.values(statusCounts),
-          backgroundColor: ['#4CAF50', '#FFC107', '#FF9800', '#F44336'],
+          data: this.statusSummary.map((item) => item.count),
+          backgroundColor: this.statusSummary.map((item) => item.color),
+          hoverOffset: 8,
         },
       ],
     };
@@ -85,8 +162,9 @@ export class PbsAnalyticsComponent implements OnInit {
       labels: ['Available', 'In Use'],
       datasets: [
         {
-          data: [available, total - available],
+          data: [available, Math.max(total - available, 0)],
           backgroundColor: ['#0f6cff', '#e5e7eb'],
+          hoverOffset: 8,
         },
       ],
     };
@@ -117,9 +195,90 @@ export class PbsAnalyticsComponent implements OnInit {
     return this.stations.reduce((s, x) => s + (x.bikesAvailable || 0), 0);
   }
 
+  getTotalStations() {
+    return this.stations.length;
+  }
+
+  getAverageAvailability() {
+    if (!this.stations.length) {
+      return 0;
+    }
+
+    const totalPercentage = this.stations.reduce(
+      (sum, station) => sum + (station.availabilityPercentage || 0),
+      0
+    );
+
+    return Math.round(totalPercentage / this.stations.length);
+  }
+
+  getCriticalStationCount() {
+    return this.stations.filter(
+      (station) => station.statusLabel === 'Low Stock' || station.statusLabel === 'Empty'
+    ).length;
+  }
+
   getUtilization() {
     const total = this.getTotalFleet();
     return total ? Math.round((this.getTotalAvailable() / total) * 100) : 0;
+  }
+
+  getStatusCount(status: string) {
+    return this.statusSummary.find((item) => item.label === status)?.count ?? 0;
+  }
+
+  onPeriodChange() {
+    if (this.selectedPeriod !== 'custom') {
+      this.fromDate = '';
+      this.toDate = '';
+    }
+  }
+
+  onCustomDateChange() {
+    if (this.fromDate || this.toDate) {
+      this.selectedPeriod = 'custom';
+    }
+  }
+
+  applyFilters() {
+    if (this.selectedPeriod === 'custom' && this.fromDate && this.toDate && this.fromDate > this.toDate) {
+      const temp = this.fromDate;
+      this.fromDate = this.toDate;
+      this.toDate = temp;
+    }
+    // If the data source provided dates, we would filter here before preparing charts.
+    this.prepareCharts();
+  }
+
+  resetFilters() {
+    this.selectedPeriod = 'all';
+    this.fromDate = '';
+    this.toDate = '';
+  }
+
+  getDateRangeLabel(): string {
+    if (this.selectedPeriod === 'today') {
+      return 'Today';
+    }
+    if (this.selectedPeriod === 'week') {
+      return 'This Week';
+    }
+    if (this.selectedPeriod === 'month') {
+      return 'This Month';
+    }
+    if (this.selectedPeriod === 'custom') {
+      if (this.fromDate && this.toDate) {
+        return `${this.fromDate} → ${this.toDate}`;
+      }
+      if (this.fromDate) {
+        return `From ${this.fromDate}`;
+      }
+      if (this.toDate) {
+        return `Until ${this.toDate}`;
+      }
+      return 'Custom Range';
+    }
+    return 'All Dates';
   }
 
   // ================= PDF =================
@@ -135,6 +294,7 @@ export class PbsAnalyticsComponent implements OnInit {
     const height = (canvas.height * width) / canvas.width;
 
     pdf.addImage(imgData, 'PNG', 0, 10, width, height);
-    pdf.save(`pbs-report-${new Date().toISOString()}.pdf`);
+    const safeLabel = this.getDateRangeLabel().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+    pdf.save(`pbs-report-${safeLabel}-${new Date().toISOString()}.pdf`);
   }
 }

@@ -1,0 +1,315 @@
+<div class="reports-container">
+  <mat-card class="header-card">
+    <div class="header-content">
+      <h1>Chartered Bike Reports</h1>
+      <div class="header-actions">
+        <button mat-raised-button color="primary" (click)="refreshReports()" [disabled]="loadingWeek || loadingMonth">
+          <mat-icon>refresh</mat-icon>
+          Refresh Reports
+        </button>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- Error Message -->
+  <mat-card *ngIf="error" class="error-card">
+    <div class="error-content">
+      <mat-icon>error</mat-icon>
+      <span>{{ error }}</span>
+      <button mat-icon-button (click)="dismissError()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- Tab Navigation -->
+  <mat-tab-group [(selectedIndex)]="selectedTab" class="reports-tabs">
+    <!-- Last Week Report -->
+    <mat-tab label="Last Week Report">
+      <ng-template mat-tab-label>
+        <mat-icon>date_range</mat-icon>
+        <span style="margin-left: 8px;">Last Week</span>
+      </ng-template>
+
+      <div class="tab-content">
+        <!-- Loading Spinner -->
+        <div *ngIf="loadingWeek" class="loading-container">
+          <mat-spinner diameter="50"></mat-spinner>
+          <p>Loading last week report...</p>
+        </div>
+
+        <!-- Report Content -->
+        <div *ngIf="!loadingWeek && lastWeekReport.length > 0">
+          <div class="report-header">
+            <div class="report-title">
+              <h2>Last 7 Days Report</h2>
+              <p class="report-date">Generated on: {{ 'now' | date: 'medium' }}</p>
+            </div>
+            <div class="report-actions">
+              <button
+                mat-stroked-button
+                color="primary"
+                (click)="exportToCSV('Week', lastWeekReport)"
+              >
+                <mat-icon>download</mat-icon>
+                Export CSV
+              </button>
+              <button
+                mat-stroked-button
+                color="accent"
+                (click)="exportToPDF('Week', lastWeekReport)"
+              >
+                <mat-icon>picture_as_pdf</mat-icon>
+                Export PDF
+              </button>
+            </div>
+          </div>
+
+          <mat-card [id]="'week-table'" class="report-table-card">
+            <div class="table-container">
+              <table mat-table [dataSource]="lastWeekReport" class="report-table">
+                <!-- Station Name Column -->
+                <ng-container matColumnDef="stationName">
+                  <th mat-header-cell *matHeaderCellDef>Station Name</th>
+                  <td mat-cell *matCellDef="let report">
+                    <strong>{{ report.stationName }}</strong>
+                  </td>
+                </ng-container>
+
+                <!-- Total Bikes Column -->
+                <ng-container matColumnDef="totalBikes">
+                  <th mat-header-cell *matHeaderCellDef>Total Bikes</th>
+                  <td mat-cell *matCellDef="let report">{{ report.totalBikes }}</td>
+                </ng-container>
+
+                <!-- Active Bikes Column -->
+                <ng-container matColumnDef="activeBikes">
+                  <th mat-header-cell *matHeaderCellDef>Active</th>
+                  <td mat-cell *matCellDef="let report">
+                    <span class="active-badge">{{ report.activeBikes }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Inactive Bikes Column -->
+                <ng-container matColumnDef="inactiveBikes">
+                  <th mat-header-cell *matHeaderCellDef>Inactive</th>
+                  <td mat-cell *matCellDef="let report">
+                    <span class="inactive-badge">{{ report.inactiveBikes }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Bikes On Trip Column -->
+                <ng-container matColumnDef="bikesOnTrip">
+                  <th mat-header-cell *matHeaderCellDef>On Trip</th>
+                  <td mat-cell *matCellDef="let report">{{ report.bikesOnTrip }}</td>
+                </ng-container>
+
+                <!-- Availability Percentage Column -->
+                <ng-container matColumnDef="availabilityPercentage">
+                  <th mat-header-cell *matHeaderCellDef>Availability %</th>
+                  <td mat-cell *matCellDef="let report">
+                    <div class="percentage-bar">
+                      <div
+                        class="percentage-fill"
+                        [style.width.%]="report.availabilityPercentage"
+                        [ngClass]="getAvailabilityColor(report.availabilityPercentage)"
+                      ></div>
+                      <span class="percentage-text">{{ report.availabilityPercentage | number: '1.0-1' }}%</span>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              </table>
+            </div>
+          </mat-card>
+
+          <!-- Summary Statistics -->
+          <mat-card class="summary-card">
+            <h3>Summary Statistics</h3>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Total Stations</div>
+                <div class="summary-value">{{ lastWeekReport.length }}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Bikes</div>
+                <div class="summary-value">
+                  {{ lastWeekReport | reduce: 'totalBikes':0 | number }}
+                </div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Active Bikes</div>
+                <div class="summary-value">
+                  {{ lastWeekReport | reduce: 'activeBikes':0 | number }}
+                </div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Avg Availability</div>
+                <div class="summary-value">
+                  {{
+                    ((lastWeekReport | reduce: 'availabilityPercentage':0) / lastWeekReport.length) | number: '1.0-1'
+                  }}%
+                </div>
+              </div>
+            </div>
+          </mat-card>
+        </div>
+
+        <!-- Empty State -->
+        <mat-card *ngIf="!loadingWeek && lastWeekReport.length === 0" class="empty-card">
+          <div class="empty-content">
+            <mat-icon class="empty-icon">info</mat-icon>
+            <h3>No Data Available</h3>
+            <p>No report data available for the last week.</p>
+          </div>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+    <!-- Last Month Report -->
+    <mat-tab label="Last Month Report">
+      <ng-template mat-tab-label>
+        <mat-icon>calendar_month</mat-icon>
+        <span style="margin-left: 8px;">Last Month</span>
+      </ng-template>
+
+      <div class="tab-content">
+        <!-- Loading Spinner -->
+        <div *ngIf="loadingMonth" class="loading-container">
+          <mat-spinner diameter="50"></mat-spinner>
+          <p>Loading last month report...</p>
+        </div>
+
+        <!-- Report Content -->
+        <div *ngIf="!loadingMonth && lastMonthReport.length > 0">
+          <div class="report-header">
+            <div class="report-title">
+              <h2>Last 30 Days Report</h2>
+              <p class="report-date">Generated on: {{ 'now' | date: 'medium' }}</p>
+            </div>
+            <div class="report-actions">
+              <button
+                mat-stroked-button
+                color="primary"
+                (click)="exportToCSV('Month', lastMonthReport)"
+              >
+                <mat-icon>download</mat-icon>
+                Export CSV
+              </button>
+              <button
+                mat-stroked-button
+                color="accent"
+                (click)="exportToPDF('Month', lastMonthReport)"
+              >
+                <mat-icon>picture_as_pdf</mat-icon>
+                Export PDF
+              </button>
+            </div>
+          </div>
+
+          <mat-card [id]="'month-table'" class="report-table-card">
+            <div class="table-container">
+              <table mat-table [dataSource]="lastMonthReport" class="report-table">
+                <!-- Station Name Column -->
+                <ng-container matColumnDef="stationName">
+                  <th mat-header-cell *matHeaderCellDef>Station Name</th>
+                  <td mat-cell *matCellDef="let report">
+                    <strong>{{ report.stationName }}</strong>
+                  </td>
+                </ng-container>
+
+                <!-- Total Bikes Column -->
+                <ng-container matColumnDef="totalBikes">
+                  <th mat-header-cell *matHeaderCellDef>Total Bikes</th>
+                  <td mat-cell *matCellDef="let report">{{ report.totalBikes }}</td>
+                </ng-container>
+
+                <!-- Active Bikes Column -->
+                <ng-container matColumnDef="activeBikes">
+                  <th mat-header-cell *matHeaderCellDef>Active</th>
+                  <td mat-cell *matCellDef="let report">
+                    <span class="active-badge">{{ report.activeBikes }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Inactive Bikes Column -->
+                <ng-container matColumnDef="inactiveBikes">
+                  <th mat-header-cell *matHeaderCellDef>Inactive</th>
+                  <td mat-cell *matCellDef="let report">
+                    <span class="inactive-badge">{{ report.inactiveBikes }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Bikes On Trip Column -->
+                <ng-container matColumnDef="bikesOnTrip">
+                  <th mat-header-cell *matHeaderCellDef>On Trip</th>
+                  <td mat-cell *matCellDef="let report">{{ report.bikesOnTrip }}</td>
+                </ng-container>
+
+                <!-- Availability Percentage Column -->
+                <ng-container matColumnDef="availabilityPercentage">
+                  <th mat-header-cell *matHeaderCellDef>Availability %</th>
+                  <td mat-cell *matCellDef="let report">
+                    <div class="percentage-bar">
+                      <div
+                        class="percentage-fill"
+                        [style.width.%]="report.availabilityPercentage"
+                        [ngClass]="getAvailabilityColor(report.availabilityPercentage)"
+                      ></div>
+                      <span class="percentage-text">{{ report.availabilityPercentage | number: '1.0-1' }}%</span>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              </table>
+            </div>
+          </mat-card>
+
+          <!-- Summary Statistics -->
+          <mat-card class="summary-card">
+            <h3>Summary Statistics</h3>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Total Stations</div>
+                <div class="summary-value">{{ lastMonthReport.length }}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Bikes</div>
+                <div class="summary-value">
+                  {{ lastMonthReport | reduce: 'totalBikes':0 | number }}
+                </div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Active Bikes</div>
+                <div class="summary-value">
+                  {{ lastMonthReport | reduce: 'activeBikes':0 | number }}
+                </div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Avg Availability</div>
+                <div class="summary-value">
+                  {{
+                    ((lastMonthReport | reduce: 'availabilityPercentage':0) / lastMonthReport.length) | number: '1.0-1'
+                  }}%
+                </div>
+              </div>
+            </div>
+          </mat-card>
+        </div>
+
+        <!-- Empty State -->
+        <mat-card *ngIf="!loadingMonth && lastMonthReport.length === 0" class="empty-card">
+          <div class="empty-content">
+            <mat-icon class="empty-icon">info</mat-icon>
+            <h3>No Data Available</h3>
+            <p>No report data available for the last month.</p>
+          </div>
+        </mat-card>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

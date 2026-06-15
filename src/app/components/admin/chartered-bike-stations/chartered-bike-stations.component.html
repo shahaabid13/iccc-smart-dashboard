@@ -1,0 +1,208 @@
+<div class="chartered-bike-container">
+  <mat-card class="header-card">
+    <div class="header-content">
+      <h1>Chartered Bike Stations</h1>
+      <div class="header-actions">
+        <button mat-raised-button color="primary" (click)="refreshStations()" [disabled]="loading">
+          <mat-icon>refresh</mat-icon>
+          Refresh
+        </button>
+        <button
+          mat-raised-button
+          [color]="autoRefreshEnabled ? 'accent' : 'primary'"
+          (click)="toggleAutoRefresh()"
+          [disabled]="loading"
+        >
+          <mat-icon>{{ autoRefreshEnabled ? 'pause' : 'play_arrow' }}</mat-icon>
+          {{ autoRefreshEnabled ? 'Stop Auto-Refresh' : 'Start Auto-Refresh' }}
+        </button>
+        <button mat-raised-button color="warn" (click)="syncData()" [disabled]="loading">
+          <mat-icon>sync</mat-icon>
+          Sync Data
+        </button>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- Error Message -->
+  <mat-card *ngIf="error" class="error-card">
+    <div class="error-content">
+      <mat-icon>error</mat-icon>
+      <span>{{ error }}</span>
+      <button mat-icon-button (click)="dismissError()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- Filters -->
+  <mat-card class="filters-card">
+    <div class="filters-content">
+      <mat-form-field class="search-field">
+        <mat-label>Search Station</mat-label>
+        <input
+          matInput
+          placeholder="Enter station name"
+          [(ngModel)]="searchText"
+          (ngModelChange)="onSearchChange($event)"
+        />
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field class="filter-field">
+        <mat-label>Minimum Bikes</mat-label>
+        <input
+          matInput
+          type="number"
+          [(ngModel)]="minBikesFilter"
+          min="0"
+          placeholder="Filter by minimum bikes"
+        />
+      </mat-form-field>
+
+      <button mat-raised-button color="primary" (click)="loadFilteredStations()" [disabled]="loading">
+        Apply Filter
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>Loading stations...</p>
+  </div>
+
+  <!-- Stations Table -->
+  <mat-card *ngIf="!loading && filteredStations.length > 0" class="table-card">
+    <div class="table-container">
+      <table mat-table [dataSource]="filteredStations" class="stations-table">
+        <!-- Station Name Column -->
+        <ng-container matColumnDef="stationName">
+          <th mat-header-cell *matHeaderCellDef>Station Name</th>
+          <td mat-cell *matCellDef="let station">
+            <strong>{{ station.stationName }}</strong>
+            <br />
+            <small class="text-muted">#{{ station.stationNumber }}</small>
+          </td>
+        </ng-container>
+
+        <!-- Bikes Available Column -->
+        <ng-container matColumnDef="bikesAvailable">
+          <th mat-header-cell *matHeaderCellDef>Available</th>
+          <td mat-cell *matCellDef="let station">
+            <span class="bikes-available">{{ station.bikesAvailable }}</span>
+            <span class="text-muted">/ {{ station.bikesTotal }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Bikes Total Column -->
+        <ng-container matColumnDef="bikesTotal">
+          <th mat-header-cell *matHeaderCellDef>Total</th>
+          <td mat-cell *matCellDef="let station">{{ station.bikesTotal }}</td>
+        </ng-container>
+
+        <!-- Availability Percentage Column -->
+        <ng-container matColumnDef="availabilityPercentage">
+          <th mat-header-cell *matHeaderCellDef>Availability %</th>
+          <td mat-cell *matCellDef="let station">
+            <div class="percentage-bar">
+              <div
+                class="percentage-fill"
+                [style.width.%]="getAvailabilityPercentage(station)"
+                [ngClass]="getStatusColor(station)"
+              ></div>
+              <span class="percentage-text">{{ getAvailabilityPercentage(station) }}%</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Bike Rack Available Column -->
+        <ng-container matColumnDef="bikeRackAvailable">
+          <th mat-header-cell *matHeaderCellDef>Rack Available</th>
+          <td mat-cell *matCellDef="let station">
+            <span>{{ station.bikesRack }}</span>
+            <span class="text-muted">/ {{ station.bikesFree }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let station">
+            <span
+              class="status-badge"
+              [ngClass]="'status-' + getStatusLabel(station).toLowerCase()"
+              [matTooltip]="'Availability: ' + getAvailabilityPercentage(station) + '%'"
+            >
+              {{ getStatusLabel(station) }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let station">
+            <button
+              mat-icon-button
+              matTooltip="View Details"
+              class="action-btn"
+            >
+              <mat-icon>info</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              matTooltip="View on Map"
+              class="action-btn"
+            >
+              <mat-icon>location_on</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+  </mat-card>
+
+  <!-- Empty State -->
+  <mat-card *ngIf="!loading && filteredStations.length === 0" class="empty-card">
+    <div class="empty-content">
+      <mat-icon class="empty-icon">info</mat-icon>
+      <h3>No Stations Found</h3>
+      <p>Try adjusting your filters or refresh the data.</p>
+    </div>
+  </mat-card>
+
+  <!-- Summary Statistics -->
+  <mat-card *ngIf="!loading && filteredStations.length > 0" class="stats-card">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-label">Total Stations</div>
+        <div class="stat-value">{{ filteredStations.length }}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Total Bikes</div>
+        <div class="stat-value">
+          {{ filteredStations | reduce: 'bikesTotal':0 | number }}
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Available Bikes</div>
+        <div class="stat-value">
+          {{ filteredStations | reduce: 'bikesAvailable':0 | number }}
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Average Availability</div>
+        <div class="stat-value">
+          {{
+            (filteredStations
+              | reduce: 'bikesAvailable':0) / (filteredStations | reduce: 'bikesTotal':0) * 100 | number: '1.0-0'
+          }}%
+        </div>
+      </div>
+    </div>
+  </mat-card>
+</div>

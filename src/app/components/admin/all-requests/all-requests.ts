@@ -207,7 +207,19 @@ export class AllRequestsComponent implements OnInit {
     this.loading = true;
     console.log('Loading requests from:', this.apiUrl);
 
-    this.http.get<MaintenanceRequest[]>(this.apiUrl).subscribe({
+    const token = localStorage.getItem('token');
+    if (!token) {
+      this.snackBar.open('❌ You must log in to view maintenance requests', 'Close', {
+        duration: 3000,
+        panelClass: ['error-snackbar']
+      });
+      this.loading = false;
+      return;
+    }
+
+    const headers = { headers: { Authorization: `Bearer ${token}` } } as any;
+
+    this.http.get<MaintenanceRequest[]>(this.apiUrl, headers).subscribe({
       next: (data) => {
         console.log('Requests loaded:', data);
         this.requests = Array.isArray(data) ? data : [];
@@ -330,7 +342,19 @@ Updated: ${request.formattedUpdatedAt}`;
       remarks: approved ? 'Request approved by administrator' : 'Request rejected by administrator'
     };
 
-    this.http.post(`${this.apiUrl}/${request.id}/approve`, payload).subscribe({
+    const token = localStorage.getItem('token');
+    if (!token) {
+      this.snackBar.open('❌ You must log in to perform this action', 'Close', {
+        duration: 3000,
+        panelClass: ['error-snackbar']
+      });
+      this.actionInProgress = null;
+      return;
+    }
+
+    const headers = { headers: { Authorization: `Bearer ${token}` } } as any;
+
+    this.http.post(`${this.apiUrl}/${request.id}/approve`, payload, headers).subscribe({
       next: () => {
         this.snackBar.open(
           `✅ Request #${request.id} ${approved ? 'approved' : 'rejected'} successfully`,

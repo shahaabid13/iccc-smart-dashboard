@@ -70,3 +70,73 @@ export interface CharteredBikeStationUI extends CharteredBikeStation {
   statusColor?: string;
   statusLabel?: string;
 }
+
+// ==================== Historical Data DTOs ====================
+export interface CharteredBikeStationHistoryDto {
+  stationName: string;
+  stationNumber: number;
+  timestamp: string; // LocalDateTime format: 2024-01-15T10:30:00
+  bikesAvailable: number;
+  bikesTotal: number;
+  bikeRackAvailable: number;
+  bikeRackTotal: number;
+  latitude: string;
+  longitude: string;
+}
+
+export interface CharteredBikeHistoryResponse {
+  data: CharteredBikeStationHistoryDto[];
+  status: number;
+  message: string;
+}
+
+// ==================== Statistics DTOs ====================
+export interface CharteredBikeStationStatsDto {
+  stationName: string;
+  stationNumber: number;
+  startDate: string; // LocalDateTime
+  endDate: string;   // LocalDateTime
+  minBikes: number;
+  maxBikes: number;
+  avgBikes: number;
+  minRackAvailable: number;
+  maxRackAvailable: number;
+  avgRackAvailable: number;
+  dataPoints: number;
+  trend: 'UP' | 'DOWN' | 'STABLE';
+}
+
+export interface CharteredBikeStatsResponse {
+  data: CharteredBikeStationStatsDto[];
+  status: number;
+  message: string;
+}
+
+// ==================== Report DTOs ====================
+export interface CharteredBikeReportDto {
+  stationName: string;
+  stationNumber: number;
+  totalBikes: number;
+  activeBikes: number;
+  inactiveBikes: number;
+  bikesOnTrip: number;
+  availabilityPercentage: number;
+  reportDate: string;
+  avgAvailability: number;
+  minAvailability: number;
+  maxAvailability: number;
+}
+
+export interface CharteredBikeReportResponse {
+  data: CharteredBikeReportDto[];
+  status: number;
+  message: string;
+}
+
+// ==================== Station Names DTO ====================
+export interface CharteredBikeStationNamesDto {
+  stationName: string;
+  stationNumber: number;
+  latitude: string;
+  longitude: string;
+}

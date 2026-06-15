@@ -710,7 +710,17 @@ export class DeviceHistoryComponent implements OnInit {
   loadDeviceInfo(deviceId: string) {
     this.http.get<any>(`/api/devices/${deviceId}`).subscribe({
       next: (data) => {
-        this.deviceInfo = data;
+        // Normalize backend response to fields expected by the template
+        const currentSerial = data?.serialNumber || data?.serial || data?.currentSerial || null;
+        const currentLocation = data?.locationName || (data?.location && (data.location.name || data.location.locationName)) || data?.location || null;
+
+        this.deviceInfo = {
+          ...data,
+          currentSerial,
+          currentLocation,
+          deviceType: data?.deviceType || data?.type || null,
+          status: data?.status || 'UNKNOWN'
+        };
       },
       error: (err) => {
         console.error('Failed to load device info:', err);

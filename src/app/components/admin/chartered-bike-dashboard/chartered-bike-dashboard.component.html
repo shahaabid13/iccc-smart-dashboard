@@ -1,0 +1,205 @@
+<div class="dashboard-container">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <h1>Chartered Bike Srinagar Dashboard</h1>
+    <div class="header-actions">
+      <button mat-raised-button color="primary" (click)="refreshData()" [disabled]="loading">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Error Message -->
+  <mat-card *ngIf="error" class="error-card">
+    <div class="error-content">
+      <mat-icon>error</mat-icon>
+      <span>{{ error }}</span>
+      <button mat-icon-button (click)="dismissError()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>Loading dashboard data...</p>
+  </div>
+
+  <!-- Dashboard Content -->
+  <div *ngIf="!loading && stations.length > 0" class="dashboard-content">
+    <!-- Key Metrics -->
+    <div class="metrics-section">
+      <h2>Key Metrics</h2>
+      <div class="metrics-grid">
+        <!-- Overall Status Card -->
+        <mat-card class="metric-card status-card" [ngClass]="'status-' + getStatusIndicator()">
+          <div class="metric-content">
+            <mat-icon class="metric-icon">dashboard</mat-icon>
+            <div class="metric-info">
+              <div class="metric-label">Overall Status</div>
+              <div class="metric-value">{{ getStatusIndicator() | uppercase }}</div>
+              <div class="metric-detail">{{ avgAvailability }}% Available</div>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Total Stations -->
+        <mat-card class="metric-card stations-card">
+          <div class="metric-content">
+            <mat-icon class="metric-icon">location_on</mat-icon>
+            <div class="metric-info">
+              <div class="metric-label">Total Stations</div>
+              <div class="metric-value">{{ totalStations }}</div>
+              <div class="metric-detail">Active locations</div>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Total Bikes -->
+        <mat-card class="metric-card bikes-card">
+          <div class="metric-content">
+            <mat-icon class="metric-icon">directions_bike</mat-icon>
+            <div class="metric-info">
+              <div class="metric-label">Total Bikes</div>
+              <div class="metric-value">{{ totalBikes }}</div>
+              <div class="metric-detail">Available: {{ availableBikes }}</div>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Critical Stations -->
+        <mat-card class="metric-card critical-card">
+          <div class="metric-content">
+            <mat-icon class="metric-icon">warning</mat-icon>
+            <div class="metric-info">
+              <div class="metric-label">Critical Stations</div>
+              <div class="metric-value">{{ criticalStations }}</div>
+              <div class="metric-detail">&lt;25% Availability</div>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Availability Rate -->
+        <mat-card class="metric-card availability-card">
+          <div class="metric-content">
+            <mat-icon class="metric-icon">percent</mat-icon>
+            <div class="metric-info">
+              <div class="metric-label">Avg Availability</div>
+              <div class="metric-value">{{ avgAvailability }}%</div>
+              <div class="metric-detail">Network average</div>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Last Sync -->
+        <mat-card class="metric-card sync-card">
+          <div class="metric-content">
+            <mat-icon class="metric-icon">schedule</mat-icon>
+            <div class="metric-info">
+              <div class="metric-label">Last Sync</div>
+              <div class="metric-value">{{ getFormattedTime(lastSyncTime) }}</div>
+              <div class="metric-detail">Real-time data</div>
+            </div>
+          </div>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- Quick Access Section -->
+    <div class="quick-access-section">
+      <h2>Quick Access</h2>
+      <div class="quick-access-grid">
+        <!-- View Stations -->
+        <mat-card
+          class="quick-access-card"
+          (click)="navigateTo('/chartered-bike/stations')"
+          style="cursor: pointer;"
+        >
+          <mat-card-content>
+            <mat-icon class="access-icon">location_on</mat-icon>
+            <div class="access-title">View Stations</div>
+            <p class="access-description">Real-time station status and availability</p>
+            <button mat-raised-button color="primary" (click)="$event.stopPropagation()">
+              Go to Stations
+              <mat-icon>arrow_forward</mat-icon>
+            </button>
+          </mat-card-content>
+        </mat-card>
+
+        <!-- View History -->
+        <mat-card
+          class="quick-access-card"
+          (click)="navigateTo('/chartered-bike/history')"
+          style="cursor: pointer;"
+        >
+          <mat-card-content>
+            <mat-icon class="access-icon">history</mat-icon>
+            <div class="access-title">View History</div>
+            <p class="access-description">Historical data and trends over time</p>
+            <button mat-raised-button color="primary" (click)="$event.stopPropagation()">
+              Go to History
+              <mat-icon>arrow_forward</mat-icon>
+            </button>
+          </mat-card-content>
+        </mat-card>
+
+        <!-- View Statistics -->
+        <mat-card
+          class="quick-access-card"
+          (click)="navigateTo('/chartered-bike/statistics')"
+          style="cursor: pointer;"
+        >
+          <mat-card-content>
+            <mat-icon class="access-icon">bar_chart</mat-icon>
+            <div class="access-title">View Statistics</div>
+            <p class="access-description">Min, max, and average statistics</p>
+            <button mat-raised-button color="primary" (click)="$event.stopPropagation()">
+              Go to Statistics
+              <mat-icon>arrow_forward</mat-icon>
+            </button>
+          </mat-card-content>
+        </mat-card>
+
+        <!-- View Reports -->
+        <mat-card
+          class="quick-access-card"
+          (click)="navigateTo('/chartered-bike/reports')"
+          style="cursor: pointer;"
+        >
+          <mat-card-content>
+            <mat-icon class="access-icon">description</mat-icon>
+            <div class="access-title">View Reports</div>
+            <p class="access-description">Weekly and monthly reports</p>
+            <button mat-raised-button color="primary" (click)="$event.stopPropagation()">
+              Go to Reports
+              <mat-icon>arrow_forward</mat-icon>
+            </button>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- Top Stations Section -->
+    <div class="top-stations-section" *ngIf="stations.length > 0">
+      <h2>Station Overview</h2>
+      <div class="stations-summary">
+        <p class="summary-text">Displaying data from {{ stations.length }} stations</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <mat-card *ngIf="!loading && stations.length === 0" class="empty-card">
+    <div class="empty-content">
+      <mat-icon class="empty-icon">info</mat-icon>
+      <h3>No Data Available</h3>
+      <p>Unable to load dashboard data. Please try refreshing or check your connection.</p>
+      <button mat-raised-button color="primary" (click)="refreshData()">
+        <mat-icon>refresh</mat-icon>
+        Retry
+      </button>
+    </div>
+  </mat-card>
+</div>

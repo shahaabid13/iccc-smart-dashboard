@@ -1,0 +1,164 @@
+<div class="history-container">
+  <mat-card class="header-card">
+    <div class="header-content">
+      <h1>Chartered Bike History</h1>
+      <p class="subtitle">View historical bike availability data over time</p>
+    </div>
+  </mat-card>
+
+  <!-- Error Message -->
+  <mat-card *ngIf="error" class="error-card">
+    <div class="error-content">
+      <mat-icon>error</mat-icon>
+      <span>{{ error }}</span>
+      <button mat-icon-button (click)="dismissError()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- Filters -->
+  <mat-card class="filters-card">
+    <form [formGroup]="historyForm" class="filter-form">
+      <div class="filter-row">
+        <mat-form-field class="filter-field">
+          <mat-label>View Type</mat-label>
+          <mat-select formControlName="viewType" (selectionChange)="onViewTypeChange($event.value)">
+            <mat-option value="custom">Custom Date Range</mat-option>
+            <mat-option value="recent">Recent (Last N Days)</mat-option>
+            <mat-option value="all">All Stations</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field class="filter-field" *ngIf="historyForm.get('viewType')?.value !== 'all'">
+          <mat-label>Station</mat-label>
+          <mat-select formControlName="stationName">
+            <mat-optgroup label="Select a Station">
+              <mat-option *ngFor="let station of stationNames" [value]="station.stationName">
+                {{ station.stationName }}
+              </mat-option>
+            </mat-optgroup>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field class="filter-field" *ngIf="historyForm.get('viewType')?.value === 'recent'">
+          <mat-label>Recent Days</mat-label>
+          <input matInput type="number" formControlName="recentDays" min="1" max="30" />
+          <mat-icon matSuffix>timer</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field class="filter-field">
+          <mat-label>Start Date</mat-label>
+          <input matInput [matDatepicker]="startPicker" formControlName="startDate" />
+          <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+          <mat-datepicker #startPicker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field class="filter-field">
+          <mat-label>End Date</mat-label>
+          <input matInput [matDatepicker]="endPicker" formControlName="endDate" />
+          <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+          <mat-datepicker #endPicker></mat-datepicker>
+        </mat-form-field>
+      </div>
+
+      <div class="button-row">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="loadHistory()"
+          [disabled]="loading || historyForm.invalid"
+        >
+          <mat-icon>search</mat-icon>
+          Load History
+        </button>
+        <button
+          mat-raised-button
+          color="accent"
+          (click)="exportToCSV()"
+          [disabled]="loading || historyData.length === 0"
+        >
+          <mat-icon>download</mat-icon>
+          Export CSV
+        </button>
+      </div>
+    </form>
+  </mat-card>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>Loading history...</p>
+  </div>
+
+  <!-- History Table -->
+  <mat-card *ngIf="!loading && filteredHistoryData.length > 0" class="table-card">
+    <div class="table-info">
+      <span class="record-count">{{ historyData.length }} total records</span>
+    </div>
+    <div class="table-container">
+      <table mat-table [dataSource]="filteredHistoryData" class="history-table">
+        <!-- Timestamp Column -->
+        <ng-container matColumnDef="timestamp">
+          <th mat-header-cell *matHeaderCellDef>Timestamp</th>
+          <td mat-cell *matCellDef="let record">{{ formatTimestamp(record.timestamp) }}</td>
+        </ng-container>
+
+        <!-- Bikes Available Column -->
+        <ng-container matColumnDef="bikesAvailable">
+          <th mat-header-cell *matHeaderCellDef>Available</th>
+          <td mat-cell *matCellDef="let record">
+            <span class="bikes-available">{{ record.bikesAvailable }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Total Bikes Column -->
+        <ng-container matColumnDef="bikesTotal">
+          <th mat-header-cell *matHeaderCellDef>Total</th>
+          <td mat-cell *matCellDef="let record">{{ record.bikesTotal }}</td>
+        </ng-container>
+
+        <!-- Availability Percentage Column -->
+        <ng-container matColumnDef="availabilityPercentage">
+          <th mat-header-cell *matHeaderCellDef>Availability %</th>
+          <td mat-cell *matCellDef="let record">
+            <div class="percentage-bar">
+              <div
+                class="percentage-fill"
+                [style.width.%]="getAvailabilityPercentage(record)"
+                [ngClass]="getAvailabilityPercentage(record) >= 50 ? 'good' : 'warning'"
+              ></div>
+              <span class="percentage-text">{{ getAvailabilityPercentage(record) }}%</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Bike Rack Available Column -->
+        <ng-container matColumnDef="bikeRackAvailable">
+          <th mat-header-cell *matHeaderCellDef>Rack Available</th>
+          <td mat-cell *matCellDef="let record">{{ record.bikeRackAvailable }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <mat-paginator
+      [length]="historyData.length"
+      [pageSize]="pageSize"
+      [pageSizeOptions]="[5, 10, 20, 50]"
+      (page)="onPageChange($event)"
+    ></mat-paginator>
+  </mat-card>
+
+  <!-- Empty State -->
+  <mat-card *ngIf="!loading && historyData.length === 0" class="empty-card">
+    <div class="empty-content">
+      <mat-icon class="empty-icon">history</mat-icon>
+      <h3>No History Found</h3>
+      <p>Select a station and date range to view historical data.</p>
+    </div>
+  </mat-card>
+</div>

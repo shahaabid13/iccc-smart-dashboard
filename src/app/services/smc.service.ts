@@ -3,6 +3,16 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, map, catchError, of, tap } from 'rxjs';
 import { TimeFrameDataDTO, TimeFrameRequest } from './timeframe.service';
 import { environment } from '../../environments/environment';
+import {
+  CharteredBikeStation,
+  CharteredBikeStationHistoryDto,
+  CharteredBikeStationStatsDto,
+  CharteredBikeReportDto,
+  CharteredBikeStationNamesDto,
+  CharteredBikeHistoryResponse,
+  CharteredBikeStatsResponse,
+  CharteredBikeReportResponse,
+} from '../models/chartered-bike';
 
 @Injectable({ providedIn: 'root' })
 export class SmcService {
@@ -393,4 +403,190 @@ private getMockTimeframeData(): TimeFrameDataDTO[] {
       }
     ];
   }
+
+  // ========================== CHARTERED BIKE API METHODS ==========================
+  
+  private readonly charteredBikeBaseUrl = '/api/chartered-bike';
+
+  /**
+   * Get live station data (real-time, saves to DB)
+   */
+  getCharteredBikeStations(): Observable<CharteredBikeStation[]> {
+    return this.http.get<any>(`${this.charteredBikeBaseUrl}/stations`).pipe(
+      map(response => response.data || response || []),
+      catchError(error => {
+        console.error('Error fetching chartered bike stations:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get filtered station data (minimum bikes threshold)
+   */
+  getCharteredBikeStationsFiltered(minBikes: number): Observable<CharteredBikeStation[]> {
+    return this.http.get<any>(
+      `${this.charteredBikeBaseUrl}/stations/filtered`,
+      { params: { minBikes: minBikes.toString() } }
+    ).pipe(
+      map(response => response.data || response || []),
+      catchError(error => {
+        console.error('Error fetching filtered chartered bike stations:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get latest station data from database
+   */
+  getCharteredBikeLatest(): Observable<CharteredBikeStation[]> {
+    return this.http.get<any>(`${this.charteredBikeBaseUrl}/latest`).pipe(
+      map(response => response.data || response || []),
+      catchError(error => {
+        console.error('Error fetching latest chartered bike data:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get available station names for historical data
+   */
+  getCharteredBikeStationNames(): Observable<CharteredBikeStationNamesDto[]> {
+    return this.http.get<any>(
+      `${this.charteredBikeBaseUrl}/history/stations`
+    ).pipe(
+      map(response => response.data || response || []),
+      catchError(error => {
+        console.error('Error fetching station names:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get historical data for a specific station
+   * @param stationName Station name
+   * @param startDate Start date in format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+   * @param endDate End date in format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+   */
+  getCharteredBikeStationHistory(
+    stationName: string,
+    startDate: string,
+    endDate: string
+  ): Observable<CharteredBikeStationHistoryDto[]> {
+    return this.http.get<CharteredBikeHistoryResponse>(
+      `${this.charteredBikeBaseUrl}/history/${encodeURIComponent(stationName)}`,
+      { params: { start: startDate, end: endDate } }
+    ).pipe(
+      map(response => response.data || []),
+      catchError(error => {
+        console.error('Error fetching station history:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get historical data for all stations
+   * @param startDate Start date
+   * @param endDate End date
+   */
+  getCharteredBikeAllHistory(startDate: string, endDate: string): Observable<CharteredBikeStationHistoryDto[]> {
+    return this.http.get<CharteredBikeHistoryResponse>(
+      `${this.charteredBikeBaseUrl}/history/all`,
+      { params: { start: startDate, end: endDate } }
+    ).pipe(
+      map(response => response.data || []),
+      catchError(error => {
+        console.error('Error fetching all history:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get recent historical data for a station (last N days)
+   * @param stationName Station name
+   * @param days Number of days to retrieve
+   */
+  getCharteredBikeStationRecentHistory(stationName: string, days: number): Observable<CharteredBikeStationHistoryDto[]> {
+    return this.http.get<CharteredBikeHistoryResponse>(
+      `${this.charteredBikeBaseUrl}/history/${encodeURIComponent(stationName)}/recent`,
+      { params: { days: days.toString() } }
+    ).pipe(
+      map(response => response.data || []),
+      catchError(error => {
+        console.error('Error fetching recent history:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get statistics for a station
+   * @param stationName Station name
+   * @param startDate Start date
+   * @param endDate End date
+   */
+  getCharteredBikeStationStats(
+    stationName: string,
+    startDate: string,
+    endDate: string
+  ): Observable<CharteredBikeStationStatsDto[]> {
+    return this.http.get<CharteredBikeStatsResponse>(
+      `${this.charteredBikeBaseUrl}/history/${encodeURIComponent(stationName)}/stats`,
+      { params: { start: startDate, end: endDate } }
+    ).pipe(
+      map(response => response.data || []),
+      catchError(error => {
+        console.error('Error fetching station stats:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get last week report
+   */
+  getCharteredBikeLastWeekReport(): Observable<CharteredBikeReportDto[]> {
+    return this.http.get<CharteredBikeReportResponse>(
+      `${this.charteredBikeBaseUrl}/reports/last-week`
+    ).pipe(
+      map(response => response.data || []),
+      catchError(error => {
+        console.error('Error fetching last week report:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get last month report
+   */
+  getCharteredBikeLastMonthReport(): Observable<CharteredBikeReportDto[]> {
+    return this.http.get<CharteredBikeReportResponse>(
+      `${this.charteredBikeBaseUrl}/reports/last-month`
+    ).pipe(
+      map(response => response.data || []),
+      catchError(error => {
+        console.error('Error fetching last month report:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Manually trigger sync with Chartered Bike API
+   */
+  syncCharteredBikeData(): Observable<any> {
+    return this.http.post(`${this.charteredBikeBaseUrl}/sync`, {}).pipe(
+      catchError(error => {
+        console.error('Error syncing chartered bike data:', error);
+        return of({ success: false, message: 'Sync failed' });
+      })
+    );
+  }
 }
+

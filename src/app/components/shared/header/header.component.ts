@@ -112,6 +112,44 @@ import { Subject, takeUntil } from 'rxjs';
           </div>
         </div>
 
+        <!-- Chartered Bike Dropdown -->
+        <div class="nav-section" *ngIf="!isSidebarCollapsed">
+          <div class="section-label">Chartered Bike</div>
+        </div>
+
+        <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
+          <div class="dropdown-header" (click)="toggleDropdown('charteredBike')">
+            <span class="dropdown-icon">🚴</span>
+            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Chartered Bike</span>
+            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
+              {{ openDropdown === 'charteredBike' ? '▲' : '▼' }}
+            </span>
+          </div>
+
+          <div class="dropdown-content" *ngIf="openDropdown === 'charteredBike' && !isSidebarCollapsed">
+            <a routerLink="/chartered-bike" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">🏠</span>
+              <span>Dashboard</span>
+            </a>
+            <a routerLink="/chartered-bike/stations" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📍</span>
+              <span>Stations</span>
+            </a>
+            <a routerLink="/chartered-bike/history" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📜</span>
+              <span>History</span>
+            </a>
+            <a routerLink="/chartered-bike/statistics" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📈</span>
+              <span>Statistics</span>
+            </a>
+            <a routerLink="/chartered-bike/reports" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📋</span>
+              <span>Reports</span>
+            </a>
+          </div>
+        </div>
+
         <!-- ANPR Analytics Dropdown -->
         <div class="nav-section" *ngIf="!isSidebarCollapsed">
           <div class="section-label">ANPR Analytics</div>
