@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/services/locations.service.ts"],
+  "sourcesContent": ["import { Injectable } from '@angular/core';\r\nimport { Observable } from 'rxjs';\r\nimport { ApiService } from './api.service';\r\n\r\n@Injectable({ providedIn: 'root' })\r\nexport class LocationsService {\r\n  constructor(private api: ApiService) {}\r\n\r\n  getAll(): Observable<any[]> {\r\n    return this.api.get<any[]>('/locations');\r\n  }\r\n\r\n  searchByName(name: string): Observable<any[]> {\r\n    return this.api.get<any[]>('/locations/search', { name });\r\n  }\r\n}\r\n"],
+  "mappings": ";;;;;;;;;;;AAKM,IAAO,mBAAP,MAAO,kBAAgB;EACP;EAApB,YAAoB,KAAe;AAAf,SAAA,MAAA;EAAkB;EAEtC,SAAM;AACJ,WAAO,KAAK,IAAI,IAAW,YAAY;EACzC;EAEA,aAAa,MAAY;AACvB,WAAO,KAAK,IAAI,IAAW,qBAAqB,EAAE,KAAI,CAAE;EAC1D;;qCATW,mBAAgB,mBAAA,UAAA,CAAA;EAAA;4EAAhB,mBAAgB,SAAhB,kBAAgB,WAAA,YADH,OAAM,CAAA;;;sEACnB,kBAAgB,CAAA;UAD5B;WAAW,EAAE,YAAY,OAAM,CAAE;;;",
+  "names": []
+}

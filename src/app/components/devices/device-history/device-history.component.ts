@@ -9,6 +9,9 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { InventoryService } from '../../../services/inventory.service';
+import { AuthService } from '../../../services/auth.service';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 @Component({
   standalone: true,
@@ -21,7 +24,8 @@ import { HttpClient } from '@angular/common/http';
     MatProgressSpinnerModule,
     MatIconModule,
     MatChipsModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatSnackBarModule
   ],
   template: `
     <div class="page-container">
@@ -37,10 +41,17 @@ import { HttpClient } from '@angular/common/http';
               <p class="subtitle">Complete audit trail for device activities</p>
             </div>
           </div>
-          <button mat-raised-button color="primary" (click)="reload()" class="refresh-btn">
-            <mat-icon>refresh</mat-icon>
-            Refresh
-          </button>
+          <div class="header-actions">
+            <button *ngIf="isAdmin" mat-raised-button color="accent" (click)="syncFromInstall()" class="sync-btn">
+              <mat-icon>sync</mat-icon>
+              Sync From Install
+            </button>
+
+            <button mat-raised-button color="primary" (click)="reload()" class="refresh-btn">
+              <mat-icon>refresh</mat-icon>
+              Refresh
+            </button>
+          </div>
         </div>
 
         <!-- Device Summary Card -->
@@ -49,7 +60,10 @@ import { HttpClient } from '@angular/common/http';
             <div class="device-info-grid">
               <div class="device-info-item">
                 <span class="label">Current Serial:</span>
-                <span class="value serial">{{ deviceInfo.currentSerial || 'N/A' }}</span>
+                    <span class="value serial">{{ deviceInfo.currentSerial || 'N/A' }}</span>
+                    <div class="installed-snapshot" *ngIf="installedSerial">
+                      <small>Installed Serial: {{ installedSerial }}</small>
+                    </div>
               </div>
               <div class="device-info-item">
                 <span class="label">Device Type:</span>
@@ -58,6 +72,9 @@ import { HttpClient } from '@angular/common/http';
               <div class="device-info-item">
                 <span class="label">Current Location:</span>
                 <span class="value">{{ deviceInfo.currentLocation || 'N/A' }}</span>
+                <div class="installed-snapshot" *ngIf="installedLocation">
+                  <small>Installed Location: {{ installedLocation }}</small>
+                </div>
               </div>
               <div class="device-info-item">
                 <span class="label">Status:</span>
@@ -283,15 +300,16 @@ import { HttpClient } from '@angular/common/http';
 
     .label {
       font-size: 12px;
-      color: #666;
+      color: #111010;
       text-transform: uppercase;
       font-weight: 600;
+      font-style: bold;
     }
 
     .value {
       font-size: 16px;
       font-weight: 500;
-      color: #333;
+      color: #251919;
     }
 
     .serial {
@@ -311,7 +329,7 @@ import { HttpClient } from '@angular/common/http';
     }
 
     .status-inactive {
-      background: #f44336 !important;
+      background: #dacccc !important;
       color: white !important;
     }
 
@@ -373,7 +391,7 @@ import { HttpClient } from '@angular/common/http';
     th.mat-header-cell {
       background: #f8f9fa;
       font-weight: 600;
-      color: #333;
+      color: #b19e9e;
       font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -410,7 +428,7 @@ import { HttpClient } from '@angular/common/http';
     }
 
     .action-update {
-      background: #9c27b0 !important;
+      background: #bcabbe !important;
       color: white !important;
     }
 
@@ -617,12 +635,21 @@ export class DeviceHistoryComponent implements OnInit {
     'performedBy'
   ];
   loading = false;
+  installedSerial: string | null = null;
+  installedLocation: string | null = null;
+
+  isAdmin = false;
 
   constructor(
     private route: ActivatedRoute,
     private http: HttpClient,
-    private router: Router
-  ) {}
+    private router: Router,
+    private inventoryService: InventoryService,
+    private auth: AuthService,
+    private snackBar: MatSnackBar
+  ) {
+    this.isAdmin = this.auth.isAdmin();
+  }
 
   ngOnInit() {
     const deviceId = this.route.snapshot.paramMap.get('deviceId');
@@ -645,6 +672,29 @@ export class DeviceHistoryComponent implements OnInit {
         })).sort((a, b) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
+
+        // derive installed snapshot from most relevant history entry (INSTALL/REPLACE)
+        // Note: for REPLACE records the "replacedDeviceSerial" is the old serial that was removed.
+        // Showing that value as the "Installed Serial" caused confusion when no action was taken.
+        // Prefer the serial that was installed (newSerial) for both INSTALL and REPLACE actions.
+        const installEntry = this.history.find(h => {
+          const a = (h.action || '').toString().toUpperCase();
+          return a.includes('INSTALL') || a.includes('REPLACE');
+        });
+        if (installEntry) {
+          const actionCode = (installEntry.action || '').toString().toUpperCase();
+          // Prefer the "newSerial" (the serial that was installed). Fall back to other serial fields if needed.
+          if (actionCode.includes('REPLACE')) {
+            this.installedSerial = (installEntry.newSerial || installEntry.serialNumber || null);
+          } else {
+            this.installedSerial = (installEntry.newSerial || installEntry.replacedDeviceSerial || installEntry.serialNumber || null);
+          }
+
+          this.installedLocation = (installEntry.newLocation || installEntry.location || installEntry.locationName || null);
+        } else {
+          this.installedSerial = null;
+          this.installedLocation = null;
+        }
         this.loading = false;
       },
       error: (err) => {
@@ -654,41 +704,96 @@ export class DeviceHistoryComponent implements OnInit {
     });
   }
 
-  /** Parse custom date format: "2025,11,14,14,28,46,956170000" */
-  private parseCustomDate(dateString: string): Date {
-    if (!dateString) return new Date();
-    
+  /**
+   * Parse custom date inputs robustly.
+   * Accepts:
+   * - Date objects (returned as-is)
+   * - numeric epochs (seconds or milliseconds)
+   * - ISO strings with fractional seconds (will truncate to milliseconds)
+   * - comma-separated parts like "2025,11,14,14,28,46,956170000"
+   * Behavior: truncate fractional seconds to milliseconds (keep first 3 digits)
+   */
+  private parseCustomDate(dateInput: any): Date {
+    if (!dateInput) return new Date();
+
+    // If already a Date, return as-is
+    if (dateInput instanceof Date) return dateInput;
+
+    // If a number: assume epoch seconds when small, else milliseconds
+    if (typeof dateInput === 'number') {
+      const n = dateInput;
+      const ms = n < 1e12 ? n * 1000 : n; // seconds -> ms
+      return new Date(ms);
+    }
+
+    // If string-like
+    let s = String(dateInput).trim();
+
+    // Normalize fractional seconds: if more than 3 digits, truncate to 3
+    // e.g. .230317 -> .230
+    s = s.replace(/\.(\d{3})\d+/, '.$1');
+
     try {
-      // Handle the custom format: "2025,11,14,14,28,46,956170000"
-      if (typeof dateString === 'string' && dateString.includes(',')) {
-        const parts = dateString.split(',').map(part => parseInt(part, 10));
-        
-        // parts: [year, month, day, hour, minute, second, milliseconds]
+      // Handle comma-separated custom format: year,month,day,hour,minute,second,fraction
+      if (s.includes(',')) {
+        const parts = s.split(',').map(p => p.trim());
         if (parts.length >= 6) {
-          // Note: month is 0-indexed in JavaScript Date (11 = December)
-          const year = parts[0];
-          const month = parts[1] - 1; // Convert to 0-indexed
-          const day = parts[2];
-          const hour = parts[3];
-          const minute = parts[4];
-          const second = parts[5];
-          const millisecond = parts[6] || 0;
-          
-          return new Date(year, month, day, hour, minute, second, millisecond / 1000000);
+          const year = Number(parts[0]) || 0;
+          const month = (Number(parts[1]) || 1) - 1;
+          const day = Number(parts[2]) || 1;
+          const hour = Number(parts[3]) || 0;
+          const minute = Number(parts[4]) || 0;
+          const second = Number(parts[5]) || 0;
+
+          // Fractional part may be micro/nano/milli; take first 3 digits as milliseconds
+          let millisecond = 0;
+          if (parts.length >= 7 && parts[6]) {
+            const fracStr = parts[6].replace(/[^0-9]/g, '');
+            if (fracStr.length >= 3) {
+              millisecond = Number(fracStr.slice(0, 3));
+            } else if (fracStr.length > 0) {
+              millisecond = Number((fracStr + '000').slice(0, 3));
+            }
+          }
+
+          return new Date(year, month, day, hour, minute, second, millisecond);
         }
       }
-      
-      // Fallback: try parsing as ISO string or timestamp
-      return new Date(dateString);
-    } catch (error) {
-      console.warn('Failed to parse date:', dateString, error);
-      return new Date();
+
+      // Handle ISO-like strings with fractional seconds: truncate to 3 digits
+      // e.g. 2026-06-17T12:35:36.230317 -> 2026-06-17T12:35:36.230
+      const isoFrac = s.match(/(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})(\.(\d+))/);
+      if (isoFrac) {
+        const base = isoFrac[1];
+        const frac = isoFrac[3] || '';
+        const ms = frac.length >= 3 ? frac.slice(0, 3) : (frac + '000').slice(0, 3);
+        const rebuilt = `${base}.${ms}${s.slice(isoFrac[0].length)}`;
+        const d = new Date(rebuilt);
+        if (!isNaN(d.getTime())) return d;
+      }
+
+      // If numeric string timestamp
+      if (/^\d+$/.test(s)) {
+        const num = Number(s);
+        const ms = num < 1e12 ? num * 1000 : num;
+        return new Date(ms);
+      }
+
+      // Fallback: let Date try to parse
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d;
+    } catch (err) {
+      console.warn('Failed to parse date input:', dateInput, err);
     }
+
+    // Last resort: return current date
+    return new Date();
   }
 
   /** Format date for display */
   formatDate(dateInput: any): string {
     const date = this.parseCustomDate(dateInput);
+    if (!date || isNaN(date.getTime())) return 'N/A';
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -699,6 +804,7 @@ export class DeviceHistoryComponent implements OnInit {
   /** Format time for display */
   formatTime(dateInput: any): string {
     const date = this.parseCustomDate(dateInput);
+    if (!date || isNaN(date.getTime())) return 'N/A';
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -776,6 +882,35 @@ export class DeviceHistoryComponent implements OnInit {
       this.loadHistory(deviceId);
       this.loadDeviceInfo(deviceId);
     }
+  }
+
+  syncFromInstall() {
+    if (!this.isAdmin) return;
+    const deviceId = this.route.snapshot.paramMap.get('deviceId');
+    if (!deviceId) return;
+
+    if (!this.installedSerial && !this.installedLocation) {
+      this.snackBar.open('No install snapshot available to sync from', 'Close', { duration: 3000, panelClass: ['warning-snackbar'] });
+      return;
+    }
+
+    const confirmMsg = `Sync device master from installed snapshot? This will update current serial/location.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const patch: any = {};
+    if (this.installedSerial) patch.serialNumber = this.installedSerial;
+    if (this.installedLocation) patch.locationName = this.installedLocation;
+
+    this.inventoryService.syncFromInstall(deviceId, patch).subscribe({
+      next: (res: any) => {
+        this.snackBar.open('Device master synced from install snapshot', 'Close', { duration: 3000, panelClass: ['success-snackbar'] });
+        this.reload();
+      },
+      error: (err: any) => {
+        console.error('Failed to sync device master:', err);
+        this.snackBar.open('Failed to sync device master', 'Close', { duration: 5000, panelClass: ['error-snackbar'] });
+      }
+    });
   }
 
   goBack() {

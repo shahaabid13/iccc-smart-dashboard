@@ -16,6 +16,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatOptionModule } from '@angular/material/core';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTooltipModule } from '@angular/material/tooltip';
+
+// Export libraries
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 @Component({
   standalone: true,
@@ -32,9 +39,13 @@ import { MatOptionModule } from '@angular/material/core';
     MatCardModule,
     MatAutocompleteModule,
     MatOptionModule,
+    MatMenuModule,
+    MatTooltipModule,
   ],
   template: `
     <div class="page-container">
+
+      <!-- Summary Cards -->
       <div class="summary-cards" *ngIf="items.length > 0">
         <mat-card class="summary-card total-card">
           <mat-card-content>
@@ -86,12 +97,32 @@ import { MatOptionModule } from '@angular/material/core';
       </div>
 
       <mat-card class="inventory-card mat-elevation-z4">
-        <h2>Device Inventory</h2>
 
-        <!-- 🔍 Filters -->
+        <!-- Card Header with title + export button -->
+        <div class="card-top-bar">
+          <h2>Device Inventory</h2>
+          <div class="card-top-actions">
+            <button mat-raised-button color="accent" [matMenuTriggerFor]="exportMenu" class="export-btn">
+              <mat-icon>download</mat-icon>
+              Export
+            </button>
+            <mat-menu #exportMenu="matMenu">
+              <button mat-menu-item (click)="exportToExcel()">
+                <mat-icon>description</mat-icon>
+                Export to Excel
+              </button>
+              <button mat-menu-item (click)="exportToPDF()">
+                <mat-icon>picture_as_pdf</mat-icon>
+                Export to PDF
+              </button>
+            </mat-menu>
+          </div>
+        </div>
+
+        <!-- Filters -->
         <div class="filters-container">
           <div class="filters">
-            <!-- Search by location name or serial -->
+            <!-- Search -->
             <mat-form-field appearance="fill" class="filter-field">
               <mat-label>Search</mat-label>
               <input
@@ -129,20 +160,38 @@ import { MatOptionModule } from '@angular/material/core';
               <mat-label>Status</mat-label>
               <mat-select [(ngModel)]="selectedStatus" (selectionChange)="onFilterChange()">
                 <mat-option value="" class="options-select">All Status</mat-option>
-                <mat-option class="options-select" *ngFor="let status of statuses" [value]="status">
-                  {{ status }}
+                <mat-option class="options-select" *ngFor="let status of statuses" [value]="status.value">
+                  {{ status.label }}
                 </mat-option>
               </mat-select>
             </mat-form-field>
 
-            <!-- 🧹 Reset Filters -->
+            <!-- Filter by Notified -->
+            <mat-form-field appearance="fill" class="filter-field">
+              <mat-label>Notified</mat-label>
+              <mat-select [(ngModel)]="notifiedFilter" (selectionChange)="onFilterChange()">
+                <mat-option value="" class="options-select">All</mat-option>
+                <mat-option value="notified" class="options-select">Notified</mat-option>
+                <mat-option value="not_notified" class="options-select">Not Notified</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <!-- Reset Filters -->
             <button mat-raised-button class="reset-btn" (click)="resetFilters()">
               Reset Filters
             </button>
           </div>
         </div>
 
-        <!-- 🧾 Table -->
+        <!-- Export info bar -->
+        <div class="export-info-bar" *ngIf="isActiveFilter()">
+          <mat-icon class="info-icon">filter_list</mat-icon>
+          <span>
+            Showing {{ filteredItems.length }} of {{ items.length }} devices — export will reflect current filters.
+          </span>
+        </div>
+
+        <!-- Table -->
         <div class="table-full-container">
           <table mat-table [dataSource]="paginatedItems" class="full-width-table">
 
@@ -194,23 +243,29 @@ import { MatOptionModule } from '@angular/material/core';
               </td>
             </ng-container>
 
+            <!-- Notified Column — plain Yes/No, no toggle -->
+            <ng-container matColumnDef="notified">
+              <th mat-header-cell *matHeaderCellDef>Notified</th>
+              <td mat-cell *matCellDef="let item">
+                <span [class]="item.notified ? 'notified-yes' : 'notified-no'">
+                  {{ item.notified ? 'Yes' : 'No' }}
+                </span>
+              </td>
+            </ng-container>
+
             <!-- Poles -->
             <ng-container matColumnDef="poles">
               <th mat-header-cell *matHeaderCellDef>Poles</th>
-              <td mat-cell *matCellDef="let item">
-                {{ item.poles ? 'Yes' : 'No' }}
-              </td>
+              <td mat-cell *matCellDef="let item">{{ item.poles ? 'Yes' : 'No' }}</td>
             </ng-container>
 
             <!-- ECB Present -->
             <ng-container matColumnDef="ecbPresent">
               <th mat-header-cell *matHeaderCellDef>ECB Present</th>
-              <td mat-cell *matCellDef="let item">
-                {{ item.ecbPresent ? 'Yes' : 'No' }}
-              </td>
+              <td mat-cell *matCellDef="let item">{{ item.ecbPresent ? 'Yes' : 'No' }}</td>
             </ng-container>
 
-            <!-- Actions (only for admin) -->
+            <!-- Actions (admin only) -->
             <ng-container *ngIf="isAdmin" matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef>Actions</th>
               <td mat-cell *matCellDef="let item">
@@ -223,7 +278,6 @@ import { MatOptionModule } from '@angular/material/core';
               </td>
             </ng-container>
 
-            <!-- Header + Rows -->
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
           </table>
@@ -268,10 +322,11 @@ import { MatOptionModule } from '@angular/material/core';
             </div>
 
             <div class="pagination-info">
-              Page {{ pageIndex + 1 }} of {{ totalPages }} • {{ filteredItems.length }} total devices
+              Page {{ pageIndex + 1 }} of {{ totalPages }} &bull; {{ filteredItems.length }} total devices
             </div>
           </div>
         </div>
+
       </mat-card>
     </div>
   `,
@@ -292,6 +347,58 @@ import { MatOptionModule } from '@angular/material/core';
         box-sizing: border-box;
       }
 
+      /* ── Card top bar: title + export button ── */
+      .card-top-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .card-top-bar h2 {
+        margin: 0;
+        font-weight: 600;
+        color: #3f51b5;
+      }
+
+      .card-top-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .export-btn {
+        border-radius: 8px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* ── Export info banner ── */
+      .export-info-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #e3f2fd;
+        border: 1px solid #90caf9;
+        border-radius: 6px;
+        padding: 8px 14px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        color: #1565c0;
+      }
+
+      .info-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+        color: #1976d2;
+      }
+
+      /* ── Summary cards ── */
       .summary-cards {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -313,10 +420,11 @@ import { MatOptionModule } from '@angular/material/core';
         align-items: center;
         gap: 12px;
       }
- .options-select{
-      text-color: #6610f2;
-      font-weight: 500;
-      background-color: #f8f9fa !important;      }
+
+      .options-select {
+        font-weight: 500;
+        background-color: #f8f9fa !important;
+      }
 
       .summary-icon {
         font-size: 32px;
@@ -340,35 +448,13 @@ import { MatOptionModule } from '@angular/material/core';
         color: #f0f0f0;
       }
 
-      .total-card {
-        background: linear-gradient(135deg, #2196F3, #1976D2);
-        color: white;
-      }
+      .total-card  { background: linear-gradient(135deg, #2196F3, #1976D2); color: white; }
+      .active-card { background: linear-gradient(135deg, #4CAF50, #388E3C); color: white; }
+      .poles-card  { background: linear-gradient(135deg, #FF9800, #F57C00); color: white; }
+      .ecb-card    { background: linear-gradient(135deg, #9C27B0, #7B1FA2); color: white; }
 
-      .active-card {
-        background: linear-gradient(135deg, #4CAF50, #388E3C);
-        color: white;
-      }
-
-      .poles-card {
-        background: linear-gradient(135deg, #FF9800, #F57C00);
-        color: white;
-      }
-
-      .ecb-card {
-        background: linear-gradient(135deg, #9C27B0, #7B1FA2);
-        color: white;
-      }
-
-      h2 {
-        margin-bottom: 20px;
-        font-weight: 600;
-        color: #3f51b5;
-        text-align: center;
-      }
-
+      /* ── Filters ── */
       .filters-container {
-        background: #ffffff;
         border-radius: 8px;
         padding: 20px;
         margin-bottom: 20px;
@@ -384,13 +470,11 @@ import { MatOptionModule } from '@angular/material/core';
       }
 
       .filter-field {
-        min-width: 200px;
+        min-width: 180px;
         flex: 1;
       }
 
-      /* Solid backgrounds for form fields */
       ::ng-deep .filters-container .mat-form-field-appearance-fill .mat-form-field-flex {
-        background-color: #f5f5f5 !important;
         border-radius: 4px !important;
         border: 1px solid #e0e0e0 !important;
       }
@@ -399,39 +483,25 @@ import { MatOptionModule } from '@angular/material/core';
         display: none !important;
       }
 
-      ::ng-deep .filters-container .mat-select-value {
-        background-color: #f5f5f5 !important;
-      }
-
-      ::ng-deep .filters-container .mat-form-field-infix {
-        background-color: #f5f5f5 !important;
-      }
-
-      ::ng-deep .filters-container input {
-        background-color: #f5f5f5 !important;
-      }
-
       ::ng-deep .mat-select-panel {
         background: white !important;
-        border: 2px solid #ccc !important;
+        border: 2px solid #523e3e !important;
       }
 
-      ::ng-deep .mat-option {
-        background: white !important;
-      }
+      ::ng-deep .mat-option { background: white !important; }
 
       ::ng-deep .mat-option:hover:not(.mat-option-disabled) {
-        background: #f0f0f0 !important;
+        background: #462f2f !important;
       }
 
       ::ng-deep .mat-option.mat-selected {
         background: #e3f2fd !important;
-        color: #1976d2 !important;
+        color: #253b52 !important;
       }
 
       .reset-btn {
-        background: linear-gradient(135deg, #ef5350, #e53935);
-        color: white;
+        background: linear-gradient(135deg, #f3e8e8, #ecdfdf);
+        color: #555;
         font-weight: 600;
         border-radius: 8px;
         padding: 0 16px;
@@ -440,16 +510,16 @@ import { MatOptionModule } from '@angular/material/core';
         gap: 6px;
         height: 48px;
         transition: all 0.3s ease;
-        box-shadow: 0 3px 8px rgba(244, 67, 54, 0.25);
         white-space: nowrap;
         margin-top: 4px;
       }
 
       .reset-btn:hover {
         transform: translateY(-2px);
-        background: linear-gradient(135deg, #e53935, #d32f2f);
+        background: linear-gradient(135deg, #ddc5c5, #e6d1d1);
       }
 
+      /* ── Table ── */
       .table-full-container {
         width: 100%;
         max-height: 600px;
@@ -490,10 +560,7 @@ import { MatOptionModule } from '@angular/material/core';
         white-space: nowrap;
       }
 
-      tr:hover {
-        background-color: #e3f2fd;
-        transition: background-color 0.2s ease;
-      }
+      tr:hover { background-color: #e3f2fd; transition: background-color 0.2s ease; }
 
       .no-items {
         text-align: center;
@@ -502,6 +569,7 @@ import { MatOptionModule } from '@angular/material/core';
         font-size: 16px;
       }
 
+      /* ── Status badge ── */
       .status-badge {
         padding: 4px 12px;
         border-radius: 12px;
@@ -510,33 +578,33 @@ import { MatOptionModule } from '@angular/material/core';
         text-transform: capitalize;
       }
 
-      .status-active, .status-installed {
-        background: #e8f5e8;
+      .status-active, .status-installed { background: #e8f5e8; color: #2e7d32; }
+      .status-inactive                  { background: #ffebee; color: #c62828; }
+      .status-maintenance               { background: #fff3e0; color: #ef6c00; }
+      .status-unknown                   { background: #f5f5f5; color: #666; }
+
+      /* ── Notified Yes / No badges ── */
+      .notified-yes {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #e8f5e9;
         color: #2e7d32;
       }
 
-      .status-inactive {
+      .notified-no {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
         background: #ffebee;
         color: #c62828;
       }
 
-      .status-maintenance {
-        background: #fff3e0;
-        color: #ef6c00;
-      }
-
-      .status-unknown {
-        background: #f5f5f5;
-        color: #666;
-      }
-
-      .paginator {
-        border-radius: 8px;
-        border: 1px solid #e0e0e0;
-        width: 100%;
-        background-color: #ffffff !important;
-      }
-
+      /* ── Pagination ── */
       .pagination-container {
         margin-top: 16px;
         padding: 16px;
@@ -556,12 +624,6 @@ import { MatOptionModule } from '@angular/material/core';
         align-items: center;
         justify-content: center;
         gap: 8px;
-      }
-
-      .pagination-nav-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
       }
 
       .pagination-pages {
@@ -603,46 +665,22 @@ import { MatOptionModule } from '@angular/material/core';
         font-weight: 500;
       }
 
-      /* Responsive Design */
+      /* ── Responsive ── */
       @media (max-width: 768px) {
-        .page-container {
-          padding: 15px;
-        }
-
-        .summary-cards {
-          grid-template-columns: repeat(2, 1fr);
-        }
-
-        .filters {
-          flex-direction: column;
-          align-items: stretch;
-        }
-
-        .filter-field {
-          min-width: auto;
-          width: 100%;
-        }
-
-        .reset-btn {
-          width: 100%;
-          justify-content: center;
-        }
+        .page-container { padding: 15px; }
+        .summary-cards  { grid-template-columns: repeat(2, 1fr); }
+        .filters        { flex-direction: column; align-items: stretch; }
+        .filter-field   { min-width: auto; width: 100%; }
+        .reset-btn      { width: 100%; justify-content: center; }
+        .card-top-bar   { flex-direction: column; align-items: flex-start; }
 
         th.mat-header-cell,
-        td.mat-cell {
-          padding: 8px 4px;
-          font-size: 12px;
-        }
+        td.mat-cell { padding: 8px 4px; font-size: 12px; }
       }
 
       @media (max-width: 480px) {
-        .summary-cards {
-          grid-template-columns: 1fr;
-        }
-
-        .table-full-container {
-          max-height: 500px;
-        }
+        .summary-cards       { grid-template-columns: 1fr; }
+        .table-full-container { max-height: 500px; }
       }
     `,
   ],
@@ -651,14 +689,17 @@ export class InventoryListComponent implements OnInit {
   items: InventoryItem[] = [];
   filteredItems: InventoryItem[] = [];
   paginatedItems: InventoryItem[] = [];
+
   query: string = '';
   selectedLocation: string = '';
   selectedType: string = '';
   selectedStatus: string = '';
+  notifiedFilter: string = '';
+
   isAdmin = false;
   displayedColumns: string[] = [];
 
-  // Map to store display device types with numbering
+  /** Map to store display device types with numbering */
   deviceTypeMap = new Map<string, string>();
 
   // Pagination
@@ -666,11 +707,18 @@ export class InventoryListComponent implements OnInit {
   pageIndex = 0;
   pageSizeOptions = [10, 25, 50, 100];
 
-  // Device types based on your backend data
   deviceTypes: string[] = ['ANPR', 'RLVD', 'PTZ', 'FIXED', 'ANALYTICAL'];
 
-  // Status options from your backend data
-  statuses: string[] = ['Installed', 'Active', 'Inactive', 'Maintenance'];
+  statuses: Array<{ value: string; label: string }> = [
+    { value: 'Installed',    label: 'Installed'    },
+    { value: 'Active',       label: 'Active'       },
+    { value: 'Inactive',     label: 'Inactive'     },
+    { value: 'Maintenance',  label: 'Maintenance'  },
+    { value: 'Fault',        label: 'Faulty'       },
+    { value: 'Under Repair', label: 'Under Repair' },
+    { value: 'Moved',        label: 'Moved'        },
+    { value: 'Relocated',    label: 'Relocated'    },
+  ];
 
   constructor(
     private inventory: InventoryService,
@@ -682,36 +730,32 @@ export class InventoryListComponent implements OnInit {
     this.loadInventory();
     this.isAdmin = this.auth.isAdmin();
     this.setDisplayedColumns();
+    
   }
 
-  private loadInventory() {
-    this.inventory.getAll().subscribe({
-      next: (data) => {
-        this.items = (data || []).sort((a, b) => {
-          const locA = (a.locationName || '').toLowerCase();
-          const locB = (b.locationName || '').toLowerCase();
+  // ─── Data loading ───────────────────────────────────────────────────────────
 
-          // Primary sort: by Location Name
-          const locCompare = locA.localeCompare(locB);
-          if (locCompare !== 0) {
-            return locCompare;
-          }
-
-          // Secondary sort: by Approach Road (within same location)
-          const roadA = (a.approachRoad || '').toLowerCase();
-          const roadB = (b.approachRoad || '').toLowerCase();
-          return roadA.localeCompare(roadB);
-        });
-        this.applyFilters();
-      },
-      error: (error) => {
-        console.error('Error loading inventory:', error);
-        this.items = [];
-        this.filteredItems = [];
-        this.updatePaginatedItems();
-      }
-    });
-  }
+ private loadInventory() {
+  this.inventory.getAll().subscribe({
+    next: (data) => {
+      // transformDevice() in service already coerces all booleans — just sort
+      this.items = (data || []).sort((a, b) => {
+        const locCompare = (a.locationName || '').toLowerCase()
+          .localeCompare((b.locationName || '').toLowerCase());
+        if (locCompare !== 0) return locCompare;
+        return (a.approachRoad || '').toLowerCase()
+          .localeCompare((b.approachRoad || '').toLowerCase());
+      });
+      this.applyFilters();
+    },
+    error: (error) => {
+      console.error('Error loading inventory:', error);
+      this.items = [];
+      this.filteredItems = [];
+      this.updatePaginatedItems();
+    },
+  });
+}
 
   private setDisplayedColumns() {
     const baseColumns = [
@@ -721,16 +765,14 @@ export class InventoryListComponent implements OnInit {
       'deviceType',
       'serialNumber',
       'status',
+      'notified',
       'poles',
-      'ecbPresent'
+      'ecbPresent',
     ];
-
-    if (this.isAdmin) {
-      this.displayedColumns = [...baseColumns, 'actions'];
-    } else {
-      this.displayedColumns = baseColumns;
-    }
+    this.displayedColumns = this.isAdmin ? [...baseColumns, 'actions'] : baseColumns;
   }
+
+  // ─── Filters ────────────────────────────────────────────────────────────────
 
   onFilterChange() {
     this.applyFilters();
@@ -741,11 +783,17 @@ export class InventoryListComponent implements OnInit {
     this.selectedLocation = '';
     this.selectedType = '';
     this.selectedStatus = '';
+    this.notifiedFilter = '';
     this.pageIndex = 0;
     this.applyFilters();
   }
 
-  /** Apply Filters */
+  /** Returns true when at least one filter is active */
+  isActiveFilter(): boolean {
+    return !!(this.query || this.selectedLocation || this.selectedType ||
+              this.selectedStatus || this.notifiedFilter);
+  }
+
   private applyFilters() {
     const q = (this.query || '').toLowerCase().trim();
 
@@ -765,137 +813,234 @@ export class InventoryListComponent implements OnInit {
       const matchesStatus =
         !this.selectedStatus || item.status === this.selectedStatus;
 
-      return matchesQuery && matchesLocation && matchesType && matchesStatus;
+      const matchesNotified =
+        !this.notifiedFilter ||
+        (this.notifiedFilter === 'notified'     &&  !!item.notified) ||
+        (this.notifiedFilter === 'not_notified' && !item.notified);
+
+      return matchesQuery && matchesLocation && matchesType && matchesStatus && matchesNotified;
     });
 
-    // Apply numbering for duplicate device types within same location
     this.applyDeviceTypeNumbering(this.filteredItems);
-
-    this.pageIndex = 0; // Reset to first page when filters change
+    this.pageIndex = 0;
     this.updatePaginatedItems();
   }
 
-  /** Apply numbering to duplicate device types within the same location and approach road */
+  // ─── Device-type display numbering ──────────────────────────────────────────
+
   private applyDeviceTypeNumbering(items: InventoryItem[]) {
     this.deviceTypeMap.clear();
-    const deviceTypeCountByLocationRoad = new Map<string, Map<string, number>>();
+    const countByLocationRoad = new Map<string, Map<string, number>>();
 
     items.forEach((item) => {
-      const location = item.locationName || 'Unknown';
-      const approachRoad = item.approachRoad || 'Unknown';
-      const baseDeviceType = item.deviceType || 'Unknown';
-
-      // Create a composite key for location + approach road
+      const location     = item.locationName  || 'Unknown';
+      const approachRoad = item.approachRoad  || 'Unknown';
+      const baseType     = item.deviceType    || 'Unknown';
       const locationRoadKey = `${location}|||${approachRoad}`;
 
-      if (!deviceTypeCountByLocationRoad.has(locationRoadKey)) {
-        deviceTypeCountByLocationRoad.set(locationRoadKey, new Map());
+      if (!countByLocationRoad.has(locationRoadKey)) {
+        countByLocationRoad.set(locationRoadKey, new Map());
       }
 
-      const typeCountMap = deviceTypeCountByLocationRoad.get(locationRoadKey)!;
-      const currentCount = (typeCountMap.get(baseDeviceType) || 0) + 1;
-      typeCountMap.set(baseDeviceType, currentCount);
+      const typeCountMap   = countByLocationRoad.get(locationRoadKey)!;
+      const currentCount   = (typeCountMap.get(baseType) || 0) + 1;
+      typeCountMap.set(baseType, currentCount);
 
-      // Generate unique key for this item
-      const itemKey = `${item.id || item.serialNumber}`;
-
-      // Only number if there are duplicates in this location+road combination
-      const displayType = currentCount > 1 || this.hasMoreDuplicatesInGroup(items, location, approachRoad, baseDeviceType)
-        ? `${baseDeviceType} ${currentCount}`
-        : baseDeviceType;
+      const itemKey      = `${item.id || item.serialNumber}`;
+      const hasDupes     = this.hasMoreDuplicatesInGroup(items, location, approachRoad, baseType);
+      const displayType  = (currentCount > 1 || hasDupes) ? `${baseType} ${currentCount}` : baseType;
 
       this.deviceTypeMap.set(itemKey, displayType);
     });
   }
 
-  /** Check if a device type appears more than once in a location+approach road group */
-  private hasMoreDuplicatesInGroup(items: InventoryItem[], location: string, approachRoad: string, deviceType: string): boolean {
+  private hasMoreDuplicatesInGroup(
+    items: InventoryItem[], location: string, approachRoad: string, deviceType: string
+  ): boolean {
     return items.filter(
       item => item.locationName === location &&
-               item.approachRoad === approachRoad &&
-               item.deviceType === deviceType
+              item.approachRoad === approachRoad &&
+              item.deviceType   === deviceType
     ).length > 1;
   }
 
-  /** Get display device type for an item */
   getDisplayDeviceType(item: InventoryItem): string {
     const itemKey = `${item.id || item.serialNumber}`;
     return this.deviceTypeMap.get(itemKey) || item.deviceType || 'N/A';
   }
 
-  private updatePaginatedItems() {
-    const startIndex = this.pageIndex * this.pageSize;
-    const endIndex = startIndex + this.pageSize;
-    this.paginatedItems = this.filteredItems.slice(startIndex, endIndex);
+  // ─── Export ─────────────────────────────────────────────────────────────────
+
+  /** Build a human-readable label describing active filters, used in report headers */
+  private getFilterDescription(): string {
+    const parts: string[] = [];
+    if (this.query)           parts.push(`Search: "${this.query}"`);
+    if (this.selectedLocation) parts.push(`Location: ${this.selectedLocation}`);
+    if (this.selectedType)    parts.push(`Type: ${this.selectedType}`);
+    if (this.selectedStatus)  parts.push(`Status: ${this.selectedStatus}`);
+    if (this.notifiedFilter)  parts.push(`Notified: ${this.notifiedFilter === 'notified' ? 'Yes' : 'No'}`);
+    return parts.length ? parts.join(' | ') : 'All devices';
   }
 
-  /** Unique Locations */
-  get locations(): string[] {
-    const locations = this.items
-      .map((i) => i.locationName)
-      .filter((loc): loc is string => Boolean(loc && loc.trim()));
-
-    return Array.from(new Set(locations)).sort();
+  /** Map filteredItems to flat export rows */
+  private prepareExportData(): any[] {
+    return this.filteredItems.map((item) => ({
+      'Location Name':  item.locationName  || 'N/A',
+      'Approach Road':  item.approachRoad  || 'N/A',
+      'Device Type':    this.getDisplayDeviceType(item),
+      'Serial Number':  item.serialNumber  || 'N/A',
+      'Status':         item.status        || 'Unknown',
+      'Notified':       item.notified      ? 'Yes' : 'No',
+      'Poles':          item.poles         ? 'Yes' : 'No',
+      'ECB Present':    item.ecbPresent    ? 'Yes' : 'No',
+      'Latitude':       item.latitude      || 'N/A',
+      'Longitude':      item.longitude     || 'N/A',
+    }));
   }
+
+  exportToExcel() {
+    try {
+      const exportData = this.prepareExportData();
+
+      // Meta sheet with filter info
+      const metaRows = [
+        ['Device Inventory Report'],
+        [`Generated on: ${new Date().toLocaleString()}`],
+        [`Filters applied: ${this.getFilterDescription()}`],
+        [`Total records exported: ${exportData.length}`],
+      ];
+      const metaSheet = XLSX.utils.aoa_to_sheet(metaRows);
+
+      // Data sheet
+      const dataSheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Auto-fit column widths based on header length
+      const headers = Object.keys(exportData[0] || {});
+      dataSheet['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 14) }));
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
+      XLSX.utils.book_append_sheet(workbook, dataSheet, 'Inventory');
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `inventory-report-${dateStr}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Error exporting to Excel. Please try again.');
+    }
+  }
+
+  exportToPDF() {
+    try {
+      const exportData = this.prepareExportData();
+      const doc = new jsPDF({ orientation: 'landscape' });
+
+      // Title
+      doc.setFontSize(18);
+      doc.setTextColor(40, 53, 147);
+      doc.text('Device Inventory Report', 14, 18);
+
+      // Meta info
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
+      doc.text(`Filters: ${this.getFilterDescription()}`, 14, 32);
+      doc.text(`Total records: ${exportData.length}`, 14, 38);
+
+      // Table
+      autoTable(doc, {
+        head: [[
+          'Location', 'Approach Road', 'Device Type', 'Serial No.',
+          'Status', 'Notified', 'Poles', 'ECB', 'Lat', 'Lng',
+        ]],
+        body: exportData.map(row => [
+          row['Location Name'],
+          row['Approach Road'],
+          row['Device Type'],
+          row['Serial Number'],
+          row['Status'],
+          row['Notified'],
+          row['Poles'],
+          row['ECB Present'],
+          row['Latitude'],
+          row['Longitude'],
+        ]),
+        startY: 44,
+        styles:     { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [86, 135, 184], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 248, 255] },
+        columnStyles: {
+          0: { cellWidth: 36 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 24 },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 22 },
+          5: { cellWidth: 18 },
+          6: { cellWidth: 14 },
+          7: { cellWidth: 14 },
+          8: { cellWidth: 20 },
+          9: { cellWidth: 20 },
+        },
+      });
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      doc.save(`inventory-report-${dateStr}.pdf`);
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+      alert('Error exporting to PDF. Please try again.');
+    }
+  }
+
+  // ─── Navigation ─────────────────────────────────────────────────────────────
 
   edit(id?: string) {
-    if (id) {
-      this.router.navigate(['/admin/items', id, 'edit']);
-    }
+    if (id) this.router.navigate(['/admin/items', id, 'edit']);
   }
 
   viewHistory(id?: string) {
-    if (id) {
-      this.router.navigate(['/devices', id, 'history']);
-    }
+    if (id) this.router.navigate(['/devices', id, 'history']);
   }
 
-  /** Count active devices */
+  // ─── Summary card helpers ────────────────────────────────────────────────────
+
   getActiveDevicesCount(): number {
-    return this.items.filter(device =>
-      device.status?.toLowerCase() === 'active' ||
-      device.status?.toLowerCase() === 'installed'
+    return this.items.filter(d =>
+      d.status?.toLowerCase() === 'active' || d.status?.toLowerCase() === 'installed'
     ).length;
   }
 
-  /** Count devices with poles */
   getPolesCount(): number {
     const uniquePoles = new Set(
       this.items
-        .filter(device => device.poles)
-        .map(device => {
-          const locationName = (device.locationName || '').toLowerCase().trim();
-          const approachRoad = (device.approachRoad || '').toLowerCase().trim();
-          return `${locationName}|${approachRoad}`;
-        })
+        .filter(d => d.poles)
+        .map(d => `${(d.locationName || '').toLowerCase().trim()}|${(d.approachRoad || '').toLowerCase().trim()}`)
     );
     return uniquePoles.size;
   }
 
-  /** Count unique locations with ECB present */
-  /** Deduplicates by locationName + approachRoad with normalized strings */
   getECBCount(): number {
     const uniqueECB = new Set(
       this.items
-        .filter(device => device.ecbPresent)
-        .map(device => {
-          const locationName = (device.locationName || '').toLowerCase().trim();
-          const approachRoad = (device.approachRoad || '').toLowerCase().trim();
-          return `${locationName}|${approachRoad}`;
-        })
+        .filter(d => d.ecbPresent)
+        .map(d => `${(d.locationName || '').toLowerCase().trim()}|${(d.approachRoad || '').toLowerCase().trim()}`)
     );
     return uniqueECB.size;
   }
 
-  /** Get total number of pages */
+  // ─── Pagination ─────────────────────────────────────────────────────────────
+
   get totalPages(): number {
     return Math.ceil(this.filteredItems.length / this.pageSize);
   }
 
-  /** Get visible page numbers for pagination */
+  private updatePaginatedItems() {
+    const start = this.pageIndex * this.pageSize;
+    this.paginatedItems = this.filteredItems.slice(start, start + this.pageSize);
+  }
+
   getVisiblePages(): Array<{ number: number; display: string; isEllipsis: boolean }> {
     const pages: Array<{ number: number; display: string; isEllipsis: boolean }> = [];
-    const maxVisible = 5;
+    const maxVisible  = 5;
     const currentPage = this.pageIndex + 1;
 
     if (this.totalPages <= maxVisible) {
@@ -903,20 +1048,22 @@ export class InventoryListComponent implements OnInit {
         pages.push({ number: i, display: i.toString(), isEllipsis: false });
       }
     } else {
-      const halfVisible = Math.floor(maxVisible / 2);
+      const half = Math.floor(maxVisible / 2);
 
-      if (currentPage <= halfVisible + 1) {
+      if (currentPage <= half + 1) {
         for (let i = 1; i <= maxVisible; i++) {
           pages.push({ number: i, display: i.toString(), isEllipsis: false });
         }
         pages.push({ number: 0, display: '...', isEllipsis: true });
         pages.push({ number: this.totalPages, display: this.totalPages.toString(), isEllipsis: false });
-      } else if (currentPage >= this.totalPages - halfVisible) {
+
+      } else if (currentPage >= this.totalPages - half) {
         pages.push({ number: 1, display: '1', isEllipsis: false });
         pages.push({ number: 0, display: '...', isEllipsis: true });
         for (let i = this.totalPages - maxVisible + 1; i <= this.totalPages; i++) {
           pages.push({ number: i, display: i.toString(), isEllipsis: false });
         }
+
       } else {
         pages.push({ number: 1, display: '1', isEllipsis: false });
         pages.push({ number: 0, display: '...', isEllipsis: true });
@@ -931,7 +1078,6 @@ export class InventoryListComponent implements OnInit {
     return pages;
   }
 
-  /** Go to specific page */
   goToPage(pageNumber: number): void {
     if (pageNumber >= 1 && pageNumber <= this.totalPages) {
       this.pageIndex = pageNumber - 1;
@@ -939,7 +1085,6 @@ export class InventoryListComponent implements OnInit {
     }
   }
 
-  /** Go to next page */
   nextPage(): void {
     if (this.pageIndex < this.totalPages - 1) {
       this.pageIndex++;
@@ -947,11 +1092,22 @@ export class InventoryListComponent implements OnInit {
     }
   }
 
-  /** Go to previous page */
   previousPage(): void {
     if (this.pageIndex > 0) {
       this.pageIndex--;
       this.updatePaginatedItems();
     }
+  }
+
+  // ─── Unique location list for filter dropdown ────────────────────────────────
+
+  get locations(): string[] {
+    return Array.from(
+      new Set(
+        this.items
+          .map(i => i.locationName)
+          .filter((loc): loc is string => Boolean(loc?.trim()))
+      )
+    ).sort();
   }
 }

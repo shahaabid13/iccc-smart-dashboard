@@ -500,7 +500,7 @@ import * as XLSX from 'xlsx';
     .card-value {
       font-size: 2rem;
       font-weight: bold;
-      color: #007bff;
+      color: #010508;
       margin-bottom: 5px;
     }
 
@@ -1079,6 +1079,35 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
     this.startDate = this.startDate || this.allTimeStartDate;
   }
 
+  // Color helpers (ensure available for dataset styling)
+  private hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+    if (!hex) return null;
+    const h = hex.replace('#', '').trim();
+    if (h.length === 3) {
+      const r = parseInt(h[0] + h[0], 16);
+      const g = parseInt(h[1] + h[1], 16);
+      const b = parseInt(h[2] + h[2], 16);
+      return { r, g, b };
+    }
+    if (h.length === 6) {
+      const r = parseInt(h.substring(0, 2), 16);
+      const g = parseInt(h.substring(2, 4), 16);
+      const b = parseInt(h.substring(4, 6), 16);
+      return { r, g, b };
+    }
+    return null;
+  }
+
+  private darkenHex(hex: string, percent: number): string {
+    const rgb = this.hexToRgb(hex);
+    if (!rgb) return hex;
+    const factor = (100 - percent) / 100;
+    const r = Math.max(0, Math.min(255, Math.round(rgb.r * factor)));
+    const g = Math.max(0, Math.min(255, Math.round(rgb.g * factor)));
+    const b = Math.max(0, Math.min(255, Math.round(rgb.b * factor)));
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
   ngOnInit(): void {
     if (this.selectedWbId) {
       this.wbId = this.selectedWbId;
@@ -1607,10 +1636,12 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
           label: 'Net Weight',
           data: netWeights,
           backgroundColor,
-          borderColor: backgroundColor,
+          borderColor: this.darkenHex(backgroundColor, 30),
           borderWidth: 2,
-          barPercentage: 0.7,
-          categoryPercentage: 0.8,
+          hoverBackgroundColor: this.darkenHex(backgroundColor, 18),
+          barPercentage: 0.75,
+          categoryPercentage: 0.85,
+          maxBarThickness: 60,
           yAxisID: 'y',
         },
         {
@@ -2063,10 +2094,12 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
           label,
           data,
           backgroundColor,
-          borderColor: backgroundColor,
-          borderWidth: 1,
-          barPercentage: 0.8,
-          categoryPercentage: 0.8,
+          borderColor: this.darkenHex(backgroundColor, 30),
+          borderWidth: 2,
+          hoverBackgroundColor: this.darkenHex(backgroundColor, 15),
+          barPercentage: 0.95,
+          categoryPercentage: 0.95,
+          maxBarThickness: dataType === 'hourly' ? 28 : 48,
         }
       ]
     };

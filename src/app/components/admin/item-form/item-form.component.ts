@@ -382,6 +382,7 @@ submit() {
 
     // optional
     description: undefined,
+    notified: 0
   };
 
   const request$ = this.isEdit

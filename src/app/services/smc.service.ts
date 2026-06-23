@@ -77,18 +77,29 @@ export class SmcService {
 
 getNetTrend(wbId: string, startDate?: string, endDate?: string): Observable<any[]> {
   if (startDate && endDate) {
-    const params = { start: startDate, end: endDate, wbId };
-    return this.http.get<any>(`${this.baseUrl}/report/summary`, { params }).pipe(
+    // Prefer calling the trend endpoint with date range params so we get per-day data
+    const params = { start: startDate, end: endDate };
+    return this.http.get<any[]>(`${this.baseUrl}/report/trend/net/${wbId}`, { params }).pipe(
       map(data => {
-        const weight = data?.totalNetWeight ?? data?.totalWeight ?? 0;
-        return [{
-          dateTime: `${startDate} to ${endDate}`,
-          weight
-        }];
+        return Array.isArray(data) ? data.map((item: any) => ({
+          dateTime: item.dateTime || item.date || item.timestamp,
+          netWeight: item.netWeight || item.weight || item.value || 0
+        })) : [];
       }),
       catchError(error => {
-        console.error('Error fetching custom-range net trend via summary:', error);
-        return of([{ dateTime: `${startDate} to ${endDate}`, weight: 0 }]);
+        console.error('Error fetching net trend with range, falling back to summary:', error);
+        // Fallback to the summary endpoint if trend by range fails
+        const summaryParams = { start: startDate, end: endDate, wbId };
+        return this.http.get<any>(`${this.baseUrl}/report/summary`, { params: summaryParams }).pipe(
+          map(data => {
+            const weight = data?.totalNetWeight ?? data?.totalWeight ?? 0;
+            return [{ dateTime: `${startDate} to ${endDate}`, weight }];
+          }),
+          catchError(err => {
+            console.error('Error fetching custom-range net trend via summary fallback:', err);
+            return of([{ dateTime: `${startDate} to ${endDate}`, weight: 0 }]);
+          })
+        );
       })
     );
   }
@@ -161,18 +172,28 @@ getVehicleTrend(wbId: string): Observable<any[]> {
 
 getLast24Trend(wbId: string, startDate?: string, endDate?: string): Observable<any[]> {
   if (startDate && endDate) {
-    const params = { start: startDate, end: endDate, wbId };
-    return this.http.get<any>(`${this.baseUrl}/report/summary`, { params }).pipe(
+    // If a custom range is requested, try fetching hourly trend for the given range
+    const params = { start: startDate, end: endDate };
+    return this.http.get<any[]>(`${this.baseUrl}/report/trend/last24/${wbId}`, { params }).pipe(
       map(data => {
-        const weight = data?.totalNetWeight ?? data?.totalWeight ?? 0;
-        return [{
-          dateTime: `${startDate} to ${endDate}`,
-          weight
-        }];
+        return Array.isArray(data) ? data.map((item: any) => ({
+          dateTime: item.dateTime || item.date || item.timestamp,
+          weight: item.netWeight || item.weight || item.value || 0
+        })) : [];
       }),
       catchError(error => {
-        console.error('Error fetching custom-range last 24 trend via summary:', error);
-        return of([{ dateTime: `${startDate} to ${endDate}`, weight: 0 }]);
+        console.error('Error fetching last24 trend with range, falling back to summary:', error);
+        const summaryParams = { start: startDate, end: endDate, wbId };
+        return this.http.get<any>(`${this.baseUrl}/report/summary`, { params: summaryParams }).pipe(
+          map(data => {
+            const weight = data?.totalNetWeight ?? data?.totalWeight ?? 0;
+            return [{ dateTime: `${startDate} to ${endDate}`, weight }];
+          }),
+          catchError(err => {
+            console.error('Error fetching custom-range last24 via summary fallback:', err);
+            return of([{ dateTime: `${startDate} to ${endDate}`, weight: 0 }]);
+          })
+        );
       })
     );
   }
