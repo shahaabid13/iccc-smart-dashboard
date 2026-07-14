@@ -50,13 +50,12 @@ function isAdminProtectedRoute(url: string): boolean {
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  console.log("REQUEST URL =", req.url);
+
   const authService = inject(AuthService);
 
-  // ============================================
-  // LOGIN ENDPOINTS - NO TOKEN INJECTION
-  // ============================================
   if (isLoginRoute(req.url)) {
-    console.log('[AUTH] Login endpoint (no token injection):', req.url);
+    console.log("LOGIN REQUEST DETECTED");
     return next(req);
   }
 

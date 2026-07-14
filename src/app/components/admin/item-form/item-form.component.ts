@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { InventoryService } from '../../../services/inventory.service';
-import { InventoryItemPayload } from '../../../models/inventory-item';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
@@ -99,14 +98,19 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
             <input type="checkbox" formControlName="placeholder" />
             Placeholder Device
           </label>
+
+          <label class="checkbox">
+            <input type="checkbox" formControlName="notified" />
+            Notified
+          </label>
         </div>
 
         <div class="buttons">
           <button type="submit" [disabled]="form.invalid || submitting" class="btn primary">
-            <mat-progress-spinner 
-              *ngIf="submitting" 
-              diameter="16" 
-              mode="indeterminate" 
+            <mat-progress-spinner
+              *ngIf="submitting"
+              diameter="16"
+              mode="indeterminate"
               color="white"
               class="spinner">
             </mat-progress-spinner>
@@ -128,7 +132,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-    
     h2 {
       text-align: center;
       color: #1976d2;
@@ -136,13 +139,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       font-weight: 600;
       font-size: 24px;
     }
-    
     form {
       display: flex;
       flex-direction: column;
       gap: 20px;
     }
-    
     label {
       display: flex;
       flex-direction: column;
@@ -150,7 +151,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       color: #333;
       font-size: 14px;
     }
-    
     input, select {
       padding: 12px;
       border: 2px solid #e0e0e0;
@@ -160,19 +160,16 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       transition: border-color 0.3s ease;
       background: #fafafa;
     }
-    
     input:focus, select:focus {
       outline: none;
       border-color: #1976d2;
       background: white;
     }
-    
     .coordinates-group {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 15px;
     }
-    
     .checkbox-group {
       display: flex;
       flex-direction: column;
@@ -183,7 +180,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       border-radius: 8px;
       border: 1px solid #e9ecef;
     }
-    
     .checkbox {
       flex-direction: row;
       align-items: center;
@@ -191,14 +187,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       font-weight: normal;
       cursor: pointer;
     }
-    
     .checkbox input[type="checkbox"] {
       margin: 0;
       width: 18px;
       height: 18px;
       cursor: pointer;
     }
-    
     .buttons {
       display: flex;
       gap: 12px;
@@ -207,7 +201,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       padding-top: 20px;
       border-top: 1px solid #e0e0e0;
     }
-    
     .btn {
       padding: 12px 24px;
       border-radius: 8px;
@@ -222,63 +215,40 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       min-width: 120px;
       justify-content: center;
     }
-    
     .btn.primary {
       background-color: #1976d2;
       color: #fff;
     }
-    
     .btn.primary:hover:not(:disabled) {
       background-color: #1565c0;
       transform: translateY(-1px);
       box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3);
     }
-    
     .btn.secondary {
       background-color: #f5f5f5;
       color: #333;
       border: 1px solid #ddd;
     }
-    
     .btn.secondary:hover:not(:disabled) {
       background-color: #e0e0e0;
     }
-    
     .btn:disabled {
       opacity: 0.6;
       cursor: not-allowed;
       transform: none !important;
     }
-    
     .error {
       color: #d32f2f;
       font-size: 12px;
       margin-top: 4px;
       font-weight: normal;
     }
-    
-    .spinner {
-      display: inline-block;
-    }
-    
-    /* Responsive Design */
+    .spinner { display: inline-block; }
     @media (max-width: 768px) {
-      .item-form {
-        margin: 10px;
-        padding: 20px;
-      }
-      
-      .coordinates-group {
-        grid-template-columns: 1fr;
-      }
-      
-      .buttons {
-        flex-direction: column;
-      }
-      
-      .btn {
-        width: 100%;
-      }
+      .item-form { margin: 10px; padding: 20px; }
+      .coordinates-group { grid-template-columns: 1fr; }
+      .buttons { flex-direction: column; }
+      .btn { width: 100%; }
     }
   `]
 })
@@ -296,7 +266,6 @@ export class ItemFormComponent {
     private snackBar: MatSnackBar
   ) {
     this.initializeForm();
-
     this.itemId = this.route.snapshot.paramMap.get('id');
     if (this.itemId) {
       this.isEdit = true;
@@ -304,23 +273,22 @@ export class ItemFormComponent {
     }
   }
 
-  /** Initialize the form with proper validation */
   private initializeForm() {
     this.form = this.fb.group({
       locationName: ['', [Validators.required, Validators.minLength(2)]],
       serialNumber: ['', [Validators.required, Validators.minLength(2)]],
-      deviceType: ['', Validators.required],
-      status: ['Installed', Validators.required],
-      latitude: ['', [Validators.required, Validators.pattern(/^-?([0-8]?[0-9]|90)(\.[0-9]{1,6})?$/)]],
-      longitude: ['', [Validators.required, Validators.pattern(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]{1,6})?$/)]],
+      deviceType:   ['', Validators.required],
+      status:       ['Installed', Validators.required],
+      latitude:     ['', [Validators.required, Validators.pattern(/^-?([0-8]?[0-9]|90)(\.[0-9]{1,6})?$/)]],
+      longitude:    ['', [Validators.required, Validators.pattern(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]{1,6})?$/)]],
       approachRoad: [''],
-      poles: [false],
-      ecbPresent: [false],
-      placeholder: [false]
+      poles:        [false],
+      ecbPresent:   [false],
+      placeholder:  [false],
+      notified:     [true],
     });
   }
 
-  /** Load item details for edit mode */
   private loadItem(id: string) {
     this.inventory.getById(id).subscribe({
       next: (item) => {
@@ -328,17 +296,17 @@ export class ItemFormComponent {
           this.form.patchValue({
             locationName: item.locationName || '',
             serialNumber: item.serialNumber || '',
-            deviceType: item.deviceType || '',
-            status: item.status || 'Installed',
-            latitude: item.latitude || '',
-            longitude: item.longitude || '',
-            // If approachRoad is an object from backend, patch the name; otherwise use string
+            deviceType:   item.deviceType   || '',
+            status:       item.status       || 'Installed',
+            latitude:     item.latitude     || '',
+            longitude:    item.longitude    || '',
             approachRoad: (item.approachRoad && typeof item.approachRoad === 'object')
               ? ((item.approachRoad as any).name || '')
               : (item.approachRoad || ''),
-            poles: item.poles || false,
-            ecbPresent: item.ecbPresent || false,
-            placeholder: item.placeholder || false
+            poles:       item.poles       || false,
+            ecbPresent:  item.ecbPresent  || false,
+            placeholder: item.placeholder || false,
+            notified:    item.notified ?? true,
           });
         }
       },
@@ -352,85 +320,59 @@ export class ItemFormComponent {
     });
   }
 
-  /** Create or update device */
-  /** Create or update device */
-submit() {
-  if (this.form.invalid) {
-    this.markFormGroupTouched();
-    this.snackBar.open('⚠️ Please fill all required fields correctly', 'Close', { duration: 3000 });
-    return;
+  submit() {
+    if (this.form.invalid) {
+      this.markFormGroupTouched();
+      this.snackBar.open('⚠️ Please fill all required fields correctly', 'Close', { duration: 3000 });
+      return;
+    }
+
+    this.submitting = true;
+
+    // Build payload matching DeviceRequest exactly
+    const payload = {
+      locationName:    this.form.value.locationName,
+      serialNumber:    this.form.value.serialNumber,
+      deviceType:      this.form.value.deviceType,
+      status:          this.form.value.status,
+      latitude:        String(this.form.value.latitude),
+      longitude:       String(this.form.value.longitude),
+      approachRoadName: this.form.value.approachRoad,  // ← matches DeviceRequest field
+      poles:           !!this.form.value.poles,
+      ecbPresent:      !!this.form.value.ecbPresent,
+      placeholder:     !!this.form.value.placeholder,
+      notified:        !!this.form.value.notified,     // ← boolean, not 0/1
+    };
+
+    const request$ = this.isEdit
+      ? this.inventory.updateDevice(this.itemId!, payload)   // ← new dedicated method
+      : this.inventory.createDevice(payload);                // ← new dedicated method
+
+    request$.subscribe({
+      next: () => {
+        this.submitting = false;
+        this.snackBar.open(
+          this.isEdit ? '✅ Device updated successfully!' : '✅ Device created successfully!',
+          'Close',
+          { duration: 4000 }
+        );
+        this.router.navigate(['/admin/inventory']);
+      },
+      error: (err: { error: { message: any; }; }) => {
+        this.submitting = false;
+        console.error(err);
+        this.snackBar.open(
+          err.error?.message || '❌ Error saving device. Try again.',
+          'Close',
+          { duration: 5000 }
+        );
+      }
+    });
   }
 
-  this.submitting = true;
-
-  const payload: InventoryItemPayload = {
-    // Frontend compatibility fields required by InventoryItemPayload
-    name: this.form.value.locationName,
-    location: this.form.value.locationName,
-    quantity: 1,
-    // Backend fields
-    locationName: this.form.value.locationName,
-    serialNumber: this.form.value.serialNumber,
-    deviceType: this.form.value.deviceType,
-    status: this.form.value.status,
-    latitude: String(this.form.value.latitude),
-    longitude: String(this.form.value.longitude),
-    approachRoad: this.form.value.approachRoad,
-    poles: !!this.form.value.poles,
-    ecbPresent: !!this.form.value.ecbPresent,
-    placeholder: !!this.form.value.placeholder,
-
-    // optional
-    description: undefined,
-    notified: 0
-  };
-
-  const request$ = this.isEdit
-    ? this.inventory.update(this.itemId!, payload)
-    : this.inventory.create(payload);
-
-  request$.subscribe({
-    next: (device: any) => {
-      this.submitting = false;
-      this.snackBar.open(
-        this.isEdit ? '✅ Device updated successfully!' : '✅ Device created successfully!',
-        'Close',
-        { duration: 4000 }
-      );
-
-      // Some backends return a minimal response for create/update. If the returned
-      // device is missing `locationName` or `approachRoad`, fetch the full device
-      // by id before navigating so the inventory list displays correct data.
-      const id = device?.id ?? (device && (device as any).deviceId) ?? null;
-      const needsRefresh = !device?.locationName || !device?.approachRoad;
-
-      if (id && needsRefresh) {
-        this.inventory.getById(id).subscribe({
-          next: () => this.router.navigate(['/admin/inventory']),
-          error: () => this.router.navigate(['/admin/inventory'])
-        });
-      } else {
-        this.router.navigate(['/admin/inventory']);
-      }
-    },
-    error: (err) => {
-      this.submitting = false;
-      console.error(err);
-      this.snackBar.open(
-        err.error?.message || '❌ Error saving device. Try again.',
-        'Close',
-        { duration: 5000 }
-      );
-    }
-  });
-}
-
-
-  /** Mark all form controls as touched to show validation errors */
   private markFormGroupTouched() {
     Object.keys(this.form.controls).forEach(key => {
-      const control = this.form.controls[key];
-      control.markAsTouched();
+      this.form.controls[key].markAsTouched();
     });
   }
 

@@ -794,11 +794,10 @@ export class DeviceHistoryComponent implements OnInit {
   formatDate(dateInput: any): string {
     const date = this.parseCustomDate(dateInput);
     if (!date || isNaN(date.getTime())) return 'N/A';
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yy = String(date.getFullYear()).slice(-2);
+    return `${dd}/${mm}/${yy}`;
   }
 
   /** Format time for display */

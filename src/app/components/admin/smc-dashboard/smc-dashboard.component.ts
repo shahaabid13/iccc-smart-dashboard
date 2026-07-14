@@ -1262,7 +1262,7 @@ exportReportToPDF(): void {
       const sortedDates = Array.from(recordsByDate.keys()).sort((a, b) => {
         const dateA = new Date(a);
         const dateB = new Date(b);
-        return dateB.getTime() - dateA.getTime(); // Descending order
+       return dateA.getTime() - dateB.getTime(); 
       });
 
       // Calculate overall totals
@@ -1370,7 +1370,7 @@ exportReportToPDF(): void {
       }
 
       // Save the PDF
-      const fileName = `SMC_Daily_Data_Report_${this.getDateRangeLabel().replace(/ /g, '_')}_${new Date().getTime()}.pdf`;
+      const fileName = `SMC_All_Data_Report_${this.getDateRangeLabel().replace(/ /g, '_')}_${new Date().getTime()}.pdf`;
       doc.save(fileName);
       console.log('✅ Daily data report exported to PDF successfully');
     } catch (error) {

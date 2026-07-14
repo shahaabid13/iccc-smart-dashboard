@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/pipes/reduce.pipe.ts"],
-  "sourcesContent": ["import { Pipe, PipeTransform } from '@angular/core';\r\n\r\n/**\r\n * Pipe to reduce an array of objects to a sum of a specific property\r\n * Usage: {{ arrayOfObjects | reduce: 'propertyName':initialValue }}\r\n * Example: {{ stations | reduce: 'bikesTotal':0 }}\r\n */\r\n@Pipe({\r\n  name: 'reduce',\r\n  standalone: true,\r\n})\r\nexport class ReducePipe implements PipeTransform {\r\n  transform<T>(array: T[], property: keyof T, initialValue: number = 0): number {\r\n    if (!Array.isArray(array)) {\r\n      return initialValue;\r\n    }\r\n\r\n    return array.reduce((sum, item) => {\r\n      const value = item[property];\r\n      const numValue = typeof value === 'number' ? value : 0;\r\n      return sum + numValue;\r\n    }, initialValue);\r\n  }\r\n}\r\n"],
-  "mappings": ";;;;;;;AAWM,IAAO,aAAP,MAAO,YAAU;EACrB,UAAa,OAAY,UAAmB,eAAuB,GAAC;AAClE,QAAI,CAAC,MAAM,QAAQ,KAAK,GAAG;AACzB,aAAO;IACT;AAEA,WAAO,MAAM,OAAO,CAAC,KAAK,SAAQ;AAChC,YAAM,QAAQ,KAAK,QAAQ;AAC3B,YAAM,WAAW,OAAO,UAAU,WAAW,QAAQ;AACrD,aAAO,MAAM;IACf,GAAG,YAAY;EACjB;;qCAXW,aAAU;EAAA;qFAAV,aAAU,MAAA,KAAA,CAAA;;;sEAAV,YAAU,CAAA;UAJtB;WAAK;MACJ,MAAM;MACN,YAAY;KACb;;;",
-  "names": []
-}

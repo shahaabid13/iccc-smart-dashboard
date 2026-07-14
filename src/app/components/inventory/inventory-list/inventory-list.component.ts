@@ -882,6 +882,14 @@ export class InventoryListComponent implements OnInit {
     return parts.length ? parts.join(' | ') : 'All devices';
   }
 
+  /** Format date as dd/mm/yy (sep optional) */
+  private formatShortDate(date: Date, sep: string = '/'): string {
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yy = String(date.getFullYear()).slice(-2);
+    return `${dd}${sep}${mm}${sep}${yy}`;
+  }
+
   /** Map filteredItems to flat export rows */
   private prepareExportData(): any[] {
     return this.filteredItems.map((item) => ({
@@ -899,99 +907,446 @@ export class InventoryListComponent implements OnInit {
   }
 
   exportToExcel() {
-    try {
-      const exportData = this.prepareExportData();
+  try {
+    // ── 1. Group filteredItems by location then approach road ──────────────
+    type GroupedData = {
+      slNo: number;
+      location: string;
+      approachRoad: string;
+      lat: string;
+      lng: string;
+      rlvd: string[];
+      anpr1: string[];
+      anpr2: string[];
+      anpr3: string[];
+      analytical: string[];
+      ptz: string[];
+    };
 
-      // Meta sheet with filter info
-      const metaRows = [
-        ['Device Inventory Report'],
-        [`Generated on: ${new Date().toLocaleString()}`],
-        [`Filters applied: ${this.getFilterDescription()}`],
-        [`Total records exported: ${exportData.length}`],
-      ];
-      const metaSheet = XLSX.utils.aoa_to_sheet(metaRows);
+    const locationOrder: string[] = [];
+    const locationMap = new Map<string, Map<string, GroupedData>>();
 
-      // Data sheet
-      const dataSheet = XLSX.utils.json_to_sheet(exportData);
+    this.filteredItems.forEach(item => {
+      const loc  = item.locationName || 'Unknown';
+      const road = item.approachRoad  || '';
 
-      // Auto-fit column widths based on header length
-      const headers = Object.keys(exportData[0] || {});
-      dataSheet['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 14) }));
+      if (!locationMap.has(loc)) {
+        locationMap.set(loc, new Map());
+        locationOrder.push(loc);
+      }
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
-      XLSX.utils.book_append_sheet(workbook, dataSheet, 'Inventory');
+      const roadMap = locationMap.get(loc)!;
+      if (!roadMap.has(road)) {
+        roadMap.set(road, {
+          slNo: 0,
+          location: loc,
+          approachRoad: road,
+          lat: item.latitude  || '',
+          lng: item.longitude || '',
+          rlvd: [], anpr1: [], anpr2: [], anpr3: [], analytical: [], ptz: []
+        });
+      }
 
-      const dateStr = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(workbook, `inventory-report-${dateStr}.xlsx`);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('Error exporting to Excel. Please try again.');
-    }
+      const group = roadMap.get(road)!;
+      const serial = item.serialNumber || '';
+      const type   = (item.deviceType || '').toUpperCase();
+
+      if      (type === 'RLVD')       group.rlvd.push(serial);
+      else if (type === 'ANALYTICAL') group.analytical.push(serial);
+      else if (type === 'PTZ')        group.ptz.push(serial);
+      else if (type === 'ANPR') {
+        if      (group.anpr1.length === 0) group.anpr1.push(serial);
+        else if (group.anpr2.length === 0) group.anpr2.push(serial);
+        else                               group.anpr3.push(serial);
+      }
+    });
+
+    // Assign sl numbers
+    let slNo = 1;
+    locationOrder.forEach(loc => {
+      locationMap.get(loc)!.forEach(g => { g.slNo = slNo; });
+      slNo++;
+    });
+
+    // ── 2. Build rows exactly like the original Excel ──────────────────────
+    const aoa: any[][] = [];
+
+    // Row 0 — Title
+    aoa.push(['ITMS SRINAGAR\nDetails of various cameras Installed at different locations/Junctions across Srinagar City',
+      '', '', '', '', '', '', '', '', '', '']);
+
+    // Row 1 — Headers
+    aoa.push(['Sl. No', 'Location', 'Approach Road', 'Lat', 'Long',
+      'RLVD', 'ANPR-1\n(IR Included)', 'ANPR-2\n(IR Included)', 'ANPR-3\n(IR Included)',
+      'ANALYTICAL', 'PTZ']);
+
+    // Row 2 — Sub-headers (model prefix row)
+    aoa.push(['', '', '', '', '',
+      'PLEXONICS\nPL-7573ERPR', 'PLEXONICS\nPL-7273RVPH', 'PLEXONICS\nPL-7273RVPH',
+      'PLEXONICS\nPL-7273RVPH', 'PLEXONICS\nPL-7573ERVP', 'PLEXONICS\nPL-7875H']);
+
+    // Data rows — one row per approach road, max devices per type as separate rows
+    locationOrder.forEach(loc => {
+      const roads = Array.from(locationMap.get(loc)!.values());
+
+      roads.forEach((g, roadIdx) => {
+        const maxRows = Math.max(
+          g.rlvd.length, g.anpr1.length, g.anpr2.length,
+          g.anpr3.length, g.analytical.length, g.ptz.length, 1
+        );
+
+        for (let i = 0; i < maxRows; i++) {
+          aoa.push([
+            i === 0 && roadIdx === 0 ? g.slNo : '',  // Sl.No only on first road/first row
+            i === 0 && roadIdx === 0 ? g.location : '', // Location only on first row of location
+            i === 0 ? g.approachRoad : '',             // Approach road only on first row
+            i === 0 ? g.lat : '',
+            i === 0 ? g.lng : '',
+            g.rlvd[i]       || '',
+            g.anpr1[i]      || '',
+            g.anpr2[i]      || '',
+            g.anpr3[i]      || '',
+            g.analytical[i] || '',
+            g.ptz[i]        || '',
+          ]);
+        }
+      });
+    });
+
+    // ── 3. Build worksheet ─────────────────────────────────────────────────
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 8  },  // Sl. No
+      { wch: 28 },  // Location
+      { wch: 32 },  // Approach Road
+      { wch: 14 },  // Lat
+      { wch: 14 },  // Long
+      { wch: 20 },  // RLVD
+      { wch: 22 },  // ANPR-1
+      { wch: 22 },  // ANPR-2
+      { wch: 22 },  // ANPR-3
+      { wch: 22 },  // ANALYTICAL
+      { wch: 20 },  // PTZ
+    ];
+
+    // Merge title row across all 11 columns
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }
+    ];
+
+    // Row heights for title and header rows
+    ws['!rows'] = [
+      { hpt: 40 },  // Title row
+      { hpt: 30 },  // Header row
+      { hpt: 30 },  // Sub-header row
+    ];
+
+    // ── 4. Create workbook with Summary sheet ──────────────────────────────
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ITMS Camera Details');
+
+    // Summary sheet
+    const summaryData = [
+      ['Device Type', 'Count'],
+      ['RLVD',        this.filteredItems.filter(i => i.deviceType === 'RLVD').length],
+      ['ANPR',        this.filteredItems.filter(i => i.deviceType === 'ANPR').length],
+      ['ANALYTICAL',  this.filteredItems.filter(i => i.deviceType === 'ANALYTICAL').length],
+      ['PTZ',         this.filteredItems.filter(i => i.deviceType === 'PTZ').length],
+      ['FIXED',       this.filteredItems.filter(i => i.deviceType === 'FIXED').length],
+      ['TOTAL',       this.filteredItems.length],
+    ];
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+    summaryWs['!cols'] = [{ wch: 16 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+
+    // ── 5. Save ────────────────────────────────────────────────────────────
+    const fileDate = this.formatShortDate(new Date(), '-');
+    XLSX.writeFile(wb, `ITMS-Camera-Report-${fileDate}.xlsx`);
+
+  } catch (error) {
+    console.error('Error exporting to Excel:', error);
+    alert('Error exporting to Excel. Please try again.');
   }
+}
 
-  exportToPDF() {
-    try {
-      const exportData = this.prepareExportData();
-      const doc = new jsPDF({ orientation: 'landscape' });
+exportToPDF() {
+  try {
+    const loadImage = (url: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          canvas.getContext('2d')!.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg'));
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    };
 
-      // Title
+    loadImage('/download.jpg').then(logoBase64 => {
+      this.generatePDF(logoBase64);
+    }).catch(() => {
+      this.generatePDF(null);
+    });
+
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    alert('Error exporting to PDF. Please try again.');
+  }
+}
+
+private generatePDF(logoBase64: string | null) {
+  try {
+    type GroupedData = {
+      slNo: number;
+      location: string;
+      approachRoad: string;
+      lat: string;
+      lng: string;
+      rlvd: string[];
+      anpr1: string[];
+      anpr2: string[];
+      anpr3: string[];
+      analytical: string[];
+      ptz: string[];
+    };
+
+    const locationOrder: string[] = [];
+    const locationMap = new Map<string, Map<string, GroupedData>>();
+
+    this.filteredItems.forEach(item => {
+      const loc  = item.locationName || 'Unknown';
+      const road = item.approachRoad  || '';
+
+      if (!locationMap.has(loc)) {
+        locationMap.set(loc, new Map());
+        locationOrder.push(loc);
+      }
+
+      const roadMap = locationMap.get(loc)!;
+      if (!roadMap.has(road)) {
+        roadMap.set(road, {
+          slNo: 0,
+          location: loc,
+          approachRoad: road,
+          lat: item.latitude  || '',
+          lng: item.longitude || '',
+          rlvd: [], anpr1: [], anpr2: [], anpr3: [], analytical: [], ptz: []
+        });
+      }
+
+      const group  = roadMap.get(road)!;
+      const serial = item.serialNumber || '';
+      const type   = (item.deviceType || '').toUpperCase();
+
+      if      (type === 'RLVD')       group.rlvd.push(serial);
+      else if (type === 'ANALYTICAL') group.analytical.push(serial);
+      else if (type === 'PTZ')        group.ptz.push(serial);
+      else if (type === 'ANPR') {
+        if      (group.anpr1.length === 0) group.anpr1.push(serial);
+        else if (group.anpr2.length === 0) group.anpr2.push(serial);
+        else                               group.anpr3.push(serial);
+      }
+    });
+
+    let slNo = 1;
+    locationOrder.forEach(loc => {
+      locationMap.get(loc)!.forEach(g => { g.slNo = slNo; });
+      slNo++;
+    });
+
+    // ── 2. Build rows ──────────────────────────────────────────────────────
+    const body: any[][] = [];
+
+    locationOrder.forEach(loc => {
+      const roads = Array.from(locationMap.get(loc)!.values());
+      roads.forEach((g, roadIdx) => {
+        const maxRows = Math.max(
+          g.rlvd.length, g.anpr1.length, g.anpr2.length,
+          g.anpr3.length, g.analytical.length, g.ptz.length, 1
+        );
+        for (let i = 0; i < maxRows; i++) {
+          body.push([
+            i === 0 && roadIdx === 0 ? g.slNo.toString() : '',
+            i === 0 && roadIdx === 0 ? g.location        : '',
+            i === 0                  ? g.approachRoad    : '',
+            i === 0                  ? g.lat             : '',
+            i === 0                  ? g.lng             : '',
+            g.rlvd[i]       || '',
+            g.anpr1[i]      || '',
+            g.anpr2[i]      || '',
+            g.anpr3[i]      || '',
+            g.analytical[i] || '',
+            g.ptz[i]        || '',
+          ]);
+        }
+      });
+    });
+
+    // ── 3. Setup doc ───────────────────────────────────────────────────────
+    const doc = new jsPDF({ orientation: 'landscape', format: 'a3' });
+    const pageW      = doc.internal.pageSize.getWidth();
+    const pageH      = doc.internal.pageSize.getHeight();
+    const margin     = 10;
+    const tableWidth = pageW - margin * 2;
+
+    // ── Draw logo (page 1 only) ────────────────────────────────────────────
+    const drawLogo = () => {
+      if (logoBase64) {
+        doc.addImage(logoBase64, 'JPEG', pageW - 52, 4, 42, 32);
+      }
+    };
+
+    // ── Draw watermark ─────────────────────────────────────────────────────
+    const drawWatermark = () => {
+      if (!logoBase64) return;
+      doc.saveGraphicsState();
+      (doc as any).setGState(new (doc as any).GState({ opacity: 0.12 })); // ← more visible
+      doc.addImage(logoBase64, 'JPEG', pageW / 2 - 50, pageH / 2 - 40, 100, 80);
+      doc.restoreGraphicsState();
+    };
+
+    // ── Draw header ────────────────────────────────────────────────────────
+    const drawHeader = () => {
+      drawLogo();
+
       doc.setFontSize(18);
       doc.setTextColor(40, 53, 147);
-      doc.text('Device Inventory Report', 14, 18);
+      doc.text('ITMS SRINAGAR — Device Inventory Report', margin, 16);
 
-      // Meta info
       doc.setFontSize(9);
       doc.setTextColor(80, 80, 80);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
-      doc.text(`Filters: ${this.getFilterDescription()}`, 14, 32);
-      doc.text(`Total records: ${exportData.length}`, 14, 38);
+      doc.text(`Generated: ${this.formatShortDate(new Date(), '/')} `,    margin, 24);
+      // ← Filters line removed
+      doc.text(`Total devices: ${this.filteredItems.length}`,  margin, 30);
 
-      // Table
-      autoTable(doc, {
-        head: [[
-          'Location', 'Approach Road', 'Device Type', 'Serial No.',
-          'Status', 'Notified', 'Poles', 'ECB', 'Lat', 'Lng',
-        ]],
-        body: exportData.map(row => [
-          row['Location Name'],
-          row['Approach Road'],
-          row['Device Type'],
-          row['Serial Number'],
-          row['Status'],
-          row['Notified'],
-          row['Poles'],
-          row['ECB Present'],
-          row['Latitude'],
-          row['Longitude'],
-        ]),
-        startY: 44,
-        styles:     { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [86, 135, 184], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 248, 255] },
-        columnStyles: {
-          0: { cellWidth: 36 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 24 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 22 },
-          5: { cellWidth: 18 },
-          6: { cellWidth: 14 },
-          7: { cellWidth: 14 },
-          8: { cellWidth: 20 },
-          9: { cellWidth: 20 },
-        },
-      });
+      const rlvdCount       = this.filteredItems.filter(i => i.deviceType === 'RLVD').length;
+      const anprCount       = this.filteredItems.filter(i => i.deviceType === 'ANPR').length;
+      const analyticalCount = this.filteredItems.filter(i => i.deviceType === 'ANALYTICAL').length;
+      const ptzCount        = this.filteredItems.filter(i => i.deviceType === 'PTZ').length;
+      doc.text(
+        `RLVD: ${rlvdCount}  |  ANPR: ${anprCount}  |  ANALYTICAL: ${analyticalCount}  |  PTZ: ${ptzCount}`,
+        margin, 36
+      );
+    };
 
-      const dateStr = new Date().toISOString().split('T')[0];
-      doc.save(`inventory-report-${dateStr}.pdf`);
-    } catch (error) {
-      console.error('Error exporting to PDF:', error);
-      alert('Error exporting to PDF. Please try again.');
-    }
+    // Draw page 1 header + watermark
+    drawHeader();
+    drawWatermark();
+
+    // ── Column widths ──────────────────────────────────────────────────────
+    const pct = [0.04, 0.11, 0.13, 0.06, 0.06, 0.10, 0.11, 0.11, 0.10, 0.10, 0.14];
+    const colWidths = pct.map(p => parseFloat((tableWidth * p).toFixed(2)));
+    const drift = tableWidth - colWidths.reduce((a, b) => a + b, 0);
+    colWidths[colWidths.length - 1] = parseFloat(
+      (colWidths[colWidths.length - 1] + drift).toFixed(2)
+    );
+
+    autoTable(doc, {
+      head: [[
+        'S.No.', 'Location', 'Approach Road', 'Lat', 'Long',
+        'RLVD', 'ANPR-1', 'ANPR-2', 'ANPR-3', 'ANALYTICAL', 'PTZ'
+      ]],
+      body,
+      startY: 41,   // ← moved up since filter line removed
+      margin: { left: margin, right: margin },
+      tableWidth,
+      styles: {
+        fontSize: 8,
+        cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+        overflow: 'linebreak',
+        valign: 'middle',
+        lineWidth: 0,        
+        halign: 'left',
+      },
+      headStyles: {
+        fillColor: [56, 105, 164],
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 8.5,
+        halign: 'left',
+        lineWidth: 0,
+      },
+      alternateRowStyles: { fillColor: [247, 250, 255] },
+      bodyStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [40, 40, 40],
+      },
+      columnStyles: {
+        0:  { cellWidth: colWidths[0],  halign: 'center', fontStyle: 'bold' },
+        1:  { cellWidth: colWidths[1],  halign: 'left' },
+        2:  { cellWidth: colWidths[2],  halign: 'left' },
+        3:  { cellWidth: colWidths[3],  halign: 'left', fontSize: 7 },
+        4:  { cellWidth: colWidths[4],  halign: 'left', fontSize: 7 },
+        5:  { cellWidth: colWidths[5],  halign: 'left' },
+        6:  { cellWidth: colWidths[6],  halign: 'left' },
+        7:  { cellWidth: colWidths[7],  halign: 'left' },
+        8:  { cellWidth: colWidths[8],  halign: 'left' },
+        9:  { cellWidth: colWidths[9],  halign: 'left' },
+        10: { cellWidth: colWidths[10], halign: 'left', overflow: 'linebreak' },
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 1 &&
+            (data.row.raw as any[])[1] !== '') {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      },
+      willDrawCell: (data) => {
+        // Blue separator line at each new location block
+        if (data.section === 'body' && data.column.index === 0 &&
+            (data.row.raw as any[])[1] !== '') {
+          doc.setDrawColor(86, 135, 184);
+          doc.setLineWidth(0.5);
+          doc.line(margin, data.cell.y, pageW - margin, data.cell.y);
+        }
+
+        // Subtle horizontal row separator line (replaces cell boxes)
+        if (data.section === 'body' &&
+            data.column.index === data.table.columns.length - 1) {
+          doc.setDrawColor(220, 228, 240);
+          doc.setLineWidth(0.1);
+          doc.line(
+            margin,
+            data.cell.y + data.cell.height,
+            pageW - margin,
+            data.cell.y + data.cell.height
+          );
+        }
+      },
+      didDrawPage: () => {
+        const pageNum = (doc as any).internal.getCurrentPageInfo().pageNumber;
+        const total   = (doc as any).internal.getNumberOfPages();
+
+        // Pages after page 1 — watermark only, no logo
+        if (pageNum > 0) {
+          drawWatermark();
+        }
+
+        // Footer on every page
+        doc.setFontSize(7.5);
+        doc.setTextColor(140, 140, 140);
+        doc.text(
+          `Page ${pageNum} of ${total}  •  ITMS Srinagar Device Inventory  •  ${this.formatShortDate(new Date(), '/')}`,
+          margin,
+          pageH - 6
+        );
+      },
+    });
+
+    const fileDate = this.formatShortDate(new Date(), '-');
+    doc.save(`ITMS-Camera-Report-${fileDate}.pdf`);
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Error exporting to PDF. Please try again.');
   }
-
-  // ─── Navigation ─────────────────────────────────────────────────────────────
+}
 
   edit(id?: string) {
     if (id) this.router.navigate(['/admin/items', id, 'edit']);
