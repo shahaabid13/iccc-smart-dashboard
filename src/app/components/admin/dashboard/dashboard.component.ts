@@ -96,7 +96,7 @@ import autoTable from 'jspdf-autotable';
         <span class="spacer"></span>
         <div class="toolbar-actions">
           <!-- Export Menu -->
-          <button mat-raised-button color="accent" [matMenuTriggerFor]="exportMenu" class="action-btn">
+          <button mat-raised-button color="accent" [matMenuTriggerFor]="exportMenu" class="toolbar-btn">
             <mat-icon>download</mat-icon>
             Export
           </button>
@@ -111,11 +111,11 @@ import autoTable from 'jspdf-autotable';
             </button>
           </mat-menu>
 
-          <button mat-raised-button color="accent" routerLink="/admin/excel-upload" class="action-btn">
+          <button mat-raised-button color="accent" routerLink="/admin/excel-upload" class="toolbar-btn">
             <mat-icon>upload_file</mat-icon>
             EXCEL
           </button>
-          <button mat-raised-button color="warn" (click)="createNew()" class="action-btn">
+          <button mat-raised-button color="warn" (click)="createNew()" class="toolbar-btn">
             <mat-icon>add_circle</mat-icon>
             New Device
           </button>
@@ -269,7 +269,7 @@ import autoTable from 'jspdf-autotable';
                   color="primary"
                   (click)="edit(d.id)"
                   matTooltip="Edit Device"
-                  class="action-btn">
+                  class="row-action-btn">
                   <mat-icon>edit</mat-icon>
                 </button>
                 <button
@@ -277,7 +277,7 @@ import autoTable from 'jspdf-autotable';
                   color="warn"
                   (click)="remove(d.id)"
                   matTooltip="Delete Device"
-                  class="action-btn">
+                  class="row-action-btn">
                   <mat-icon>delete</mat-icon>
                 </button>
                 <button
@@ -285,7 +285,7 @@ import autoTable from 'jspdf-autotable';
                   color="accent"
                   (click)="viewDetails(d)"
                   matTooltip="View Details"
-                  class="action-btn">
+                  class="row-action-btn">
                   <mat-icon>visibility</mat-icon>
                 </button>
               </td>
@@ -392,24 +392,29 @@ import autoTable from 'jspdf-autotable';
 
   .toolbar-actions {
     display: flex;
-    gap: 32px;
+    gap: 12px;
     align-items: center;
-
+    padding: 2px 0;
   }
 
-  .action-btn {
+  /* Toolbar buttons (Export / EXCEL / New Device).
+     mat-raised-button + color="accent"/"warn" already themes these —
+     only add spacing/radius here, never set background-color/color,
+     or it will override the Material theme colors. */
+  .toolbar-btn {
     margin-left: 8px;
     border-radius: 8px;
     font-weight: 500;
-    background-color: #fffff;
-    align-items: center;
   }
 
-  /* REMOVE the max-width constraint from dashboard container */
+  .toolbar-btn:hover {
+    filter: brightness(0.95);
+  }
+
   .dashboard-container {
     padding: 24px;
     width: 100%;
-    max-width: none; /* Remove this constraint */
+    max-width: none;
     margin: 0;
     box-sizing: border-box;
   }
@@ -480,7 +485,6 @@ import autoTable from 'jspdf-autotable';
     padding: 20px 24px 16px 24px;
     background: #f8f9fa;
     border-bottom: 1px solid #e9ecef;
-
   }
 
   .table-info {
@@ -492,7 +496,6 @@ import autoTable from 'jspdf-autotable';
   .table-actions {
     display: flex;
     gap: 12px;
-
   }
 
   .view-toggle {
@@ -507,21 +510,21 @@ import autoTable from 'jspdf-autotable';
     box-sizing: border-box;
   }
 
-  /* FIX TABLE WIDTH - Remove min-width constraints */
   .detailed-table {
     width: 100%;
-    min-width: 100%; /* Changed from 1000px to 100% */
+    min-width: 100%;
   }
 
   .compact-table {
     width: 100%;
-    min-width: 100%; /* Changed from 800px to 100% */
+    min-width: 100%;
   }
 
-  /* Ensure table cells use full available space */
   table {
     width: 100%;
-    table-layout: auto; /* Changed to auto for better distribution */
+    table-layout: auto;
+    border-collapse: collapse;
+    border-spacing: 0;
   }
 
   th.mat-header-cell {
@@ -536,13 +539,13 @@ import autoTable from 'jspdf-autotable';
     z-index: 2;
     white-space: nowrap;
     border: none;
-        font-weight: bold;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 
   .actions-header {
     text-align: center;
     font-weight: bold;
+    padding-bottom: 3px;
   }
 
   tr.mat-row:nth-child(even) {
@@ -552,7 +555,6 @@ import autoTable from 'jspdf-autotable';
   th.mat-header-cell, td.mat-cell {
     white-space: nowrap;
     padding: 14px 12px;
-        font-weight: bold;
     border-right: 1px solid #e9ecef;
   }
 
@@ -563,12 +565,25 @@ import autoTable from 'jspdf-autotable';
   td.mat-cell {
     font-size: 14px;
     color: #333;
-    border-bottom: 1px solid #e9ecef;
+    /* Border moved to the row itself below — Material's MDC table renders
+       rows as flex containers, so a border on individual cells can land
+       at slightly different heights per cell (e.g. the Location cell with
+       its icon) and looks broken/offset. A single row-level border avoids that. */
+    border-bottom: none;
     vertical-align: middle;
     border-right: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
   }
 
-  tr.mat-row:hover td {
+  tr.mat-row,
+  ::ng-deep .mat-mdc-row {
+    border-bottom: 1px solid #e9ecef;
+    align-items: stretch;
+  }
+
+  tr.mat-row:hover td,
+  ::ng-deep .mat-mdc-row:hover .mat-mdc-cell {
     background: #e3f2fd;
     transition: background-color 0.2s ease;
   }
@@ -576,19 +591,22 @@ import autoTable from 'jspdf-autotable';
   .action-buttons {
     display: flex;
     gap: 4px;
+    align-items: center;
     justify-content: center;
     min-width: 140px;
-          line-height:90px;
   }
 
-  .action-btn {
+  /* Row-level icon buttons (edit / delete / view) inside the table.
+     Kept separate from .toolbar-btn so they never collide. */
+  .row-action-btn {
     width: 36px;
     height: 36px;
     line-height: 36px;
-    transition: all 0.2s ease;
-  }
+    transition: transform 0.2s ease;
+    margin-bottom: 15px ;
+margin-top: auto  ;  }
 
-  .action-btn:hover {
+  .row-action-btn:hover {
     transform: scale(1.1);
   }
 
@@ -614,18 +632,13 @@ import autoTable from 'jspdf-autotable';
     font-weight: 500;
   }
 
-  /* Make specific columns flexible */
   .location-cell, .approach-road-cell {
     white-space: normal !important;
     min-width: 200px;
-    font-style:bold;
   }
 
   .location-cell {
-    display: flex;
-    align-items: center;
     gap: 8px;
-            line-height: 4.2;
     font-size: 13px;
   }
 
@@ -876,7 +889,7 @@ import autoTable from 'jspdf-autotable';
     justify-content: center;
   }
 
-  /* Responsive Design - Update media queries */
+  /* Responsive Design */
   @media (max-width: 1400px) {
     .dashboard-container {
       padding: 16px;
@@ -913,7 +926,6 @@ import autoTable from 'jspdf-autotable';
       align-items: center;
     }
 
-    /* Ensure table remains full width on mobile */
     .detailed-table, .compact-table {
       min-width: 100%;
     }
@@ -932,7 +944,6 @@ import autoTable from 'jspdf-autotable';
       padding: 12px 16px 0 16px;
     }
 
-    /* Adjust table for mobile */
     th.mat-header-cell, td.mat-cell {
       padding: 10px 8px;
       font-size: 12px;
@@ -940,7 +951,6 @@ import autoTable from 'jspdf-autotable';
 
     .action-buttons {
       min-width: 120px;
-      line-height:50px;
     }
   }
 
@@ -953,13 +963,12 @@ import autoTable from 'jspdf-autotable';
       padding: 8px 12px 0 12px;
     }
 
-    /* Stack action buttons vertically on very small screens */
     .action-buttons {
       flex-direction: column;
       gap: 2px;
     }
 
-    .action-btn {
+    .row-action-btn {
       width: 32px;
       height: 32px;
     }

@@ -192,8 +192,9 @@ import autoTable from 'jspdf-autotable';
         </div>
 
         <!-- Table -->
-        <div class="table-full-container">
-          <table mat-table [dataSource]="paginatedItems" class="full-width-table">
+        <div class="table-full-container table-responsive">
+          <div class="table-responsive-inner">
+            <table mat-table [dataSource]="paginatedItems" class="full-width-table table">
 
             <!-- Location Name -->
             <ng-container matColumnDef="locationName">
@@ -280,7 +281,8 @@ import autoTable from 'jspdf-autotable';
 
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-          </table>
+            </table>
+          </div>
 
           <div *ngIf="filteredItems.length === 0" class="no-items">
             {{ items.length === 0 ? 'Loading devices...' : 'No devices found matching your filters.' }}
@@ -524,18 +526,22 @@ import autoTable from 'jspdf-autotable';
         width: 100%;
         max-height: 600px;
         overflow-y: auto;
-        overflow-x: auto;
+        /* let inner responsive container handle horizontal scrolling */
+        overflow-x: hidden;
         border-radius: 8px;
         background: #fff;
         border: 1px solid #e0e0e0;
         margin-bottom: 16px;
       }
 
+      .table-responsive-inner { width: 100%; overflow-x: auto; }
+
       .full-width-table {
         width: 100%;
-        min-width: 100%;
         border-spacing: 0;
         border-collapse: collapse;
+        table-layout: auto;
+        max-width: 100%;
       }
 
       th.mat-header-cell {

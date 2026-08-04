@@ -4,10 +4,11 @@ import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../../../services/auth.service';
 import { SidebarService } from '../../../services/sidebar.service';
 import { Subject, takeUntil } from 'rxjs';
+import { CimsNotificationBellComponent } from '../../admin/cims-notification-bell.component';
 
 @Component({
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, CimsNotificationBellComponent],
   selector: 'app-header',
   template: `
     <div class="header-layout">
@@ -27,11 +28,11 @@ import { Subject, takeUntil } from 'rxjs';
 
       <nav class="sidebar-nav">
         <!-- Inventory Management Dropdown -->
-        <div class="nav-section" *ngIf="!isSidebarCollapsed">
+        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !isSidebarCollapsed">
           <div class="section-label">Inventory Management System</div>
         </div>
 
-        <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="isSidebarCollapsed">
           <div class="dropdown-header" (click)="toggleDropdown('inventory')">
             <span class="dropdown-icon">📦</span>
             <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Inventory</span>
@@ -60,12 +61,34 @@ import { Subject, takeUntil } from 'rxjs';
           </div>
         </div>
 
+        <!-- Task Management (Admin / Reviewer / Support Engineer) -->
+        <div class="dropdown-container" *ngIf="(isAdmin || isReviewer || isSupportEngineer) && !isSidebarCollapsed">
+          <div class="dropdown-header" (click)="toggleDropdown('tasks')">
+            <span class="dropdown-icon">🗂️</span>
+            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Task Management</span>
+            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
+              {{ openDropdown === 'tasks' ? '▲' : '▼' }}
+            </span>
+          </div>
+
+          <div class="dropdown-content" *ngIf="openDropdown === 'tasks' && !isSidebarCollapsed">
+            <a routerLink="/tasks/all" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📋</span>
+              <span>All Tasks</span>
+            </a>
+            <a routerLink="/tasks/create" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin || isReviewer">
+              <span class="item-icon">➕</span>
+              <span>Create Task</span>
+            </a>
+          </div>
+        </div>
+
         <!-- SWM Dropdown -->
-        <div class="nav-section" *ngIf="!isSidebarCollapsed">
+        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !isSidebarCollapsed">
           <div class="section-label">SWM</div>
         </div>
 
-        <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="isSidebarCollapsed">
           <div class="dropdown-header" (click)="toggleDropdown('swm')">
             <span class="dropdown-icon">♻️</span>
             <span class="dropdown-title" *ngIf="!isSidebarCollapsed">SWM</span>
@@ -87,11 +110,11 @@ import { Subject, takeUntil } from 'rxjs';
         </div>
 
         <!-- PBS Dropdown -->
-        <div class="nav-section" *ngIf="!isSidebarCollapsed">
+        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !isSidebarCollapsed">
           <div class="section-label">PBS</div>
         </div>
 
-        <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="isSidebarCollapsed">
           <div class="dropdown-header" (click)="toggleDropdown('pbs')">
             <span class="dropdown-icon">🏢</span>
             <span class="dropdown-title" *ngIf="!isSidebarCollapsed">PBS</span>
@@ -112,79 +135,140 @@ import { Subject, takeUntil } from 'rxjs';
           </div>
         </div>
 
-        <!-- Chartered Bike Dropdown -->
-        <div class="nav-section" *ngIf="!isSidebarCollapsed">
-          <div class="section-label">Chartered Bike</div>
+        <!-- Chartered Bike and ANPR removed as requested -->
+
+        <!-- ============ CAMERA INCIDENT MANAGEMENT SYSTEM (CIMS) ============ -->
+        
+        <!-- CIMS Section Label -->
+        <div class="nav-section" *ngIf="!isSidebarCollapsed && (userRole === 'SUPPORT_ENGINEER' || userRole === 'FIELD_PERSON' || userRole === 'REVIEWER' || userRole === 'ADMIN')">
+          <div class="section-label">Camera Incident Management</div>
         </div>
 
-        <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('charteredBike')">
-            <span class="dropdown-icon">🚴</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Chartered Bike</span>
+        <!-- Support Engineer - Only for SUPPORT_ENGINEER role (not ADMIN) -->
+        <div class="dropdown-container" *ngIf="userRole === 'SUPPORT_ENGINEER'" [class.collapsed]="isSidebarCollapsed">
+          <div class="dropdown-header" (click)="toggleDropdown('cimsSupport')">
+            <span class="dropdown-icon">🎫</span>
+            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Support Engineer</span>
             <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'charteredBike' ? '▲' : '▼' }}
+              {{ openDropdown === 'cimsSupport' ? '▲' : '▼' }}
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'charteredBike' && !isSidebarCollapsed">
-            <a routerLink="/chartered-bike" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">🏠</span>
+          <div class="dropdown-content" *ngIf="openDropdown === 'cimsSupport' && !isSidebarCollapsed">
+            <a routerLink="/cims/support-engineer/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📊</span>
               <span>Dashboard</span>
             </a>
-            <a routerLink="/chartered-bike/stations" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📍</span>
-              <span>Stations</span>
-            </a>
-            <a routerLink="/chartered-bike/history" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📜</span>
-              <span>History</span>
-            </a>
-            <a routerLink="/chartered-bike/statistics" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📈</span>
-              <span>Statistics</span>
-            </a>
-            <a routerLink="/chartered-bike/reports" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+            <a routerLink="/cims/support-engineer/my-tickets" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
               <span class="item-icon">📋</span>
-              <span>Reports</span>
+              <span>My Tickets</span>
+            </a>
+            <a routerLink="/cims/support-engineer/create-ticket" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">➕</span>
+              <span>Raise New Ticket</span>
+            </a>
+            <a routerLink="/cims/notifications/settings" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">🔔</span>
+              <span>Notification Settings</span>
             </a>
           </div>
         </div>
 
-        <!-- ANPR Analytics Dropdown -->
-        <div class="nav-section" *ngIf="!isSidebarCollapsed">
-          <div class="section-label">ANPR Analytics</div>
-        </div>
-
-        <div class="dropdown-container" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('anpr')">
-            <span class="dropdown-icon">📹</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">ANPR Analytics</span>
+        <!-- Field Person - Only for FIELD_PERSON role (not ADMIN) -->
+        <div class="dropdown-container" *ngIf="userRole === 'FIELD_PERSON'" [class.collapsed]="isSidebarCollapsed">
+          <div class="dropdown-header" (click)="toggleDropdown('cimsFieldPerson')">
+            <span class="dropdown-icon">🚧</span>
+            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Field Person</span>
             <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'anpr' ? '▲' : '▼' }}
+              {{ openDropdown === 'cimsFieldPerson' ? '▲' : '▼' }}
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'anpr' && !isSidebarCollapsed">
-            <a routerLink="/anpr/analytics-table" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📋</span>
-              <span>Analytics Table</span>
-            </a>
-            <a routerLink="/anpr/analytics-charts" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+          <div class="dropdown-content" *ngIf="openDropdown === 'cimsFieldPerson' && !isSidebarCollapsed">
+            <a routerLink="/cims/field-person/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
               <span class="item-icon">📊</span>
-              <span>Analytics Charts</span>
+              <span>Dashboard</span>
             </a>
-            <a routerLink="/anpr/bus-analytics" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">🚌</span>
-              <span>Bus Analytics</span>
+            <a routerLink="/cims/notifications/settings" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">🔔</span>
+              <span>Notification Settings</span>
             </a>
           </div>
         </div>
+
+        <!-- Reviewer - Only for REVIEWER role (not ADMIN) -->
+        <div class="dropdown-container" *ngIf="userRole === 'REVIEWER'" [class.collapsed]="isSidebarCollapsed">
+          <div class="dropdown-header" (click)="toggleDropdown('cimsReviewer')">
+            <span class="dropdown-icon">🔍</span>
+            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Reviewer</span>
+            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
+              {{ openDropdown === 'cimsReviewer' ? '▲' : '▼' }}
+            </span>
+          </div>
+
+          <div class="dropdown-content" *ngIf="openDropdown === 'cimsReviewer' && !isSidebarCollapsed">
+            <a routerLink="/cims/reviewer/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📊</span>
+              <span>Dashboard</span>
+            </a>
+            <a routerLink="/cims/reviewer/queue" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">⏳</span>
+              <span>Review Queue</span>
+            </a>
+            <a routerLink="/cims/notifications/settings" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">🔔</span>
+              <span>Notification Settings</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- CIMS Admin - Only for ADMIN role -->
+        <div class="dropdown-container" *ngIf="userRole === 'ADMIN'" [class.collapsed]="isSidebarCollapsed">
+          <div class="dropdown-header" (click)="toggleDropdown('cimsAdmin')">
+            <span class="dropdown-icon">📊</span>
+            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">CIMS Admin</span>
+            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
+              {{ openDropdown === 'cimsAdmin' ? '▲' : '▼' }}
+            </span>
+          </div>
+
+          <div class="dropdown-content" *ngIf="openDropdown === 'cimsAdmin' && !isSidebarCollapsed">
+            <a routerLink="/cims/admin/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📈</span>
+              <span>Dashboard</span>
+            </a>
+            <a routerLink="/cims/admin/all-tickets" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">📋</span>
+              <span>All Tickets</span>
+            </a>
+            <a routerLink="/cims/admin/users" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">👥</span>
+              <span>User Management</span>
+            </a>
+            <a routerLink="/cims/admin/incident-types" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">🏷️</span>
+              <span>Incident Types</span>
+            </a>
+            <a routerLink="/cims/notifications/settings" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="item-icon">🔔</span>
+              <span>Notification Settings</span>
+            </a>
+          </div>
+        </div>
+
       </nav>
 
+      <div class="nav-section" *ngIf="user && !isSidebarCollapsed">
+        <a routerLink="/tasks/my" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+          <span class="item-icon">✅</span>
+          <span>My Tasks</span>
+        </a>
+      </div>
+
       <!-- Sidebar Footer -->
-      <div class="sidebar-footer" *ngIf="!isSidebarCollapsed">
+        <div class="sidebar-footer" *ngIf="!isSidebarCollapsed">
         <div class="user-info">
-          <img src="/download.png" alt="Profile" class="user-avatar" />
+          <img src="/download.png" alt="Profile" class="user-avatar img-fluid" />
           <div class="user-details">
             <div class="user-name">{{ user?.username || 'Guest' }}</div>
             <div class="user-role">{{ user?.role || 'No Role' }}</div>
@@ -194,39 +278,55 @@ import { Subject, takeUntil } from 'rxjs';
       </div>
     </aside>
 
-    <!-- Main Header -->
-    <header class="app-header">
-      <div class="logo-container">
-        <img src="/logo.jfif" alt="Logo" class="logo-img" />
-        <div class="logo-text">ICCC SMART DASHBOARD</div>
-      </div>
+    <!-- Main Header (converted to Bootstrap responsive navbar) -->
+    <header class="app-header navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center col-auto">
+          <a class="navbar-brand d-flex align-items-center" routerLink="/home">
+            <img src="/logo.jfif" alt="Logo" class="logo-img img-fluid" />
+            <div class="logo-text ms-2 d-none d-lg-block">ICCC SMART DASHBOARD</div>
+          </a>
+        </div>
 
-      <div class="auth">
-        <div class="profile" (click)="toggleUserDropdown($event)">
-          <img src="/download.png" alt="Profile" class="profile-icon" />
-          <div class="dropdown" *ngIf="userDropdownOpen" (click)="$event.stopPropagation()">
-            <ng-container *ngIf="user; else guestOptions">
-              <p class="user-info">{{ user.username }} ({{ user.role }})</p>
-              <button (click)="logout()">Logout</button>
-              <a routerLink="/login" (click)="closeUserDropdown()" class="dropdown-link">
-                Login with another ID
-              </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
 
-              <ng-container *ngIf="isAdmin">
-                <a routerLink="/register" (click)="closeUserDropdown()" class="dropdown-link">Create Account</a>
-                <a routerLink="/forgot-password" (click)="closeUserDropdown()" class="dropdown-link">Forgot password?</a>
-              </ng-container>
+        <div class="collapse navbar-collapse" id="mainNavbar">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <!-- Keep existing router links or add quick links if needed -->
+          </ul>
 
-            </ng-container>
+          <div class="d-flex align-items-center col-auto">
+            <app-cims-notification-bell *ngIf="isCimsRole" class="me-2"></app-cims-notification-bell>
+            <div class="profile position-relative" (click)="toggleUserDropdown($event)">
+              <img src="/download.png" alt="Profile" class="profile-icon img-fluid rounded-circle" />
+              <div class="dropdown-menu dropdown-menu-end user-dropdown-menu fixed-menu" [class.show]="userDropdownOpen" (click)="$event.stopPropagation()">
+                <ng-container *ngIf="user; else guestOptions">
+                  <div class="user-info-section px-3 py-3">
+                    <div class="user-info-text">{{ user.username }} ({{ user.role }})</div>
+                  </div>
+                  <div class="dropdown-divider"></div>
+                  <button class="dropdown-item btn-logout" (click)="logout()">Logout</button>
+                  <div class="dropdown-divider"></div>
+                  <a routerLink="/login" (click)="closeUserDropdown()" class="dropdown-item">Login with another ID</a>
 
-            <ng-template #guestOptions>
-              <a routerLink="/login" (click)="closeUserDropdown()" class="dropdown-link">Login</a>
-              <a routerLink="/register" (click)="closeUserDropdown()" class="dropdown-link">Register</a>
-            </ng-template>
+                  <ng-container *ngIf="isAdmin">
+                    <a routerLink="/register" (click)="closeUserDropdown()" class="dropdown-item">Create Account</a>
+                    <a routerLink="/forgot-password" (click)="closeUserDropdown()" class="dropdown-item">Forgot password?</a>
+                  </ng-container>
+                </ng-container>
+
+                <ng-template #guestOptions>
+                  <a routerLink="/login" (click)="closeUserDropdown()" class="dropdown-item">Login</a>
+                  <a routerLink="/register" (click)="closeUserDropdown()" class="dropdown-item">Register</a>
+                </ng-template>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      </header>
+    </header>
 
       <!-- Mobile Overlay -->
       <div class="mobile-overlay" *ngIf="isMobile && !isSidebarCollapsed" (click)="toggleSidebar()"></div>
@@ -265,16 +365,28 @@ import { Subject, takeUntil } from 'rxjs';
       flex-direction: column;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-      z-index: 999;
-      height: 100vh;
+      z-index: 1000;
       position: fixed;
       left: 0;
-      top: 0;
+      /* keep sidebar below header */
+      top: 64px;
+      height: calc(100vh - 64px);
       flex-shrink: 0;
     }
 
     .sidebar.collapsed {
       width: 70px;
+    }
+
+    /* Mobile: force sidebar to icon-only on screens < 768px */
+    @media (max-width: 767px) {
+      .sidebar {
+        width: 70px;
+      }
+
+      .sidebar.collapsed {
+        width: 70px;
+      }
     }
 
     .sidebar.mobile-open {
@@ -462,18 +574,23 @@ import { Subject, takeUntil } from 'rxjs';
       text-align: center;
     }
 
-    /* Main Header */
+    /* Main Header — fixed to top so sidebar starts below it */
     .app-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding:20px;
+      padding-top:12px;
+      padding-bottom:12px;
+      height: 64px;
       border-bottom: 1px solid #eee;
       background-color: #122e52ff;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      position: relative;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1100;
       color: #fff;
-      flex: 1;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-sizing: border-box;
       width: 100%;
@@ -485,21 +602,23 @@ import { Subject, takeUntil } from 'rxjs';
       gap: 8px;
       cursor: pointer;
       position: relative;
-      margin-left: 300px;
     }
 
     .logo-img {
-      width: 60px;
-      height: 60px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       object-fit: cover;
     }
 
     .logo-text {
       font-weight: 600;
-      font-size: 2rem;
+      font-size: 1.25rem;
       font-family: 'Raleway';
       color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .auth {
@@ -525,64 +644,94 @@ import { Subject, takeUntil } from 'rxjs';
       transform: scale(1.05);
     }
 
-    .dropdown {
-      position: absolute;
-      right: 0;
-      top: 45px;
+    /* user dropdown — use Bootstrap dropdown-menu with small custom tweaks */
+    .user-dropdown-menu {
       background: #fff;
       border: 1px solid #ddd;
       border-radius: 6px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      min-width: 170px;
-      padding: 8px;
-      z-index: 1000;
-      animation: fadeIn 0.2s ease-in-out;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      min-width: 220px;
+      padding: 0;
+      z-index: 1200;
     }
 
-    .dropdown button {
-      display: block;
-      width: 100%;
-      background: none;
+    /* Use fixed positioning so the dropdown is not clipped by parent containers
+       and appears in the viewport even when sidebars/transforms are present. */
+    .user-dropdown-menu.fixed-menu {
+      position: fixed;
+      top: 74px; /* below the header */
+      right: 16px;
+      left: auto;
+    }
+
+    /* On small screens center the menu horizontally so it doesn't stick to the edge */
+    @media (max-width: 768px) {
+      .user-dropdown-menu.fixed-menu {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        max-width: calc(100% - 48px);
+      }
+    }
+
+    .user-dropdown-menu .user-info-section {
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .user-info-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: #212529;
+    }
+
+    .user-dropdown-menu .dropdown-divider {
+      margin: 6px 0;
+      border-top: 1px solid #e9ecef;
+    }
+
+    .user-dropdown-menu .dropdown-item {
+      padding: 10px 16px;
+      color: #333;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
       border: none;
-      text-align: left;
-      padding: 6px 10px;
-      cursor: pointer;
-      border-radius: 4px;
-      color: #333;
-      font-size: 0.95rem;
-      transition: background 0.2s;
-    }
-
-    .dropdown button:hover {
-      background: #f1f1f1;
-    }
-
-    .dropdown-link {
-      display: block;
+      background: none;
       width: 100%;
       text-align: left;
-      padding: 6px 10px;
       cursor: pointer;
-      border-radius: 4px;
-      transition: background 0.2s;
-      color: #333;
       text-decoration: none;
-      font-size: 0.95rem;
     }
 
-    .dropdown-link:hover {
-      background: #f1f1f1;
+    .user-dropdown-menu .dropdown-item:hover {
+      background-color: #f8f9fa;
+      color: #0056b3;
+    }
+
+    .user-dropdown-menu .dropdown-item:active {
+      background-color: #e9ecef;
+    }
+
+    .user-dropdown-menu .btn-logout {
+      color: #dc3545;
+      font-weight: 600;
+    }
+
+    .user-dropdown-menu .btn-logout:hover {
+      background-color: #fff5f5;
+      color: #c82333;
     }
 
     /* Mobile Overlay */
     .mobile-overlay {
       position: fixed;
-      top: 0;
+      top: 64px; /* below header */
       left: 0;
       right: 0;
       bottom: 0;
       background: rgba(0, 0, 0, 0.5);
-      z-index: 999;
+      z-index: 1090;
     }
 
     /* Responsive */
@@ -607,7 +756,7 @@ import { Subject, takeUntil } from 'rxjs';
       }
 
       .logo-text {
-        font-size: 1.5rem;
+        font-size: 1rem;
       }
 
       .mobile-toggle {
@@ -649,10 +798,14 @@ export class HeaderComponent implements OnInit, OnDestroy {
   isSidebarCollapsed = false;
   isMobile = false;
   userDropdownOpen = false;
-  openDropdown: string | null = null;
+  openDropdown: 'inventory' | 'tasks' | 'swm' | 'pbs' | 'cimsAdmin' | 'cimsSupport' | 'cimsFieldPerson' | 'cimsReviewer' | null = null;
   user: any = null;
+  userRole: string = ''; // Store the user's role for sidebar visibility
   isAdmin = false;
   isAgency = false;
+  isCimsRole = false;
+  isSupportEngineer = false;
+  isReviewer = false;
   sidebarCollapsedSignal = signal(false);
 
   private destroy$ = new Subject<void>();
@@ -666,8 +819,17 @@ export class HeaderComponent implements OnInit, OnDestroy {
       .subscribe((u) => {
         this.user = u;
         const role = u?.role?.toUpperCase();
+        this.userRole = role || ''; // Store role for sidebar role checks
         this.isAdmin = role === 'ADMIN';
         this.isAgency = role === 'AGENCY';
+        this.isSupportEngineer = role === 'SUPPORT_ENGINEER';
+        this.isReviewer = role === 'REVIEWER';
+        this.isCimsRole =
+          role === 'SUPPORT_ENGINEER' ||
+          role === 'FIELD_PERSON' ||
+          role === 'COORDINATOR' ||
+          role === 'REVIEWER' ||
+          role === 'ADMIN';
       });
 
     // Restore user from localStorage
@@ -682,6 +844,12 @@ export class HeaderComponent implements OnInit, OnDestroy {
     if (savedSidebarState !== null) {
       this.isSidebarCollapsed = JSON.parse(savedSidebarState);
       this.sidebarService.setSidebarState(this.isSidebarCollapsed);
+      // reflect collapsed state on body for layout offset
+      if (this.isSidebarCollapsed) {
+        document.body.classList.add('sidebar-collapsed');
+      } else {
+        document.body.classList.remove('sidebar-collapsed');
+      }
     }
 
     // Check mobile on init
@@ -695,9 +863,15 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
     this.sidebarService.setSidebarState(this.isSidebarCollapsed);
     localStorage.setItem('sidebarCollapsed', JSON.stringify(this.isSidebarCollapsed));
+    // toggle body class to adjust main content offset
+    if (this.isSidebarCollapsed) {
+      document.body.classList.add('sidebar-collapsed');
+    } else {
+      document.body.classList.remove('sidebar-collapsed');
+    }
   }
 
-  toggleDropdown(dropdownName: string) {
+  toggleDropdown(dropdownName: 'inventory' | 'tasks' | 'swm' | 'pbs' | 'cimsAdmin' | 'cimsSupport' | 'cimsFieldPerson' | 'cimsReviewer') {
     if (this.openDropdown === dropdownName) {
       this.openDropdown = null;
     } else {
@@ -708,6 +882,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   closeSidebarIfMobile() {
     if (this.isMobile) {
       this.isSidebarCollapsed = true;
+      document.body.classList.add('sidebar-collapsed');
     }
   }
 
@@ -728,6 +903,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
       this.isSidebarCollapsed = true;
       this.sidebarService.setSidebarState(true);
       localStorage.setItem('sidebarCollapsed', JSON.stringify(true));
+      document.body.classList.add('sidebar-collapsed');
     }
   }
 

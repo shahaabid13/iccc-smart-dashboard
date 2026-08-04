@@ -16,12 +16,17 @@
   width: 100%;
   padding-left: 250px;
   transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* push content below fixed header */
+  margin-top: 64px;
   box-sizing: border-box;
 }
 
 .content-wrapper.sidebar-collapsed {
   padding-left: 70px;
 }
+
+/* support toggling via body class set by header component */
+body.sidebar-collapsed .content-wrapper { padding-left: 70px; }
 
 @media (max-width: 768px) {
   .content-wrapper {
@@ -67,7 +72,17 @@ main::-webkit-scrollbar-thumb:hover {
 // App header responsive adjustments
 app-header {
   flex-shrink: 0;
-  z-index: 100;
+  z-index: 1000;
+}
+
+/* Ensure header content doesn't sit under the sidebar on wide screens */
+.app-header {
+  padding-left: 20px; /* default small screens */
+}
+
+@media (min-width: 769px) {
+  .app-header { padding-left: 250px; }
+  body.sidebar-collapsed .app-header { padding-left: 70px; }
 }
 
 // Mobile view - stack layout

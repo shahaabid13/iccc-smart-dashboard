@@ -201,13 +201,10 @@ export class LoginComponent {
       this.submitting = true;
 
       this.authService.login(username, password).subscribe({
-       next: (res) => {
-  if (res.role === 'ADMIN') {
-    this.router.navigate(['/admin/dashboard']);
-  } else {
-    this.router.navigate(['/inventory']);
-  }
-},
+        next: (res) => {
+          // After login, route every user to the unified Home Dashboard
+          this.router.navigate(['/home']);
+        },
         error: () => {
           alert('❌ Invalid username or password');
           this.submitting = false;
