@@ -1,0 +1,64 @@
+<ion-page>
+  <app-offline-banner></app-offline-banner>
+  <ion-header translucent>
+    <ion-toolbar>
+      <ion-title>Tasks</ion-title>
+      <ion-buttons slot="end">
+        <ion-button (click)="showProfile()">
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content class="ion-padding">
+    <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+      <ion-refresher-content pullingText="Pull to refresh" refreshingSpinner="crescent"></ion-refresher-content>
+    </ion-refresher>
+
+    <div class="page-shell">
+      <ng-container *ngIf="loading; else list">
+        <ion-card>
+          <ion-card-content>
+            <ion-list>
+              <ion-item *ngFor="let i of [1,2,3]">
+                <ion-label>
+                  <h3><ion-skeleton-text animated style="width: 70%"></ion-skeleton-text></h3>
+                  <p><ion-skeleton-text animated style="width: 50%"></ion-skeleton-text></p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+      </ng-container>
+
+      <ng-template #list>
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>Assigned work</ion-card-title>
+            <ion-card-subtitle>Keep track of open tasks and updates.</ion-card-subtitle>
+          </ion-card-header>
+        </ion-card>
+
+        <ion-list *ngIf="tasks.length; else emptyState">
+          <ion-item *ngFor="let task of tasks" button detail="true" (click)="open(task)">
+            <ion-label>
+              <h3>{{ task.title }}</h3>
+              <p class="ion-text-wrap ion-text-muted">{{ task.status }} • {{ task.dueDate || 'No due date' }}</p>
+            </ion-label>
+            <ion-badge [color]="task.status === 'OPEN' ? 'primary' : task.status === 'HOLD' ? 'warning' : 'success'" slot="end">{{ task.status }}</ion-badge>
+          </ion-item>
+        </ion-list>
+
+        <ng-template #emptyState>
+          <ion-card>
+            <ion-card-content class="empty-state">
+              <p class="ion-no-margin">No assigned open tasks.</p>
+              <p class="ion-text-muted">Once tasks are assigned, they’ll appear here for review.</p>
+            </ion-card-content>
+          </ion-card>
+        </ng-template>
+      </ng-template>
+    </div>
+  </ion-content>
+</ion-page>

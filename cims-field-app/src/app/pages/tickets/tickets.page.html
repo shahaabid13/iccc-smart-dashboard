@@ -1,0 +1,55 @@
+<ion-page>
+  <app-offline-banner></app-offline-banner>
+
+  <ion-header translucent>
+    <ion-toolbar>
+      <ion-title>Tickets</ion-title>
+      <ion-buttons slot="end">
+        <ion-button (click)="showProfile()">
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content class="ion-padding">
+    <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+      <ion-refresher-content pullingText="Pull to refresh" refreshingSpinner="crescent"></ion-refresher-content>
+    </ion-refresher>
+
+    <ng-container *ngIf="loading; else list">
+      <ion-list>
+        <ion-item *ngFor="let item of [1, 2, 3]" lines="none">
+          <ion-avatar slot="start">
+            <ion-skeleton-text animated style="width: 42px; height: 42px"></ion-skeleton-text>
+          </ion-avatar>
+          <ion-label>
+            <h3><ion-skeleton-text animated style="width: 60%"></ion-skeleton-text></h3>
+            <p><ion-skeleton-text animated style="width: 40%"></ion-skeleton-text></p>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </ng-container>
+
+    <ng-template #list>
+      <ion-list *ngIf="tickets.length; else emptyState">
+        <ion-item *ngFor="let ticket of tickets" button detail="true" (click)="open(ticket)">
+          <ion-label>
+            <h3>{{ ticket.incidentTypeName }}</h3>
+            <p>{{ ticket.locationName }}</p>
+          </ion-label>
+          <ion-badge [color]="colorForPriority(ticket.priority)" slot="end">{{ ticket.priority }}</ion-badge>
+          <ion-badge [color]="ticket.status === 'OPEN' ? 'primary' : ticket.status === 'RESOLVED' ? 'success' : ticket.status === 'REJECTED' ? 'danger' : ticket.status === 'HOLD' ? 'warning' : 'medium'" slot="end">{{ ticket.status }}</ion-badge>
+        </ion-item>
+      </ion-list>
+
+      <ng-template #emptyState>
+        <ion-card>
+          <ion-card-content class="empty-state">
+            <p class="ion-no-margin">No active tickets.</p>
+          </ion-card-content>
+        </ion-card>
+      </ng-template>
+    </ng-template>
+  </ion-content>
+</ion-page>

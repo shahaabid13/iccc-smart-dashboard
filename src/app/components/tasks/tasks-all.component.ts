@@ -22,19 +22,23 @@ import { Task } from '../../models/cims.models';
             <th>Assigned To</th>
             <th>Status</th>
             <th>Created</th>
+            <th>Closed</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let t of tasks">
             <td>{{ t.title }}</td>
-            <td>{{ t.assignedToName || 'Unassigned' }}</td>
+            <td>{{ t.assignedToFullName || t.assignedToUsername || 'Unassigned' }}</td>
             <td>{{ t.status }}</td>
-            <td>{{ t.createdAt | date }}</td>
-            <td><a [routerLink]="['/tasks', t.id]" class="btn btn-sm btn-outline-primary">Open</a></td>
+            <td>{{ t.createdAt | date:'medium' }}</td>
+            <td>{{ t.actionTakenAt ? (t.actionTakenAt | date:'medium') : '—' }}</td>
+            <td><a [routerLink]="['/tasks', t.id]" class="btn btn-sm btn-primary">Details</a></td>
           </tr>
         </tbody>
       </table>
+
+      <div *ngIf="!tasks.length" class="text-muted mt-3">No tasks found.</div>
     </div>
   `
 })

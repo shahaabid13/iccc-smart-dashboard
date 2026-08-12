@@ -192,17 +192,17 @@ const FETCH_ALL_PAGE_SIZE = 5000;
 
               <!-- Created Date Column -->
               <ng-container matColumnDef="createdAt">
-                <th mat-header-cell *matHeaderCellDef>Created</th>
+                <th mat-header-cell *matHeaderCellDef>Ticket Created</th>
                 <td mat-cell *matCellDef="let element">
-                  {{ element.createdAt | date: 'short' }}
+                  {{ element.createdAt | date: 'medium' }}
                 </td>
               </ng-container>
 
               <!-- Closed Date Column -->
               <ng-container matColumnDef="closedAt">
-                <th mat-header-cell *matHeaderCellDef>Closed</th>
+                <th mat-header-cell *matHeaderCellDef>Ticket Closed</th>
                 <td mat-cell *matCellDef="let element">
-                  {{ getClosedDate(element) ? (getClosedDate(element) | date: 'short') : '—' }}
+                  {{ getClosedDate(element) ? (getClosedDate(element) | date: 'medium') : '—' }}
                 </td>
               </ng-container>
 
@@ -273,6 +273,8 @@ const FETCH_ALL_PAGE_SIZE = 5000;
       flex-wrap: nowrap;
       align-items: flex-start;
       gap: 12px;
+       overflow-y: visible;   /* ← add this line */
+  padding-top: 6px;    
       overflow-x: auto;
       padding-bottom: 4px;
     }
@@ -585,8 +587,8 @@ export class CimsAllTicketsComponent implements OnInit {
         'Priority': this.toTitleCase(t.priority || ''),
         'Status': this.toTitleCase(this.isClosedStatus(t.status) ? 'CLOSED' : (t.status || '')),
         'Raised By': this.toTitleCase(t.raisedByUsername || ''),
-        'Created': (t as any).createdAt ? new Date((t as any).createdAt).toLocaleString() : '',
-        'Closed': this.getClosedDate(t) ? new Date(this.getClosedDate(t)).toLocaleString() : ''
+        'Ticket Created': (t as any).createdAt ? new Date((t as any).createdAt).toLocaleString() : '',
+        'Ticket Closed': this.getClosedDate(t) ? new Date(this.getClosedDate(t)).toLocaleString() : ''
       }));
 
       const ws = XLSX.utils.json_to_sheet(data);
@@ -602,18 +604,21 @@ export class CimsAllTicketsComponent implements OnInit {
 
   exportToPDF(): void {
     try {
-      const doc = new jsPDF();
-      const headers = ['ID', 'Type', 'Location', 'Priority', 'Status', 'Raised By', 'Created', 'Closed'];
+      // Landscape, not portrait: 7 columns (including full date+time for
+      // Created/Closed) don't fit an A4 portrait page width (~210mm) at a
+      // readable font size — they were silently getting clipped off the
+      // right edge. Landscape A4 gives ~297mm to work with instead.
+      const doc = new jsPDF({ orientation: 'landscape' });
+      const headers = ['ID', 'Type', 'Location', 'Status', 'Raised By', 'Ticket Created', 'Ticket Closed'];
 
       const data = this.filteredTickets.map(t => [
         t.id,
         this.toTitleCase(t.incidentTypeName || ''),
         this.toTitleCase(t.locationName || ''),
-        this.toTitleCase(t.priority || ''),
         this.toTitleCase(this.isClosedStatus(t.status) ? 'CLOSED' : (t.status || '')),
         this.toTitleCase(t.raisedByUsername || ''),
-        (t as any).createdAt ? new Date((t as any).createdAt).toLocaleDateString() : '',
-        this.getClosedDate(t) ? new Date(this.getClosedDate(t)).toLocaleDateString() : '—'
+        (t as any).createdAt ? new Date((t as any).createdAt).toLocaleString() : '',
+        this.getClosedDate(t) ? new Date(this.getClosedDate(t)).toLocaleString() : '—'
       ]);
 
       // Header
@@ -633,14 +638,13 @@ export class CimsAllTicketsComponent implements OnInit {
         headStyles: { fillColor: [13, 60, 97], textColor: 255, halign: 'center' },
         styles: { fontSize: 9, cellPadding: 6 },
         columnStyles: {
-          0: { cellWidth: 14 },
-          1: { cellWidth: 70 },
-          2: { cellWidth: 50 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 40 },
-          5: { cellWidth: 40 },
-          6: { cellWidth: 30 },
-          7: { cellWidth: 30 }
+          0: { cellWidth: 18 },
+          1: { cellWidth: 45 },
+          2: { cellWidth: 45 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 37 },
+          5: { cellWidth: 50 },
+          6: { cellWidth: 50 }
         },
         didDrawPage: (dataArg) => {
           // footer with page number

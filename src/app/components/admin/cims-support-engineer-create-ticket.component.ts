@@ -8,10 +8,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
+import { MatAutocompleteModule, MatAutocompleteSelectedEvent, MatAutocompleteTrigger } from '@angular/material/autocomplete';
 import { MatCardModule } from '@angular/material/card';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatIconModule } from '@angular/material/icon';
 import { CimsService } from '../../services/cims.service';
 import { CimsNotificationService } from '../../services/cims-notification.service';
 import { DevicesService } from '../../services/devices.service';
@@ -35,7 +36,8 @@ interface PriorityOption {
     MatAutocompleteModule,
     MatCardModule,
     MatSnackBarModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatIconModule
   ],
   template: `
     <div class="cims-container">
@@ -62,7 +64,9 @@ interface PriorityOption {
                   type="text"
                   placeholder="Type to search location..."
                   [formControl]="locationCtrl"
-                  [matAutocomplete]="autoLocation">
+                  [matAutocomplete]="autoLocation"
+                  #locationTrigger="matAutocompleteTrigger">
+                <mat-icon matSuffix class="dropdown-arrow" (click)="toggleAutocomplete(locationTrigger)">arrow_drop_down</mat-icon>
                 <mat-autocomplete #autoLocation="matAutocomplete" [displayWith]="displayLocation" (optionSelected)="onLocationSelected($event)">
                   <mat-option *ngFor="let location of filterLocations(locationCtrl.value)" [value]="location">
                     {{ location.name }}
@@ -79,10 +83,14 @@ interface PriorityOption {
                 <input
                   matInput
                   type="text"
-                  placeholder="Type to search approach road..."
+                  placeholder="Type to search approach road... (or select All)"
                   [formControl]="approachRoadCtrl"
                   [matAutocomplete]="autoApproachRoad"
-                  [disabled]="!getControl('locationId')?.value">
+                  [disabled]="!getControl('locationId')?.value"
+                  #approachRoadTrigger="matAutocompleteTrigger">
+                <mat-icon matSuffix class="dropdown-arrow"
+                          [class.disabled]="!getControl('locationId')?.value"
+                          (click)="toggleAutocomplete(approachRoadTrigger)">arrow_drop_down</mat-icon>
                 <mat-autocomplete #autoApproachRoad="matAutocomplete" [displayWith]="displayApproachRoad" (optionSelected)="onApproachRoadSelected($event)">
                   <mat-option *ngFor="let road of filterApproachRoads(approachRoadCtrl.value)" [value]="road">
                     {{ road.name }}
@@ -96,9 +104,11 @@ interface PriorityOption {
                 <input
                   matInput
                   type="text"
-                  placeholder="Type to search device type..."
+                  placeholder="Type to search device type... (or select All)"
                   [formControl]="deviceTypeCtrl"
-                  [matAutocomplete]="autoDeviceType">
+                  [matAutocomplete]="autoDeviceType"
+                  #deviceTypeTrigger="matAutocompleteTrigger">
+                <mat-icon matSuffix class="dropdown-arrow" (click)="toggleAutocomplete(deviceTypeTrigger)">arrow_drop_down</mat-icon>
                 <mat-autocomplete #autoDeviceType="matAutocomplete" [displayWith]="displayDeviceType" (optionSelected)="onDeviceTypeSelected($event)">
                   <mat-option *ngFor="let device of filterDeviceTypes(deviceTypeCtrl.value)" [value]="device">
                     {{ device.name }}
@@ -114,7 +124,9 @@ interface PriorityOption {
                   type="text"
                   placeholder="Type to search incident type..."
                   [formControl]="incidentTypeCtrl"
-                  [matAutocomplete]="autoIncidentType">
+                  [matAutocomplete]="autoIncidentType"
+                  #incidentTypeTrigger="matAutocompleteTrigger">
+                <mat-icon matSuffix class="dropdown-arrow" (click)="toggleAutocomplete(incidentTypeTrigger)">arrow_drop_down</mat-icon>
                 <mat-autocomplete #autoIncidentType="matAutocomplete" [displayWith]="displayIncidentType" (optionSelected)="onIncidentTypeSelected($event)">
                   <mat-option *ngFor="let type of filterIncidentTypes(incidentTypeCtrl.value)" [value]="type">
                     {{ type.name }}
@@ -133,7 +145,9 @@ interface PriorityOption {
                   type="text"
                   placeholder="Type to search field person..."
                   [formControl]="fieldPersonCtrl"
-                  [matAutocomplete]="autoFieldPerson">
+                  [matAutocomplete]="autoFieldPerson"
+                  #fieldPersonTrigger="matAutocompleteTrigger">
+                <mat-icon matSuffix class="dropdown-arrow" (click)="toggleAutocomplete(fieldPersonTrigger)">arrow_drop_down</mat-icon>
                 <mat-autocomplete #autoFieldPerson="matAutocomplete" [displayWith]="displayFieldPerson" (optionSelected)="onFieldPersonSelected($event)">
                   <mat-option *ngFor="let person of filterFieldPersons(fieldPersonCtrl.value)" [value]="person">
                     {{ person.name }} - {{ person.role }}
@@ -152,7 +166,9 @@ interface PriorityOption {
                   type="text"
                   placeholder="Type to search priority..."
                   [formControl]="priorityCtrl"
-                  [matAutocomplete]="autoPriority">
+                  [matAutocomplete]="autoPriority"
+                  #priorityTrigger="matAutocompleteTrigger">
+                <mat-icon matSuffix class="dropdown-arrow" (click)="toggleAutocomplete(priorityTrigger)">arrow_drop_down</mat-icon>
                 <mat-autocomplete #autoPriority="matAutocomplete" [displayWith]="displayPriority" (optionSelected)="onPrioritySelected($event)">
                   <mat-option *ngFor="let option of filterPriorities(priorityCtrl.value)" [value]="option">
                     {{ option.label }}
@@ -231,6 +247,18 @@ interface PriorityOption {
       grid-column: 1 / -1;
     }
 
+    .dropdown-arrow {
+      cursor: pointer;
+      color: rgba(0, 0, 0, 0.54);
+      user-select: none;
+    }
+
+    .dropdown-arrow.disabled {
+      cursor: not-allowed;
+      color: rgba(0, 0, 0, 0.26);
+      pointer-events: none;
+    }
+
     .form-actions {
       display: flex;
       gap: 12px;
@@ -280,8 +308,13 @@ export class CimsCreateTicketComponent implements OnInit {
     { value: 'HIGH', label: 'High' }
   ];
 
-  // Search/autocomplete controls (separate from the reactive form,
-  // which only ever stores the selected id).
+  private readonly ALL_APPROACH_ROAD: ApproachRoad = { id: 'ALL' as any, name: 'All', locationId: 0 as any };
+  private readonly ALL_DEVICE_TYPE: DeviceType = { id: 'ALL' as any, name: 'All' } as any;
+
+  // Path to redirect to after successful creation. Update this if your
+  // actual route is different (e.g. lazy-loaded module prefix).
+  private readonly MY_TICKETS_ROUTE = '/cims/support-engineer/my-tickets';
+
   locationCtrl = new FormControl('');
   approachRoadCtrl = new FormControl('');
   deviceTypeCtrl = new FormControl('');
@@ -321,15 +354,22 @@ export class CimsCreateTicketComponent implements OnInit {
     });
   }
 
+  // ---------- Dropdown toggle ----------
+
+  toggleAutocomplete(trigger: MatAutocompleteTrigger): void {
+    if (trigger.panelOpen) {
+      trigger.closePanel();
+    } else {
+      trigger.openPanel();
+    }
+  }
+
   // ---------- Data loading ----------
 
   loadIncidentTypes(): void {
-    console.log('[CIMS Form] Loading incident types...');
     this.cimsService.getIncidentTypes().subscribe({
       next: (response: any) => {
         const types = Array.isArray(response) ? response : (response?.content || []);
-        console.log('[CIMS Form] Incident types loaded:', types);
-        // Sort alphabetically by name for consistent dropdown order
         this.incidentTypes = types.slice().sort((a: IncidentType, b: IncidentType) => (a?.name || '').localeCompare(b?.name || ''));
       },
       error: (err: any) => {
@@ -340,12 +380,9 @@ export class CimsCreateTicketComponent implements OnInit {
   }
 
   loadFieldPersons(): void {
-    console.log('[CIMS Form] Loading assignable field persons...');
     this.cimsService.getAssignableFieldPersons().subscribe({
       next: (response: any) => {
         const persons = Array.isArray(response) ? response : (response?.content || []);
-        console.log('[CIMS Form] Assignable field persons loaded:', persons);
-        // Sort alphabetically by person name
         this.fieldPersons = persons.slice().sort((a: FieldPerson, b: FieldPerson) => (a?.name || '').localeCompare(b?.name || ''));
       },
       error: (err: any) => {
@@ -356,33 +393,25 @@ export class CimsCreateTicketComponent implements OnInit {
   }
 
   loadLocations(): void {
-    console.log('[CIMS Form] Loading locations...');
     this.cimsService.getLocations().subscribe({
       next: (response: any) => {
         const locs = Array.isArray(response) ? response : (response?.content || []);
-        console.log('[CIMS Form] Locations loaded:', locs);
-        // Sort locations alphabetically by name
         this.locations = locs.slice().sort((a: Location, b: Location) => (a?.name || '').localeCompare(b?.name || ''));
       },
       error: (err: any) => {
         console.error('[CIMS Form] Failed to load locations:', err);
-        console.error('[CIMS Form] Error details:', err.error);
         this.snackBar.open('Failed to load locations: ' + (err.error?.message || err.message), 'Close', { duration: 5000 });
       }
     });
   }
 
   loadApproachRoads(locationId: number): void {
-    console.log('[CIMS Form] Loading approach roads for location:', locationId);
     this.cimsService.getApproachRoads(locationId).subscribe({
       next: (response: any) => {
         const roads = Array.isArray(response) ? response : (response?.content || []);
-        console.log('[CIMS Form] Approach roads loaded:', roads);
-        // If backend returned usable approach-road objects, use them
         if (Array.isArray(roads) && roads.length && roads[0] && typeof roads[0] === 'object' && ('name' in roads[0])) {
           this.approachRoads = roads.slice().sort((a: ApproachRoad, b: ApproachRoad) => (a?.name || '').localeCompare(b?.name || ''));
         } else {
-          // Fallback: derive approach roads from devices (some backends don't expose approach-roads endpoint)
           const loc = this.locations.find(l => l.id === locationId);
           const locName = loc ? (loc.name || (loc as any).locationName) : undefined;
           if (locName) {
@@ -396,7 +425,6 @@ export class CimsCreateTicketComponent implements OnInit {
                   .map(d => (d.approachRoad || d.approach_road || '').toString().trim())
                   .filter(r => !!r)
                 ));
-                // Create ApproachRoad-like objects with synthetic negative ids
                 this.approachRoads = roadsFromDevices.map((r, idx) => ({ id: -(idx + 1), name: r, locationId: locationId }));
                 this.ticketForm.patchValue({ approachRoadId: '' });
                 this.approachRoadCtrl.setValue('');
@@ -410,7 +438,6 @@ export class CimsCreateTicketComponent implements OnInit {
             this.approachRoads = [];
           }
         }
-        // Reset approach road selection when location changes
         this.ticketForm.patchValue({ approachRoadId: '' });
         this.approachRoadCtrl.setValue('');
       },
@@ -423,12 +450,9 @@ export class CimsCreateTicketComponent implements OnInit {
   }
 
   loadDeviceTypes(): void {
-    console.log('[CIMS Form] Loading device types...');
     this.cimsService.getDeviceTypes().subscribe({
       next: (response: any) => {
         const types = Array.isArray(response) ? response : (response?.content || []);
-        console.log('[CIMS Form] Device types loaded:', types);
-        // Sort device types alphabetically by name
         this.deviceTypes = types.slice().sort((a: DeviceType, b: DeviceType) => (a?.name || '').localeCompare(b?.name || ''));
       },
       error: (err: any) => {
@@ -453,40 +477,44 @@ export class CimsCreateTicketComponent implements OnInit {
   // ---------- Autocomplete: filtering ----------
 
   filterLocations(term: string | Location | null): Location[] {
-    const value = this.normalizeSearchTerm(term, (l: Location) => l.name);
+    const value = this.normalizeSearchTerm(term);
     return this.locations.filter(l => l.name.toLowerCase().includes(value));
   }
 
   filterApproachRoads(term: string | ApproachRoad | null): ApproachRoad[] {
-    const value = this.normalizeSearchTerm(term, (r: ApproachRoad) => r.name);
-    return this.approachRoads.filter(r => r.name.toLowerCase().includes(value));
+    const value = this.normalizeSearchTerm(term);
+    const filtered = this.approachRoads.filter(r => r.name.toLowerCase().includes(value));
+    if ('all'.includes(value)) {
+      return [this.ALL_APPROACH_ROAD, ...filtered];
+    }
+    return filtered;
   }
 
   filterDeviceTypes(term: string | DeviceType | null): DeviceType[] {
-    const value = this.normalizeSearchTerm(term, (d: DeviceType) => d.name);
-    return this.deviceTypes.filter(d => d.name.toLowerCase().includes(value));
+    const value = this.normalizeSearchTerm(term);
+    const filtered = this.deviceTypes.filter(d => d.name.toLowerCase().includes(value));
+    if ('all'.includes(value)) {
+      return [this.ALL_DEVICE_TYPE, ...filtered];
+    }
+    return filtered;
   }
 
   filterIncidentTypes(term: string | IncidentType | null): IncidentType[] {
-    const value = this.normalizeSearchTerm(term, (t: IncidentType) => t.name);
+    const value = this.normalizeSearchTerm(term);
     return this.incidentTypes.filter(t => t.name.toLowerCase().includes(value));
   }
 
   filterFieldPersons(term: string | FieldPerson | null): FieldPerson[] {
-    const value = this.normalizeSearchTerm(term, (p: FieldPerson) => `${p.name} ${p.role}`);
+    const value = this.normalizeSearchTerm(term);
     return this.fieldPersons.filter(p => `${p.name} ${p.role}`.toLowerCase().includes(value));
   }
 
   filterPriorities(term: string | PriorityOption | null): PriorityOption[] {
-    const value = this.normalizeSearchTerm(term, (p: PriorityOption) => p.label);
+    const value = this.normalizeSearchTerm(term);
     return this.priorityOptions.filter(p => p.label.toLowerCase().includes(value));
   }
 
-  // Only filter when the user is actively typing a string. When the control's
-  // value is an already-selected object (e.g. right after selecting an option,
-  // or a pre-set default like Priority = Medium), show the full list instead
-  // of filtering it down to just that one match.
-  private normalizeSearchTerm<T>(term: string | T | null, toLabel: (item: T) => string): string {
+  private normalizeSearchTerm(term: any): string {
     if (!term || typeof term !== 'string') {
       return '';
     }
@@ -511,11 +539,19 @@ export class CimsCreateTicketComponent implements OnInit {
 
   onApproachRoadSelected(event: MatAutocompleteSelectedEvent): void {
     const road: ApproachRoad = event.option.value;
+    if (road.id === ('ALL' as any)) {
+      this.ticketForm.patchValue({ approachRoadId: null });
+      return;
+    }
     this.ticketForm.patchValue({ approachRoadId: road.id });
   }
 
   onDeviceTypeSelected(event: MatAutocompleteSelectedEvent): void {
     const device: DeviceType = event.option.value;
+    if (device.id === ('ALL' as any)) {
+      this.ticketForm.patchValue({ deviceTypeId: null });
+      return;
+    }
     this.ticketForm.patchValue({ deviceTypeId: device.id });
   }
 
@@ -549,13 +585,10 @@ export class CimsCreateTicketComponent implements OnInit {
     this.isLoading = true;
     const payload = this.ticketForm.value;
 
-    // Remove optional empty fields to avoid sending empty strings
     if (!payload.approachRoadId) delete payload.approachRoadId;
     if (!payload.deviceTypeId) delete payload.deviceTypeId;
     if (!payload.description) delete payload.description;
 
-    // Check for duplicates created today with same key fields before creating
-    // If approachRoadId is a synthetic id (<= 0) convert to name-based field
     if (payload.approachRoadId && Number(payload.approachRoadId) <= 0) {
       const selected = this.approachRoads.find((r: any) => Number(r.id) === Number(payload.approachRoadId));
       if (selected) {
@@ -571,52 +604,61 @@ export class CimsCreateTicketComponent implements OnInit {
           this.snackBar.open('A similar ticket has already been created today. Duplicate creation is not allowed.', 'Close', { duration: 7000 });
           return;
         }
-
-        this.cimsService.createTicket(payload).subscribe({
-          next: (response: Ticket) => {
-            this.isLoading = false;
-            this.snackBar.open(`Ticket #${response.id} created successfully!`, 'Close', {
-              duration: 5000,
-              panelClass: ['success-snackbar']
-            });
-
-            // Fire an immediate in-app/browser/email/SMS notification for the
-            // newly created ticket (settings-respecting).
-            this.notificationService.notifyTicketUpdate(response.id, 'TICKET_CREATED', response);
-
-            // Redirect to My Tickets after successful creation
-            this.router.navigate(['/cims/support-engineer/my-tickets']);
-          },
-          error: (err: any) => {
-            this.isLoading = false;
-            const errorMsg = err.error?.message || 'Failed to create ticket';
-            this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
-            console.error('Error creating ticket:', err);
-          }
-        });
+        this.createTicketAndRedirect(payload);
       },
       error: (err: any) => {
-        // If duplicate-check fails, allow creation but notify the user
         console.error('Duplicate check failed:', err);
-        // proceed with create to avoid blocking due to transient error
-        this.cimsService.createTicket(payload).subscribe({
-          next: (response: Ticket) => {
-            this.isLoading = false;
-            this.snackBar.open(`Ticket #${response.id} created successfully!`, 'Close', {
-              duration: 5000,
-              panelClass: ['success-snackbar']
-            });
-            this.notificationService.notifyTicketUpdate(response.id, 'TICKET_CREATED', response);
-            this.router.navigate(['/cims/support-engineer/my-tickets']);
-          },
-          error: (e: any) => {
-            this.isLoading = false;
-            const errorMsg = e.error?.message || 'Failed to create ticket';
-            this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
-            console.error('Error creating ticket after failed dup-check:', e);
-          }
+        this.createTicketAndRedirect(payload);
+      }
+    });
+  }
+
+  private createTicketAndRedirect(payload: any): void {
+  this.cimsService.createTicket(payload).subscribe({
+    next: (response: Ticket) => {
+      this.isLoading = false;
+
+      this.snackBar.open(`Ticket #${response.id} created successfully!`, 'Close', {
+        duration: 3000,
+        panelClass: ['success-snackbar']
+      });
+
+      // Notification failures must never block the redirect — isolate it.
+      try {
+        this.notificationService.notifyTicketUpdate(response.id, 'TICKET_CREATED', response);
+      } catch (notifyErr) {
+        console.error('[CIMS Form] notifyTicketUpdate failed (non-blocking):', notifyErr);
+      }
+
+      this.redirectToMyTickets();
+    },
+    error: (err: any) => {
+      this.isLoading = false;
+      const errorMsg = err.error?.message || 'Failed to create ticket';
+      this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
+      console.error('Error creating ticket:', err);
+    }
+  });
+}
+
+  // Navigates to My Tickets right after a successful create. Uses the
+  // navigate() Promise result to detect *silent* failures (e.g. a route
+  // guard returning false) which don't throw and don't show up as errors —
+  // they just do nothing, which looks like "redirect isn't working".
+  private redirectToMyTickets(): void {
+    this.router.navigate([this.MY_TICKETS_ROUTE]).then(success => {
+      if (!success) {
+        console.warn(
+          `[CIMS Form] router.navigate to "${this.MY_TICKETS_ROUTE}" resolved false ` +
+          `(likely blocked by a route guard or the path doesn't match any route). ` +
+          `Falling back to navigateByUrl with replaceUrl.`
+        );
+        this.router.navigateByUrl(this.MY_TICKETS_ROUTE, { replaceUrl: true }).catch(err => {
+          console.error('[CIMS Form] Fallback navigation also failed:', err);
         });
       }
+    }).catch(err => {
+      console.error('[CIMS Form] router.navigate threw an error:', err);
     });
   }
 
@@ -632,16 +674,10 @@ export class CimsCreateTicketComponent implements OnInit {
           return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
         };
 
-        const matches = tickets.some((t: any) => {
-          if (!isSameDay(t.createdAt)) return false;
-          return this.isSameTicketPayload(t, payload);
-        });
-
-        return matches;
+        return tickets.some((t: any) => isSameDay(t.createdAt) && this.isSameTicketPayload(t, payload));
       }),
       catchError((err) => {
         console.error('[CIMS Form] Duplicate check failed:', err);
-        // On error, return false so we don't block creation due to transient errors
         return of(false);
       })
     );
@@ -653,7 +689,6 @@ export class CimsCreateTicketComponent implements OnInit {
       return String(a) === String(b);
     };
 
-    // Compare primary identifying fields. If approach/device are missing, treat empty as equal.
     return (
       eq(ticket.locationId, payload.locationId) &&
       eq(ticket.incidentTypeId, payload.incidentTypeId) &&
@@ -676,6 +711,6 @@ export class CimsCreateTicketComponent implements OnInit {
   }
 
   goBack(): void {
-    this.router.navigate(['/cims/support-engineer/my-tickets']);
+    this.router.navigate([this.MY_TICKETS_ROUTE]);
   }
 }

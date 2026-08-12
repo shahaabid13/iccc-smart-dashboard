@@ -66,8 +66,11 @@ export interface Task {
   title: string;
   description: string;
   assignedToId?: number;
-  assignedToName?: string;
-  assignedById?: number;
+  assignedToUsername?: string;
+  assignedToFullName?: string;
+    assignedById?: number;
+  assignedByUsername?: string;
+  assignedByFullName?: string;
   assignedByName?: string;
   status: 'OPEN' | 'HOLD' | 'RESOLVED' | 'REJECTED' | 'CLOSED';
   actionSummary?: string;

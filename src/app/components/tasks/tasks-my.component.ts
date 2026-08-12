@@ -19,7 +19,7 @@ import { RouterModule } from '@angular/router';
           <div>
             <h5 class="card-title">{{ t.title }}</h5>
             <p class="card-text">{{ t.description }}</p>
-            <div class="text-muted small">Assigned By: {{ t.assignedByName || 'Unknown' }} • {{ t.createdAt | date }}</div>
+            <div class="text-muted small">Assigned By: {{ t.assignedByName || t.assignedByFullName || t.assignedByUsername || 'Unknown' }} • {{ t.createdAt | date }}</div>
           </div>
           <div>
             <a [routerLink]="['/tasks', t.id]" class="btn btn-primary">Take Action</a>
@@ -46,7 +46,16 @@ export class TasksMyComponent implements OnInit {
   }
 
   load() {
-    this.taskService.getMyTasks().subscribe(r => this.tasks = r || []);
-    this.taskService.getMyTaskHistory().subscribe(r => this.history = r || []);
+    // Backend endpoints return a Spring Data Page ({ content: [...], ... }),
+    // not a bare array — same shape as getAllTasks() in TasksAllComponent,
+    // which already guards against this. This component was missing that
+    // guard, so *ngFor was trying to iterate the whole page object and
+    // throwing NG0900.
+    this.taskService.getMyTasks().subscribe((r: any) => {
+      this.tasks = Array.isArray(r) ? r : (r?.content ?? []);
+    });
+    this.taskService.getMyTaskHistory().subscribe((r: any) => {
+      this.history = Array.isArray(r) ? r : (r?.content ?? []);
+    });
   }
 }

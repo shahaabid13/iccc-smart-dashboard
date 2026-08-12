@@ -1,0 +1,96 @@
+<ion-page>
+  <app-offline-banner></app-offline-banner>
+
+  <ion-header translucent>
+    <ion-toolbar>
+      <ion-buttons slot="start">
+        <ion-back-button defaultHref="/tabs/tickets"></ion-back-button>
+      </ion-buttons>
+      <ion-title>Ticket</ion-title>
+      <ion-buttons slot="end">
+        <ion-button (click)="showProfile()">
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content class="ion-padding">
+    <ng-container *ngIf="loading">
+      <ion-card>
+        <ion-card-content>
+          <ion-skeleton-text animated style="width: 70%"></ion-skeleton-text>
+          <ion-skeleton-text animated style="width: 50%"></ion-skeleton-text>
+          <ion-skeleton-text animated style="width: 100%"></ion-skeleton-text>
+        </ion-card-content>
+      </ion-card>
+    </ng-container>
+
+    <ng-container *ngIf="!loading && ticket">
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>{{ ticket.incidentTypeName }}</ion-card-title>
+          <ion-card-subtitle>{{ ticket.locationName }}</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-item lines="none">
+            <ion-label>
+              <h3>Status</h3>
+              <p>{{ ticket.status }}</p>
+            </ion-label>
+            <ion-badge [color]="ticket.status === 'OPEN' ? 'primary' : ticket.status === 'RESOLVED' ? 'success' : ticket.status === 'REJECTED' ? 'danger' : ticket.status === 'HOLD' ? 'warning' : 'medium'" slot="end">{{ ticket.status }}</ion-badge>
+          </ion-item>
+
+          <ion-item lines="none">
+            <ion-label>
+              <h3>Priority</h3>
+              <p>{{ ticket.priority }}</p>
+            </ion-label>
+            <ion-badge [color]="ticket.priority === 'HIGH' ? 'danger' : ticket.priority === 'MEDIUM' ? 'warning' : 'success'" slot="end">{{ ticket.priority }}</ion-badge>
+          </ion-item>
+
+          <ion-item lines="none">
+            <ion-label>
+              <h3>Description</h3>
+              <p *ngIf="ticket.description; else noDescription">{{ ticket.description }}</p>
+            </ion-label>
+          </ion-item>
+
+          <ng-template #noDescription>
+            <p class="ion-text-wrap ion-no-margin">No description provided.</p>
+          </ng-template>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card *ngIf="ticket.status === 'OPEN' || ticket.status === 'REOPENED'">
+        <ion-card-header>
+          <ion-card-title>Field acknowledgement</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <form [formGroup]="ackForm" (ngSubmit)="acknowledge()" class="form-stack">
+            <ion-item lines="none">
+              <ion-label position="stacked">Acknowledgement notes</ion-label>
+              <ion-textarea formControlName="notes" autoGrow="true"></ion-textarea>
+            </ion-item>
+            <ion-button expand="block" type="submit" [disabled]="ackForm.invalid">Acknowledge</ion-button>
+          </form>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card *ngIf="showReviewerPicker">
+        <ion-card-header>
+          <ion-card-title>Review assignment</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-item lines="none">
+            <ion-label position="stacked">Assign reviewer</ion-label>
+            <ion-select [(ngModel)]="selectedReviewerId" interface="action-sheet">
+              <ion-select-option *ngFor="let r of reviewers" [value]="r.id">{{ r.name }}</ion-select-option>
+            </ion-select>
+          </ion-item>
+          <ion-button expand="block" (click)="assignReviewer()" [disabled]="!selectedReviewerId">Assign reviewer</ion-button>
+        </ion-card-content>
+      </ion-card>
+    </ng-container>
+  </ion-content>
+</ion-page>

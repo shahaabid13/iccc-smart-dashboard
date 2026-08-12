@@ -37,8 +37,8 @@ export class TaskService {
   }
 
   takeAction(taskId: number, action: string, summary?: string): Observable<Task> {
-    return this.http.put<Task>(`${this.apiUrl}/${taskId}/action`, { action, summary });
-  }
+  return this.http.put<Task>(`${this.apiUrl}/${taskId}/action`, { status: action, summary });
+}
 
   getTaskDetail(taskId: number): Observable<Task> {
     return this.http.get<Task>(`${this.apiUrl}/${taskId}`);

@@ -120,9 +120,9 @@ import { Ticket } from '../../models/cims.models';
                       <div class="timeline-dot"></div>
                       <div class="timeline-content">
                         <div class="timeline-header">
-                          <span class="action">{{ entry.action }}</span>
-                          <span class="changed-by">by {{ entry.changedBy }}</span>
-                          <span class="time">{{ entry.changedAt | date: 'short' }}</span>
+                          <span class="action">{{ getHistoryActionLabel(entry) }}</span>
+                          <span class="changed-by">by {{ getHistoryActor(entry) }}</span>
+                          <span class="time">{{ getHistoryTimestamp(entry) | date: 'medium' }}</span>
                         </div>
                         <div class="timeline-notes" *ngIf="entry.notes">
                           {{ entry.notes }}
@@ -287,6 +287,7 @@ import { Ticket } from '../../models/cims.models';
       gap: 12px;
       font-size: 14px;
       margin-bottom: 8px;
+      flex-wrap: wrap;
     }
 
     .action {
@@ -470,5 +471,80 @@ export class CimsTicketDetailComponent implements OnInit {
 
   goBack(): void {
     this.location.back();
+  }
+
+  /**
+   * Best-effort lookup for who performed a history action. The backend
+   * TicketHistory entity stores the actor as a changedByUser relation (an
+   * AppUser), not a flat "changedBy" string field the old template assumed
+   * — so that binding always resolved to undefined. This checks the
+   * likely shapes the API might serialize that relation as, rather than
+   * assuming one specific field name (same defensive pattern used
+   * elsewhere in this app, e.g. getClosedDate()).
+   */
+  getHistoryActor(entry: any): string {
+    if (!entry) return 'Unknown';
+    return (
+      entry.changedByUsername ||
+      entry.changedByUser?.username ||
+      entry.changedByUser?.fullName ||
+      entry.changedByFullName ||
+      entry.changedBy ||
+      'Unknown'
+    );
+  }
+
+  /**
+   * Best-effort lookup for the action label shown per history entry. The
+   * backend records fromStatus/toStatus rather than a single "action"
+   * field, so derive a readable label from those if a dedicated action
+   * field isn't present on the response.
+   */
+  getHistoryAction(entry: any): string {
+    if (!entry) return '';
+    if (entry.action) return entry.action;
+    if (entry.toStatus) {
+      return entry.fromStatus ? `${entry.fromStatus} → ${entry.toStatus}` : entry.toStatus;
+    }
+    return '';
+  }
+
+  // Display-only relabeling for status codes that no longer match current
+  // role naming. The backend enum value COORDINATOR_REVIEW is kept as-is
+  // (renaming it would require a data migration across every existing
+  // ticket_history/tickets row), but the Coordinator role itself was
+  // removed — Field Person now performs this step. This map translates
+  // the raw enum to the correct current terminology for display only;
+  // nothing sent to/from the backend is affected.
+  private readonly STATUS_LABELS: Record<string, string> = {
+    COORDINATOR_REVIEW: 'FIELD PERSON REVIEW'
+  };
+
+  private toDisplayStatus(status: string): string {
+    if (!status) return status;
+    return this.STATUS_LABELS[status] || status;
+  }
+
+  /** Same as getHistoryAction(), but with status codes relabeled for
+   * display (e.g. COORDINATOR_REVIEW -> FIELD PERSON REVIEW). */
+  getHistoryActionLabel(entry: any): string {
+    if (!entry) return '';
+    if (entry.action) return entry.action;
+    if (entry.toStatus) {
+      const to = this.toDisplayStatus(entry.toStatus);
+      const from = entry.fromStatus ? this.toDisplayStatus(entry.fromStatus) : null;
+      return from ? `${from} → ${to}` : to;
+    }
+    return '';
+  }
+
+  /**
+   * Best-effort lookup for the history entry's timestamp — covers both
+   * changedAt (matches the backend entity) and createdAt in case a
+   * different DTO shape is returned.
+   */
+  getHistoryTimestamp(entry: any): any {
+    if (!entry) return null;
+    return entry.changedAt || entry.createdAt || null;
   }
 }
