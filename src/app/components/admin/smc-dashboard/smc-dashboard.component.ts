@@ -728,91 +728,243 @@ export class SmcDashboardComponent implements OnInit {
     }
   }
 
-  exportToPDF(): void {
-    if (!this.filteredRecords.length) {
-      alert('No data to export');
-      return;
-    }
-
-    try {
-      // Create new PDF document
-      const doc = new jsPDF();
-      
-      // Add title
-      doc.setFontSize(16);
-      doc.setTextColor(40);
-      doc.text('Weighbridge Data Report', 14, 15);
-      
-      // Add date range and summary
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 22);
-      doc.text(`Total Records: ${this.filteredRecords.length}`, 14, 28);
-      doc.text(`Total Net Weight: ${this.getTotalWeight().toLocaleString()} kg`, 14, 34);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 40);
-      
-      // Prepare table data
-      const tableData = this.filteredRecords.map(record => [
-        record.id?.slipno || '-',
-        record.vno || '-',
-        record.vname || '-',
-        record.sname || '-',
-        record.tweight || '0',
-        record.gweight || '0',
-        this.formatDateForExport(record.gdate),
-        record.nweight || '0',
-        record.driver || '-',
-        this.formatDateForExport(record.edate),
-        record.id?.wbId || '-'
-      ]);
-
-      // Define table columns
-      const tableColumns = [
-        'Slip No',
-        'VNo',
-        'VName',
-        'SName',
-        'TWeight',
-        'GWeight',
-        'GDate',
-        'NWeight',
-        'Driver',
-        'EDate',
-        'WB_ID'
-      ];
-
-      // Add table to PDF
-      autoTable(doc, {
-        head: [tableColumns],
-        body: tableData,
-        startY: 45,
-        styles: {
-          fontSize: 7,
-          cellPadding: 2,
-        },
-        headStyles: {
-          fillColor: [18, 46, 82],
-          textColor: 255,
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-          fillColor: [240, 240, 240]
-        },
-        margin: { top: 45 }
-      });
-
-      // Generate file name
-      const fileName = `Weighbridge_Report_${this.getDateRangeLabel().replace(/ /g, '_')}_${new Date().getTime()}.pdf`;
-
-      // Save PDF
-      doc.save(fileName);
-      
-      console.log('PDF export completed successfully');
-    } catch (error) {
-      console.error('Error exporting to PDF:', error);
-      alert('Error exporting to PDF. Please try again.');
-    }
+ exportToPDF(): void {
+  if (!this.filteredRecords.length) {
+    alert('No data to export');
+    return;
   }
+
+  try {
+    const loadImage = (url: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          canvas.getContext('2d')!.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg'));
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    };
+
+    loadImage('/download.jpg')
+      .then(logoBase64 => this.generatePDF(logoBase64))
+      .catch(() => this.generatePDF(null));
+
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    alert('Error exporting to PDF. Please try again.');
+  }
+}
+
+private formatDateDDMMYYYY(date: Date | string | null): string {
+  if (!date) return '-';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '-';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const mm = months[d.getMonth()];
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+private formatNumberWithCommas(value: string | number): string {
+  if (value === null || value === undefined || value === '') return '0';
+  const cleanValue = value.toString().replace(/,/g, '').trim();
+  const numberValue = parseFloat(cleanValue);
+  if (isNaN(numberValue)) return value.toString();
+  return numberValue.toLocaleString('en-US', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: Number.isInteger(numberValue) ? 0 : 2
+  });
+}
+
+private getFromToDates(): { from: string; to: string } {
+  const dates = this.filteredRecords
+    .map(r => new Date(r.gdate))
+    .filter(d => !isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (!dates.length) return { from: '-', to: '-' };
+
+  return {
+    from: this.formatDateDDMMYYYY(dates[0]),
+    to: this.formatDateDDMMYYYY(dates[dates.length - 1])
+  };
+}
+
+private generatePDF(logoBase64: string | null): void {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const { from, to } = this.getFromToDates();
+  const totalRecords = this.filteredRecords.length;
+  const totalNetWeight = this.getTotalWeight();
+  const totalGrossWeight = this.filteredRecords.reduce(
+    (sum, r) => sum + (Number(r.gweight) || 0), 0
+  );
+
+  const corporation = 'Corporation: SMC, Srinagar';
+  const weighbridgeId = this.filteredRecords[0]?.id?.wbId || 'SRNGR_LANDFILL_WB1';
+
+  const fmt = (n: number) => n.toLocaleString('en-US');
+
+  // ---------- LOGO (top right, like inventory report) ----------
+  const drawLogo = () => {
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'JPEG', pageWidth - 50, 6, 34, 26);
+    }
+  };
+
+  // ---------- WATERMARK (same logo image, low opacity, centered) ----------
+  const drawWatermark = () => {
+    if (!logoBase64) return;
+    doc.saveGraphicsState();
+    (doc as any).setGState(new (doc as any).GState({ opacity: 0.12 }));
+    doc.addImage(logoBase64, 'JPEG', pageWidth / 2 - 50, pageHeight / 2 - 40, 100, 80);
+    doc.restoreGraphicsState();
+  };
+
+  // ---------- HEADER (drawn on every page) ----------
+  const drawHeader = () => {
+    drawLogo();
+
+    doc.setFontSize(15);
+    doc.setTextColor(18, 46, 82);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Cumulative Logbook: Achan Biomining', 14, 18);
+
+    doc.setFontSize(9);
+    doc.setTextColor(40, 40, 40);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated on: ${this.formatDateDDMMYYYY(new Date())}`, 14, 25);
+
+    doc.setFontSize(11);
+    doc.setTextColor(18, 46, 82);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Summary', 14, 33);
+
+    doc.setDrawColor(18, 46, 82);
+    doc.setLineWidth(0.5);
+    doc.line(14, 40, pageWidth - 14, 40);
+  };
+
+  drawHeader();
+  drawWatermark();
+
+  // ---------- SUMMARY PANEL ----------
+  const summaryStartY = 46;
+  const summaryRows = [
+    ['Date Range', `${from}  to  ${to}`],
+    ['Total Records', fmt(totalRecords)],
+    ['Total Net Weight', `${fmt(totalNetWeight)} KG`],
+    ['Total Gross Weight', `${fmt(totalGrossWeight)} KG`],
+    ['Corporation', corporation],
+    ['Weighbridge', weighbridgeId]
+  ];
+
+  autoTable(doc, {
+    startY: summaryStartY,
+    body: summaryRows,
+    theme: 'plain',
+    styles: { fontSize: 9, cellPadding: 1.5 },
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: [18, 46, 82], cellWidth: 45 },
+      1: { textColor: [20, 20, 20] }
+    },
+    margin: { left: 14, right: 14 },
+    tableWidth: pageWidth - 28,
+    didParseCell: function(data) {
+      // Make KG text bold in the second column
+      if (data.column.index === 1 && data.cell.text && data.cell.text[0]?.includes('KG')) {
+        data.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+
+  const summaryEndY = (doc as any).lastAutoTable.finalY;
+  doc.setDrawColor(200);
+  doc.roundedRect(12, summaryStartY - 4, pageWidth - 24, summaryEndY - summaryStartY + 8, 2, 2, 'S');
+
+  // ---------- TABLE ----------
+  // Place a bold "Detail:" heading with extra padding below the summary panel
+  doc.setFontSize(11);
+  doc.setTextColor(18, 46, 82);
+  doc.setFont('helvetica', 'bold');
+  const detailsY = summaryEndY + 14; // increased padding
+  doc.text('Detail:', 14, detailsY);
+  // restore normal text style for the table
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+
+  const tableData = this.filteredRecords.map(record => [
+    record.id?.slipno || '-',
+    record.vno || '-',
+    // record.vname || '-',
+    this.formatDateDDMMYYYY(record.edate),
+    this.formatNumberWithCommas(record.gweight || '0'),
+    this.formatNumberWithCommas(record.tweight || '0'),
+    this.formatNumberWithCommas(record.nweight || '0'),
+    //record.driver || '-',
+    
+  ]);
+
+  const tableColumns = ['Slip No', 'Vehicle No.', 'Date', 'Gross Weight (kg)', 'Truck Weight (kg)', 'Net Weight (kg)'];
+
+  autoTable(doc, {
+    head: [tableColumns],
+    body: tableData,
+    startY: summaryEndY + 22,
+    styles: { fontSize: 8, cellPadding: 2.5, lineColor: [220, 220, 220], lineWidth: 0.1 },
+    headStyles: { fillColor: [18, 46, 82], textColor: 255, fontStyle: 'bold', halign: 'center' },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    bodyStyles: { halign: 'center' },
+    margin: { top: 45, bottom: 25 },
+
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        drawHeader();
+      }
+      drawWatermark();
+
+      const footerY = pageHeight - 18;
+      doc.setDrawColor(200);
+      doc.setLineWidth(0.2);
+      doc.line(14, footerY - 4, pageWidth - 14, footerY - 4);
+
+      doc.setFontSize(7.5);
+      doc.setTextColor(90);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${corporation}  |  Date Range: ${from} to ${to} | Total Records: ${fmt(totalRecords)}`, 14, footerY);
+      
+      // Draw second line with normal KG spacing
+      let xPos = 14;
+      const netText = `Total Net Wt: ${fmt(totalNetWeight)} KG`;
+      doc.text(netText, xPos, footerY + 5);
+      xPos += doc.getTextWidth(netText) + 8;
+      const grossText = `|  Total Gross Wt: ${fmt(totalGrossWeight)} KG`;
+      doc.text(grossText, xPos, footerY + 5);
+    }
+  });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7.5);
+    doc.setTextColor(90);
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - 14, pageHeight - 18, { align: 'right' });
+  }
+
+  const fileName = `Cumulative Logbook_Achan Biomining${from.replace(/\//g, '-')}_to_${to.replace(/\//g, '-')}_${new Date().getTime()}.pdf`;
+  doc.save(fileName);
+
+  console.log('PDF export completed successfully');
+}
 
   // Toggle export dropdown
   toggleExportDropdown(force?: boolean) {
@@ -1088,7 +1240,7 @@ exportReportToPDF(): void {
     tableBody.push(['', '', 'Total Trips', trips.toString(), '']);
 
     autoTable(doc, {
-      head: [['Slip No', 'VNo', 'EDate', 'GWeight (kg)', 'NWeight (kg)']],
+      head: [['Slip No', 'Vehicle No.', 'Date', 'Gross Weight (kg)', 'Net Weight (kg)']],
       body: tableBody,
       startY: 30,
       margin: { left: 10, right: 10 },
@@ -1150,32 +1302,6 @@ exportReportToPDF(): void {
     alert('Error exporting report to PDF');
   }
 }
-  // Helper method to format numbers with Indian numbering system (10,000 and 1,00,000)
-  private formatNumberWithCommas(num: string | number): string {
-    const numStr = num.toString();
-    const parts = numStr.split('.');
-    const integerPart = parts[0];
-    const decimalPart = parts[1] || '';
-
-    // Reverse the integer part to process from right to left
-    let reversed = integerPart.split('').reverse().join('');
-    let formatted = '';
-
-    // Apply Indian numbering: first 3 digits, then groups of 2
-    for (let i = 0; i < reversed.length; i++) {
-      if (i === 3 || (i > 3 && (i - 3) % 2 === 0)) {
-        formatted += ',';
-      }
-      formatted += reversed[i];
-    }
-
-    // Reverse back to get the correct order
-    const result = formatted.split('').reverse().join('');
-    
-    // Add back the decimal part
-    return decimalPart ? result + '.' + decimalPart : result;
-  }
-
   // Helper method to format dates for export
   private formatDateForExport(dateString: string): string {
     if (!dateString) return '-';

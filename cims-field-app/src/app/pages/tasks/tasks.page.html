@@ -11,7 +11,7 @@
     </ion-toolbar>
   </ion-header>
 
-  <ion-content class="ion-padding">
+  <ion-content class="ion-padding" style="padding-bottom:70px">
     <ion-refresher slot="fixed" (ionRefresh)="load($event)">
       <ion-refresher-content pullingText="Pull to refresh" refreshingSpinner="crescent"></ion-refresher-content>
     </ion-refresher>
@@ -41,12 +41,13 @@
         </ion-card>
 
         <ion-list *ngIf="tasks.length; else emptyState">
-          <ion-item *ngFor="let task of tasks" button detail="true" (click)="open(task)">
+          <ion-item *ngFor="let task of tasks; trackBy: trackByTaskId" button detail="true"
+                    [routerLink]="['/tasks', task.id]">
             <ion-label>
               <h3>{{ task.title }}</h3>
               <p class="ion-text-wrap ion-text-muted">{{ task.status }} • {{ task.dueDate || 'No due date' }}</p>
             </ion-label>
-            <ion-badge [color]="task.status === 'OPEN' ? 'primary' : task.status === 'HOLD' ? 'warning' : 'success'" slot="end">{{ task.status }}</ion-badge>
+            <ion-badge [color]="colorForStatus(task.status)" slot="end">{{ task.status }}</ion-badge>
           </ion-item>
         </ion-list>
 

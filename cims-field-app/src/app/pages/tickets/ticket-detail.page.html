@@ -4,7 +4,7 @@
   <ion-header translucent>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-back-button defaultHref="/tabs/tickets"></ion-back-button>
+        <ion-back-button defaultHref="/tickets"></ion-back-button>
       </ion-buttons>
       <ion-title>Ticket</ion-title>
       <ion-buttons slot="end">
@@ -15,13 +15,25 @@
     </ion-toolbar>
   </ion-header>
 
-  <ion-content class="ion-padding">
+  <ion-content class="ion-padding" [fullscreen]="true">
     <ng-container *ngIf="loading">
       <ion-card>
         <ion-card-content>
           <ion-skeleton-text animated style="width: 70%"></ion-skeleton-text>
           <ion-skeleton-text animated style="width: 50%"></ion-skeleton-text>
           <ion-skeleton-text animated style="width: 100%"></ion-skeleton-text>
+        </ion-card-content>
+      </ion-card>
+    </ng-container>
+
+    <ng-container *ngIf="loadingError">
+      <ion-card>
+        <ion-card-content>
+          <div style="padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+            <p style="margin: 0; color: #d32f2f; font-weight: bold;">Error loading ticket</p>
+            <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">{{ loadingError }}</p>
+            <p style="margin: 8px 0 0 0; color: #999; font-size: 12px;">Please check your connection and try again.</p>
+          </div>
         </ion-card-content>
       </ion-card>
     </ng-container>
@@ -70,9 +82,12 @@
           <form [formGroup]="ackForm" (ngSubmit)="acknowledge()" class="form-stack">
             <ion-item lines="none">
               <ion-label position="stacked">Acknowledgement notes</ion-label>
-              <ion-textarea formControlName="notes" autoGrow="true"></ion-textarea>
+              <ion-textarea formControlName="notes" autoGrow="true" [disabled]="isSubmittingAck"></ion-textarea>
             </ion-item>
-            <ion-button expand="block" type="submit" [disabled]="ackForm.invalid">Acknowledge</ion-button>
+            <ion-button expand="block" type="submit" [disabled]="ackForm.invalid || isSubmittingAck">
+              <span *ngIf="!isSubmittingAck">Acknowledge</span>
+              <span *ngIf="isSubmittingAck">Acknowledging...</span>
+            </ion-button>
           </form>
         </ion-card-content>
       </ion-card>
@@ -84,11 +99,15 @@
         <ion-card-content>
           <ion-item lines="none">
             <ion-label position="stacked">Assign reviewer</ion-label>
-            <ion-select [(ngModel)]="selectedReviewerId" interface="action-sheet">
+            <ion-select [(ngModel)]="selectedReviewerId" interface="action-sheet" [disabled]="isSubmittingReviewer || reviewers.length === 0">
               <ion-select-option *ngFor="let r of reviewers" [value]="r.id">{{ r.name }}</ion-select-option>
             </ion-select>
+            <p *ngIf="reviewers.length === 0" style="font-size: smaller; color: var(--ion-color-medium); padding-top: 4px;">No reviewers available to assign.</p>
           </ion-item>
-          <ion-button expand="block" (click)="assignReviewer()" [disabled]="!selectedReviewerId">Assign reviewer</ion-button>
+          <ion-button expand="block" (click)="assignReviewer()" [disabled]="!selectedReviewerId || isSubmittingReviewer">
+            <span *ngIf="!isSubmittingReviewer">Assign reviewer</span>
+            <span *ngIf="isSubmittingReviewer">Assigning...</span>
+          </ion-button>
         </ion-card-content>
       </ion-card>
     </ng-container>

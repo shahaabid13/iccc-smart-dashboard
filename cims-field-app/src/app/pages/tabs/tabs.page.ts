@@ -1,13 +1,3 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { IonicModule } from '@ionic/angular';
-import { RouterModule } from '@angular/router';
-
-@Component({
-  selector: 'app-tabs',
-  standalone: true,
-  imports: [IonicModule, RouterModule],
-  schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  templateUrl: './tabs.page.html',
-  styleUrls: ['./tabs.page.scss']
-})
-export class TabsPage {}
+// Tabs removed: routing now uses top-level routes for tickets and tasks.
+// File retained for reference but the component is intentionally disabled.
+export const TabsPageDisabled = true;

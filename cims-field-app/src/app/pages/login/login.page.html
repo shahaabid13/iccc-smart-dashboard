@@ -22,7 +22,10 @@
 
           <ion-item lines="none">
             <ion-label position="stacked">Password</ion-label>
-            <ion-input formControlName="password" type="password" autocomplete="current-password"></ion-input>
+            <ion-input formControlName="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password"></ion-input>
+            <ion-button slot="end" fill="clear" (click)="togglePasswordVisibility()" size="small">
+              <ion-icon [name]="showPassword ? 'eye-outline' : 'eye-off-outline'"></ion-icon>
+            </ion-button>
           </ion-item>
 
           <div class="error-message" *ngIf="error">{{ error }}</div>

@@ -3,7 +3,7 @@
   <ion-header translucent>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-back-button defaultHref="/tabs/tasks"></ion-back-button>
+        <ion-back-button defaultHref="/tasks"></ion-back-button>
       </ion-buttons>
       <ion-title>Task</ion-title>
       <ion-buttons slot="end">
@@ -14,7 +14,7 @@
     </ion-toolbar>
   </ion-header>
 
-  <ion-content class="ion-padding">
+  <ion-content class="ion-padding" [fullscreen]="true">
     <div class="page-shell">
       <ng-container *ngIf="loading">
         <ion-card>
@@ -22,6 +22,18 @@
             <ion-skeleton-text animated style="width: 70%"></ion-skeleton-text>
             <ion-skeleton-text animated style="width: 50%"></ion-skeleton-text>
             <ion-skeleton-text animated style="width: 100%"></ion-skeleton-text>
+          </ion-card-content>
+        </ion-card>
+      </ng-container>
+
+      <ng-container *ngIf="loadingError">
+        <ion-card>
+          <ion-card-content>
+            <div style="padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+              <p style="margin: 0; color: #d32f2f; font-weight: bold;">Error loading task</p>
+              <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">{{ loadingError }}</p>
+              <p style="margin: 8px 0 0 0; color: #999; font-size: 12px;">Please check your connection and try again.</p>
+            </div>
           </ion-card-content>
         </ion-card>
       </ng-container>
@@ -38,7 +50,7 @@
                 <h3>Status</h3>
                 <p>{{ task.status }}</p>
               </ion-label>
-              <ion-badge [color]="task.status === 'OPEN' ? 'primary' : task.status === 'HOLD' ? 'warning' : task.status === 'success' ? 'success' : 'medium'" slot="end">{{ task.status }}</ion-badge>
+              <ion-badge [color]="task.status === 'OPEN' ? 'primary' : task.status === 'HOLD' ? 'warning' : task.status === 'REJECTED' ? 'danger' : 'success'" slot="end">{{ task.status }}</ion-badge>
             </ion-item>
 
             <ion-item lines="none">
@@ -76,7 +88,7 @@
             <form [formGroup]="actionForm" (ngSubmit)="submitAction()" class="form-stack">
               <ion-item lines="none">
                 <ion-label position="stacked">Action</ion-label>
-                <ion-select formControlName="status" interface="action-sheet">
+                <ion-select formControlName="status" interface="action-sheet" [disabled]="isSubmitting">
                   <ion-select-option *ngFor="let action of availableActions" [value]="action.value">
                     {{ action.label }}
                   </ion-select-option>
@@ -85,10 +97,13 @@
 
               <ion-item lines="none">
                 <ion-label position="stacked">Summary</ion-label>
-                <ion-textarea formControlName="summary" autoGrow="true"></ion-textarea>
+                <ion-textarea formControlName="summary" autoGrow="true" [disabled]="isSubmitting"></ion-textarea>
               </ion-item>
 
-              <ion-button expand="block" type="submit" [disabled]="actionForm.invalid">Submit</ion-button>
+              <ion-button expand="block" type="submit" [disabled]="actionForm.invalid || isSubmitting">
+                <span *ngIf="!isSubmitting">Submit</span>
+                <span *ngIf="isSubmitting">Submitting...</span>
+              </ion-button>
             </form>
           </ion-card-content>
         </ion-card>

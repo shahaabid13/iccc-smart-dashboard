@@ -23,18 +23,18 @@ import { CimsNotification } from '../../models/cims.models';
           <span class="panel-title">Notifications</span>
           <div class="panel-actions">
             <button class="panel-action" (click)="markAllRead()" [disabled]="unreadCount === 0">Mark all read</button>
-            <button class="panel-action" (click)="clearAll()" [disabled]="notifications.length === 0">Clear</button>
+            <button class="panel-action" (click)="clearAll()" [disabled]="allNotifications.length === 0">Clear</button>
           </div>
         </div>
 
         <div class="panel-body">
-          <div *ngIf="notifications.length === 0" class="empty-state">
+          <div *ngIf="displayedNotifications.length === 0" class="empty-state">
             <span class="empty-icon">🔕</span>
-            <p>No notifications yet</p>
-            <small>Ticket updates will appear here.</small>
+            <p>No new notifications</p>
+            <small>Updates will appear here once available.</small>
           </div>
 
-          <div *ngFor="let notification of notifications" class="notification-item"
+          <div *ngFor="let notification of displayedNotifications" class="notification-item"
                [class.unread]="!notification.read"
                (click)="openNotification(notification)">
             <div class="item-icon">{{ getEventIcon(notification.eventType) }}</div>
@@ -57,7 +57,7 @@ import { CimsNotification } from '../../models/cims.models';
       </div>
     </div>
   `,
-  styles: [
+styles: [
     `
       .cims-notification-wrap {
         position: relative;
@@ -276,7 +276,8 @@ import { CimsNotification } from '../../models/cims.models';
   ]
 })
 export class CimsNotificationBellComponent implements OnInit, OnDestroy {
-  notifications: CimsNotification[] = [];
+  allNotifications: CimsNotification[] = [];
+  displayedNotifications: CimsNotification[] = [];
   unreadCount = 0;
   isOpen = false;
 
@@ -288,11 +289,9 @@ export class CimsNotificationBellComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.notificationService.notifications$.subscribe((items) => {
-      this.notifications = items;
-      this.unreadCount = this.notificationService.getUnreadCount();
-    });
-    this.notificationService.unreadCount$.subscribe((count) => {
-      this.unreadCount = count;
+      this.allNotifications = items;
+      this.displayedNotifications = items.filter(n => !n.read);
+      this.unreadCount = this.displayedNotifications.length;
     });
 
     this.startPolling();

@@ -2,8 +2,8 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Preferences } from '@capacitor/preferences';
-import { from, map, Observable, switchMap } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { from, map, Observable, switchMap, tap } from 'rxjs';
+import { environment, getApiBaseUrl } from '../../environments/environment';
 
 interface LoginResponse {
   token: string;
@@ -16,14 +16,23 @@ export class AuthService {
   constructor(private http: HttpClient, private router: Router) {}
 
   login(username: string, password: string): Observable<LoginResponse> {
+    const apiUrl = getApiBaseUrl();
+    const loginUrl = `${apiUrl}/api/auth/login`;
+    console.log('[AuthService] Attempting login for user:', username, 'at:', loginUrl);
     return this.http
-      .post<LoginResponse>(`${environment.apiBaseUrl}/api/auth/login`, {
+      .post<LoginResponse>(loginUrl, {
         username,
         password
       })
       .pipe(
+        tap(response => {
+          console.log('[AuthService] Login successful, received token');
+        }),
         switchMap(response =>
           from(Preferences.set({ key: 'auth_token', value: response.token })).pipe(
+            tap(() => {
+              console.log('[AuthService] Token saved to storage');
+            }),
             map(() => response)
           )
         )

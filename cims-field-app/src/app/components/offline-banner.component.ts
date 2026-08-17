@@ -1,16 +1,16 @@
 import { Component } from '@angular/core';
-import { IonicModule } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
+import { IonIcon } from '@ionic/angular/standalone';
 import { Network } from '@capacitor/network';
 import { BehaviorSubject } from 'rxjs';
 
 @Component({
   selector: 'app-offline-banner',
   standalone: true,
-  imports: [IonicModule, CommonModule],
+  imports: [CommonModule, IonIcon],
   template: `
     <div class="offline-banner" *ngIf="!(isOnline$ | async)">
-      <ion-icon name="wifi-off-outline"></ion-icon>
+      <ion-icon name="wifi-outline"></ion-icon>
       <span>You are offline. Changes will sync when connection is restored.</span>
     </div>
   `,

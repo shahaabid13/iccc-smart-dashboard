@@ -24,7 +24,7 @@ export interface Ticket {
   fieldPersonPhone?: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
   description?: string;
-  status: 'OPEN' | 'COORDINATOR_REVIEW' | 'ASSIGNED_TO_REVIEWER' | 'RESOLVED' | 'REOPENED' | 'PENDING' | 'REJECTED' | string;
+  status: 'OPEN' | 'ASSIGNED_TO_REVIEWER' | 'RESOLVED' | 'REOPENED' | 'PENDING' | 'REJECTED' | string;
   raisedByUserId?: number;
   raisedByUsername?: string;
   coordinatorId?: number;

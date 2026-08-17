@@ -1,3 +1,13 @@
-<ion-app>
-  <ion-router-outlet></ion-router-outlet>
-</ion-app>
+<router-outlet></router-outlet>
+
+<nav class="bottom-nav" *ngIf="showNav">
+  <a routerLink="/tickets" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+    <ion-icon name="document-text-outline"></ion-icon>
+    <span>Tickets</span>
+  </a>
+
+  <a routerLink="/tasks" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+    <ion-icon name="checkmark-done-outline"></ion-icon>
+    <span>Tasks</span>
+  </a>
+</nav>

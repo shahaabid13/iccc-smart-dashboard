@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, tap, of } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { map } from 'rxjs/operators';
+import { getApiBaseUrl } from '../../environments/environment';
 import { Ticket } from '../models/ticket';
 import { CacheService } from './cache.service';
 
@@ -12,18 +13,49 @@ export interface Reviewer {
 
 @Injectable({ providedIn: 'root' })
 export class TicketService {
-  private base = `${environment.apiBaseUrl}/api/incidents/tickets`;
   constructor(private http: HttpClient, private cacheService: CacheService) {}
 
+  private getBase(): string {
+    return `${getApiBaseUrl()}/api/incidents/tickets`;
+  }
+
   getMyQueue(): Observable<Ticket[]> {
-    return this.http.get<Ticket[]>(`${this.base}/my-queue`).pipe(
+    const url = `${this.getBase()}/my-queue`;
+    console.log('[TicketService] Fetching tickets from:', url);
+    return this.http.get<Ticket[]>(url).pipe(
+      tap(data => {
+        console.log('[TicketService] API returned:', data, 'length:', data?.length);
+      }),
+      map(data => {
+        // If API returns data with items, use it. Otherwise use fallback
+        if (data && Array.isArray(data) && data.length > 0) {
+          console.log('[TicketService] Using API data:', data.length, 'tickets');
+          return data;
+        }
+        console.log('[TicketService] API returned empty or falsy, using fallback data');
+        return this.fallbackTickets();
+      }),
       tap(data => void this.cacheService.cacheTickets(data)),
-      catchError(() => of(this.fallbackTickets()))
+      catchError(error => {
+        console.error('[TicketService] Error fetching tickets:', error);
+        console.log('[TicketService] Using fallback data due to error');
+        return of(this.fallbackTickets());
+      })
     );
   }
 
-  getTicket(id: number): Observable<Ticket> {
-    return this.http.get<Ticket>(`${this.base}/${id}`);
+  getTicketById(id: number): Observable<Ticket> {
+    const url = `${this.getBase()}/${id}`;
+    console.log(`[TicketService] Fetching ticket detail from: ${url}`);
+    return this.http.get<Ticket>(url).pipe(
+      tap(data => {
+        console.log('[TicketService] API returned ticket detail:', data);
+      }),
+      catchError(error => {
+        console.error('[TicketService] Error fetching ticket detail:', error);
+        throw error; // re-throw the error to be handled by the component
+      })
+    );
   }
 
   private fallbackTickets(): Ticket[] {
@@ -86,14 +118,22 @@ export class TicketService {
   }
 
   acknowledge(id: number, notes: string) {
-    return this.http.put(`${this.base}/${id}/acknowledge`, { notes });
+    return this.http.put(`${this.getBase()}/${id}/acknowledge`, { notes });
   }
 
   getReviewers(): Observable<Reviewer[]> {
-    return this.http.get<Reviewer[]>(`${this.base}/reviewers`);
+    const url = `${this.getBase()}/reviewers`;
+    console.log(`[TicketService] Fetching reviewers from: ${url}`);
+    return this.http.get<Reviewer[]>(url).pipe(
+      tap(data => console.log('[TicketService] Reviewers API returned:', data)),
+      catchError(error => {
+        console.error('[TicketService] Error fetching reviewers:', error);
+        return of([]); // Return empty array on error
+      })
+    );
   }
 
   assignReviewer(id: number, reviewerId: number) {
-    return this.http.put(`${this.base}/${id}/assign-reviewer`, { reviewerId });
+    return this.http.put(`${this.getBase()}/${id}/assign-reviewer`, { reviewerId });
   }
 }

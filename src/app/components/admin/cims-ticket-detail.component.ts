@@ -516,9 +516,7 @@ export class CimsTicketDetailComponent implements OnInit {
   // removed — Field Person now performs this step. This map translates
   // the raw enum to the correct current terminology for display only;
   // nothing sent to/from the backend is affected.
-  private readonly STATUS_LABELS: Record<string, string> = {
-    COORDINATOR_REVIEW: 'FIELD PERSON REVIEW'
-  };
+  private readonly STATUS_LABELS: Record<string, string> = {};
 
   private toDisplayStatus(status: string): string {
     if (!status) return status;
