@@ -1,1 +1,0 @@
-import{a}from"./chunk-A3TNXTE6.js";import{$ as t,da as i}from"./chunk-CAJ6GBTP.js";var o=class r{constructor(e){this.api=e}getAll(){return this.api.get("/locations")}searchByName(e){return this.api.get("/locations/search",{name:e})}static \u0275fac=function(c){return new(c||r)(i(a))};static \u0275prov=t({token:r,factory:r.\u0275fac,providedIn:"root"})};export{o as a};

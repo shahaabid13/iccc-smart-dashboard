@@ -1,1 +1,9 @@
 node_modules
+node_modules/
+dist/
+.angular/
+www/
+.env
+*.log
+backend/target/
+src/main/resources/static/browser/

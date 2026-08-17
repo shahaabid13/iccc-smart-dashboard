@@ -1,9 +1,0 @@
-com\iccc\smartdashboard\model\TaskStatus.class
-com\iccc\smartdashboard\config\SecurityConfig.class
-com\iccc\smartdashboard\model\User.class
-com\iccc\smartdashboard\controllers\AuthController.class
-com\iccc\smartdashboard\repository\TaskHistoryRepository.class
-com\iccc\smartdashboard\SmartDashboardApplication.class
-com\iccc\smartdashboard\model\TaskHistory.class
-com\iccc\smartdashboard\repository\TaskRepository.class
-com\iccc\smartdashboard\model\Task.class

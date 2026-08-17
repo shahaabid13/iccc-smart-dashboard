@@ -1,1 +1,0 @@
-import{tb as m}from"./chunk-CAJ6GBTP.js";var o=class n{transform(e,r,t=0){return Array.isArray(e)?e.reduce((i,p)=>{let u=p[r];return i+(typeof u=="number"?u:0)},t):t}static \u0275fac=function(r){return new(r||n)};static \u0275pipe=m({name:"reduce",type:n,pure:!0})};export{o as a};
