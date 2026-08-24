@@ -26,21 +26,33 @@ export class TicketService {
       tap(data => {
         console.log('[TicketService] API returned:', data, 'length:', data?.length);
       }),
-      map(data => {
-        // If API returns data with items, use it. Otherwise use fallback
-        if (data && Array.isArray(data) && data.length > 0) {
-          console.log('[TicketService] Using API data:', data.length, 'tickets');
-          return data;
+      map((data: any) => {
+        if (Array.isArray(data)) {
+          return data as Ticket[];
         }
-        console.log('[TicketService] API returned empty or falsy, using fallback data');
-        return this.fallbackTickets();
+        if (data && Array.isArray(data.content)) {
+          return data.content as Ticket[];
+        }
+        return [] as Ticket[];
       }),
       tap(data => void this.cacheService.cacheTickets(data)),
       catchError(error => {
         console.error('[TicketService] Error fetching tickets:', error);
-        console.log('[TicketService] Using fallback data due to error');
-        return of(this.fallbackTickets());
+        return of([] as Ticket[]);
       })
+    );
+  }
+
+  getMyHistory(): Observable<Ticket[]> {
+    const url = `${this.getBase()}/my-ticket-history`;
+    console.log('[TicketService] Fetching ticket history from:', url);
+    return this.http.get<any>(url).pipe(
+      map((data: any) => {
+        if (Array.isArray(data)) return data as Ticket[];
+        if (data && Array.isArray(data.content)) return data.content as Ticket[];
+        return [] as Ticket[];
+      }),
+      catchError(() => of([] as Ticket[]))
     );
   }
 
@@ -56,65 +68,6 @@ export class TicketService {
         throw error; // re-throw the error to be handled by the component
       })
     );
-  }
-
-  private fallbackTickets(): Ticket[] {
-    return [
-      {
-        id: 24,
-        incidentTypeId: 1,
-        incidentTypeName: 'Analytic Cameras out of stock',
-        locationId: 34,
-        locationName: 'Aali Masjid',
-        approachRoadId: undefined,
-        approachRoadName: undefined,
-        deviceTypeId: undefined,
-        deviceTypeName: undefined,
-        fieldPersonId: 11,
-        fieldPersonName: 'Imtiaz Ali Zargar',
-        priority: 'LOW',
-        description: undefined,
-        status: 'OPEN',
-        raisedByUserId: 25,
-        raisedByUsername: 'waisah_l1',
-        coordinatorId: undefined,
-        coordinatorUsername: undefined,
-        reviewerId: undefined,
-        reviewerUsername: undefined,
-        createdAt: '2026-08-06T14:28:47.515698',
-        coordinatorAckedAt: undefined,
-        assignedAt: undefined,
-        closedAt: undefined,
-        reopenedAt: undefined
-      },
-      {
-        id: 25,
-        incidentTypeId: 2,
-        incidentTypeName: 'Analytic not deployed',
-        locationId: 34,
-        locationName: 'Aali Masjid',
-        approachRoadId: 104,
-        approachRoadName: 'From Hawal Chowk',
-        deviceTypeId: 1,
-        deviceTypeName: 'Analytical',
-        fieldPersonId: 11,
-        fieldPersonName: 'Imtiaz Ali Zargar',
-        priority: 'MEDIUM',
-        description: undefined,
-        status: 'OPEN',
-        raisedByUserId: 25,
-        raisedByUsername: 'waisah_l1',
-        coordinatorId: undefined,
-        coordinatorUsername: undefined,
-        reviewerId: undefined,
-        reviewerUsername: undefined,
-        createdAt: '2026-08-06T14:28:47.515698',
-        coordinatorAckedAt: undefined,
-        assignedAt: undefined,
-        closedAt: undefined,
-        reopenedAt: undefined
-      }
-    ];
   }
 
   acknowledge(id: number, notes: string) {

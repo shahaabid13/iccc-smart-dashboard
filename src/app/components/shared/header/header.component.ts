@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit, signal, effect } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../../../services/auth.service';
@@ -12,245 +12,279 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
   selector: 'app-header',
   template: `
     <div class="header-layout">
-      <!-- Mobile Toggle Button -->
-      <div class="mobile-toggle" *ngIf="isMobile" (click)="toggleSidebar()">
-        <span class="toggle-icon">☰</span>
-      </div>
-
-      <!-- Sidebar Navigation -->
-      <aside class="sidebar" [class.collapsed]="isSidebarCollapsed" [class.mobile-open]="isMobile && !isSidebarCollapsed">
+      <!-- Sidebar Navigation (only show when a user is logged in) -->
+      <aside *ngIf="user" class="sidebar" [class.collapsed]="sidebarContentCollapsed" [class.mobile-open]="isMobile && mobileSidebarOpen">
       <div class="sidebar-header">
-        <h2 class="dashboard-title" *ngIf="!isSidebarCollapsed">ICCC Dashboard</h2>
-        <div class="sidebar-toggle" (click)="toggleSidebar()">
-          <span class="toggle-icon">{{ isSidebarCollapsed ? '→' : '←' }}</span>
+        <div class="brand" *ngIf="!sidebarContentCollapsed">
+          <span class="material-symbols-outlined brand-icon">dashboard</span>
+          <h2 class="dashboard-title">ICCC Dashboard</h2>
         </div>
+        <button class="sidebar-close-button" *ngIf="isMobile" type="button" aria-label="Close menu" (click)="closeMobileSidebar()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+        <button class="sidebar-toggle" *ngIf="!isMobile" type="button" aria-label="Collapse sidebar" (click)="toggleSidebar()">
+          <span class="material-symbols-outlined toggle-icon">
+            {{ isSidebarCollapsed ? 'chevron_right' : 'chevron_left' }}
+          </span>
+        </button>
       </div>
 
       <nav class="sidebar-nav">
         <!-- Inventory Management Dropdown -->
-        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !isSidebarCollapsed">
+        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !sidebarContentCollapsed">
           <div class="section-label">Inventory Management System</div>
         </div>
 
-        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('inventory')">
-            <span class="dropdown-icon">📦</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Inventory</span>
-            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'inventory' ? '▲' : '▼' }}
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'inventory'" (click)="toggleDropdown('inventory')">
+            <span class="material-symbols-outlined dropdown-icon">inventory_2</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">Inventory</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'inventory'">
+              expand_more
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'inventory' && !isSidebarCollapsed">
+          <div class="dropdown-content" *ngIf="openDropdown === 'inventory' && !sidebarContentCollapsed">
             <a routerLink="/inventory" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📋</span>
+              <span class="material-symbols-outlined item-icon">list_alt</span>
               <span>Inventory</span>
             </a>
             <a routerLink="/admin/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin">
-              <span class="item-icon">👨‍💼</span>
+              <span class="material-symbols-outlined item-icon">admin_panel_settings</span>
               <span>Admin Dashboard</span>
             </a>
             <a routerLink="/admin/all-requests" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin || isAgency">
-              <span class="item-icon">📄</span>
+              <span class="material-symbols-outlined item-icon">description</span>
               <span>All Requests</span>
             </a>
             <a routerLink="/maintenance/request" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin || isAgency">
-              <span class="item-icon">🔧</span>
+              <span class="material-symbols-outlined item-icon">construction</span>
               <span>Maintenance Request</span>
             </a>
           </div>
         </div>
 
         <!-- Task Management (Admin / Reviewer / Support Engineer) -->
-        <div class="dropdown-container" *ngIf="(isAdmin || isReviewer || isSupportEngineer) && !isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('tasks')">
-            <span class="dropdown-icon">🗂️</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Task Management</span>
-            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'tasks' ? '▲' : '▼' }}
+        <div class="dropdown-container" *ngIf="(isAdmin || isReviewer || isSupportEngineer) && !sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'tasks'" (click)="toggleDropdown('tasks')">
+            <span class="material-symbols-outlined dropdown-icon">assignment</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">Task Management</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'tasks'">
+              expand_more
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'tasks' && !isSidebarCollapsed">
+          <div class="dropdown-content" *ngIf="openDropdown === 'tasks' && !sidebarContentCollapsed">
             <a routerLink="/tasks/all" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📋</span>
+              <span class="material-symbols-outlined item-icon">checklist</span>
               <span>All Tasks</span>
             </a>
             <a routerLink="/tasks/create" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin || isReviewer">
-              <span class="item-icon">➕</span>
+              <span class="material-symbols-outlined item-icon">add_task</span>
               <span>Create Task</span>
             </a>
           </div>
         </div>
 
         <!-- SWM Dropdown -->
-        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !isSidebarCollapsed">
+        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !sidebarContentCollapsed">
           <div class="section-label">SWM</div>
         </div>
 
-        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('swm')">
-            <span class="dropdown-icon">♻️</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">SWM</span>
-            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'swm' ? '▲' : '▼' }}
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'swm'" (click)="toggleDropdown('swm')">
+            <span class="material-symbols-outlined dropdown-icon">recycling</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">SWM</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'swm'">
+              expand_more
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'swm' && !isSidebarCollapsed">
+          <div class="dropdown-content" *ngIf="openDropdown === 'swm' && !sidebarContentCollapsed">
             <a routerLink="/smc" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📊</span>
+              <span class="material-symbols-outlined item-icon">space_dashboard</span>
               <span>SWM Dashboard</span>
             </a>
             <a routerLink="/charts" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📈</span>
+              <span class="material-symbols-outlined item-icon">insights</span>
               <span>Charts</span>
             </a>
           </div>
         </div>
 
         <!-- PBS Dropdown -->
-        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !isSidebarCollapsed">
+        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !sidebarContentCollapsed">
           <div class="section-label">PBS</div>
         </div>
 
-        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('pbs')">
-            <span class="dropdown-icon">🏢</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">PBS</span>
-            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'pbs' ? '▲' : '▼' }}
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'pbs'" (click)="toggleDropdown('pbs')">
+            <span class="material-symbols-outlined dropdown-icon">pedal_bike</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">PBS</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'pbs'">
+              expand_more
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'pbs' && !isSidebarCollapsed">
+          <div class="dropdown-content" *ngIf="openDropdown === 'pbs' && !sidebarContentCollapsed">
             <a routerLink="/pbs/stations" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">🚲</span>
+              <span class="material-symbols-outlined item-icon">location_on</span>
               <span>Bike Stations</span>
             </a>
             <a routerLink="/pbs/analytics" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📊</span>
+              <span class="material-symbols-outlined item-icon">query_stats</span>
               <span>Analytics</span>
             </a>
           </div>
         </div>
 
-        <!-- Chartered Bike and ANPR removed as requested -->
+        <!-- Tram Dropdown -->
+        <div class="nav-section" *ngIf="userRole !== 'FIELD_PERSON' && !sidebarContentCollapsed">
+          <div class="section-label">TraMM</div>
+        </div>
 
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'tram'" (click)="toggleDropdown('tram')">
+            <span class="material-symbols-outlined dropdown-icon">tram</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">TraMM</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'tram'">
+              expand_more
+            </span>
+          </div>
+
+          <div class="dropdown-content" *ngIf="openDropdown === 'tram' && !sidebarContentCollapsed">
+            <a routerLink="/tramm" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="material-symbols-outlined item-icon">space_dashboard</span>
+              <span>TraMM Dashboard</span>
+            </a>
+            <a routerLink="/tramm/live-signal-status" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="material-symbols-outlined item-icon">traffic</span>
+              <span>Live Signal Status</span>
+            </a>
+            <a routerLink="/tramm/junction-monitor" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="material-symbols-outlined item-icon">hub</span>
+              <span>Junction Monitor</span>
+            </a>
+             <a routerLink="/tramm/junction-map" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="material-symbols-outlined item-icon">map</span>
+              <span>Junction Map</span>
+            </a>
+          </div>
+        </div>
         <!-- ============ CAMERA INCIDENT MANAGEMENT SYSTEM (CIMS) ============ -->
-        
+
         <!-- CIMS Section Label -->
-        <div class="nav-section" *ngIf="!isSidebarCollapsed && (userRole === 'SUPPORT_ENGINEER' || userRole === 'FIELD_PERSON' || userRole === 'REVIEWER' || userRole === 'ADMIN')">
+        <div class="nav-section" *ngIf="!sidebarContentCollapsed && (userRole === 'SUPPORT_ENGINEER' || userRole === 'FIELD_PERSON' || userRole === 'REVIEWER' || userRole === 'ADMIN')">
           <div class="section-label">Camera Incident Management</div>
         </div>
 
         <!-- Support Engineer - Only for SUPPORT_ENGINEER role (not ADMIN) -->
-        <div class="dropdown-container" *ngIf="userRole === 'SUPPORT_ENGINEER'" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('cimsSupport')">
-            <span class="dropdown-icon">🎫</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Support Engineer</span>
-            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'cimsSupport' ? '▲' : '▼' }}
+        <div class="dropdown-container" *ngIf="userRole === 'SUPPORT_ENGINEER'" [class.collapsed]="sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'cimsSupport'" (click)="toggleDropdown('cimsSupport')">
+            <span class="material-symbols-outlined dropdown-icon">support_agent</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">Support Engineer</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'cimsSupport'">
+              expand_more
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'cimsSupport' && !isSidebarCollapsed">
+          <div class="dropdown-content" *ngIf="openDropdown === 'cimsSupport' && !sidebarContentCollapsed">
             <a routerLink="/cims/support-engineer/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📊</span>
+              <span class="material-symbols-outlined item-icon">space_dashboard</span>
               <span>Dashboard</span>
             </a>
             <a routerLink="/cims/support-engineer/my-tickets" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📋</span>
+              <span class="material-symbols-outlined item-icon">confirmation_number</span>
               <span>My Tickets</span>
             </a>
             <a routerLink="/cims/support-engineer/create-ticket" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">➕</span>
+              <span class="material-symbols-outlined item-icon">add_circle</span>
               <span>Raise New Ticket</span>
             </a>
             <a routerLink="/cims/notifications/settings" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">🔔</span>
+              <span class="material-symbols-outlined item-icon">notifications</span>
               <span>Notification Settings</span>
             </a>
           </div>
         </div>
 
         <!-- Field Person - Only for FIELD_PERSON role (not ADMIN) -->
-        <div class="dropdown-container" *ngIf="userRole === 'FIELD_PERSON'" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('cimsFieldPerson')">
-            <span class="dropdown-icon">🚧</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Field Person</span>
-            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'cimsFieldPerson' ? '▲' : '▼' }}
+        <div class="dropdown-container" *ngIf="userRole === 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'cimsFieldPerson'" (click)="toggleDropdown('cimsFieldPerson')">
+            <span class="material-symbols-outlined dropdown-icon">engineering</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">Field Person</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'cimsFieldPerson'">
+              expand_more
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'cimsFieldPerson' && !isSidebarCollapsed">
+          <div class="dropdown-content" *ngIf="openDropdown === 'cimsFieldPerson' && !sidebarContentCollapsed">
             <a routerLink="/cims/field-person/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📊</span>
+              <span class="material-symbols-outlined item-icon">space_dashboard</span>
               <span>Dashboard</span>
             </a>
             <a routerLink="/cims/notifications/settings" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">🔔</span>
+              <span class="material-symbols-outlined item-icon">notifications</span>
               <span>Notification Settings</span>
             </a>
           </div>
         </div>
 
         <!-- Reviewer - Only for REVIEWER role (not ADMIN) -->
-        <div class="dropdown-container" *ngIf="userRole === 'REVIEWER'" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('cimsReviewer')">
-            <span class="dropdown-icon">🔍</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">Reviewer</span>
-            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'cimsReviewer' ? '▲' : '▼' }}
+        <div class="dropdown-container" *ngIf="userRole === 'REVIEWER'" [class.collapsed]="sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'cimsReviewer'" (click)="toggleDropdown('cimsReviewer')">
+            <span class="material-symbols-outlined dropdown-icon">rate_review</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">Reviewer</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'cimsReviewer'">
+              expand_more
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'cimsReviewer' && !isSidebarCollapsed">
+          <div class="dropdown-content" *ngIf="openDropdown === 'cimsReviewer' && !sidebarContentCollapsed">
             <a routerLink="/cims/reviewer/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📊</span>
+              <span class="material-symbols-outlined item-icon">space_dashboard</span>
               <span>Dashboard</span>
             </a>
             <a routerLink="/cims/reviewer/queue" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">⏳</span>
+              <span class="material-symbols-outlined item-icon">pending_actions</span>
               <span>Review Queue</span>
             </a>
             <a routerLink="/cims/notifications/settings" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">🔔</span>
+              <span class="material-symbols-outlined item-icon">notifications</span>
               <span>Notification Settings</span>
             </a>
           </div>
         </div>
 
         <!-- CIMS Admin - Only for ADMIN role -->
-        <div class="dropdown-container" *ngIf="userRole === 'ADMIN'" [class.collapsed]="isSidebarCollapsed">
-          <div class="dropdown-header" (click)="toggleDropdown('cimsAdmin')">
-            <span class="dropdown-icon">📊</span>
-            <span class="dropdown-title" *ngIf="!isSidebarCollapsed">CIMS Admin</span>
-            <span class="dropdown-arrow" *ngIf="!isSidebarCollapsed">
-              {{ openDropdown === 'cimsAdmin' ? '▲' : '▼' }}
+        <div class="dropdown-container" *ngIf="userRole === 'ADMIN'" [class.collapsed]="sidebarContentCollapsed">
+          <div class="dropdown-header" [class.open]="openDropdown === 'cimsAdmin'" (click)="toggleDropdown('cimsAdmin')">
+            <span class="material-symbols-outlined dropdown-icon">videocam</span>
+            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">CIMS Admin</span>
+            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'cimsAdmin'">
+              expand_more
             </span>
           </div>
 
-          <div class="dropdown-content" *ngIf="openDropdown === 'cimsAdmin' && !isSidebarCollapsed">
+          <div class="dropdown-content" *ngIf="openDropdown === 'cimsAdmin' && !sidebarContentCollapsed">
             <a routerLink="/cims/admin/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📈</span>
+              <span class="material-symbols-outlined item-icon">space_dashboard</span>
               <span>Dashboard</span>
             </a>
             <a routerLink="/cims/admin/all-tickets" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">📋</span>
+              <span class="material-symbols-outlined item-icon">list_alt</span>
               <span>All Tickets</span>
             </a>
             <a routerLink="/cims/admin/users" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">👥</span>
+              <span class="material-symbols-outlined item-icon">group</span>
               <span>User Management</span>
             </a>
             <a routerLink="/cims/admin/incident-types" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">🏷️</span>
+              <span class="material-symbols-outlined item-icon">category</span>
               <span>Incident Types</span>
             </a>
             <a routerLink="/cims/notifications/settings" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="item-icon">🔔</span>
+              <span class="material-symbols-outlined item-icon">notifications</span>
               <span>Notification Settings</span>
             </a>
           </div>
@@ -258,15 +292,15 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
 
       </nav>
 
-      <div class="nav-section" *ngIf="user && !isSidebarCollapsed">
-        <a routerLink="/tasks/my" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-          <span class="item-icon">✅</span>
+      <div class="nav-section pinned-section" *ngIf="user && !sidebarContentCollapsed">
+        <a routerLink="/tasks/my" routerLinkActive="active" class="dropdown-item pinned-item" (click)="closeSidebarIfMobile()">
+          <span class="material-symbols-outlined item-icon">task_alt</span>
           <span>My Tasks</span>
         </a>
       </div>
 
       <!-- Sidebar Footer -->
-        <div class="sidebar-footer" *ngIf="!isSidebarCollapsed">
+        <div class="sidebar-footer" *ngIf="!sidebarContentCollapsed">
         <div class="user-info">
           <img src="/download.png" alt="Profile" class="user-avatar img-fluid" />
           <div class="user-details">
@@ -281,9 +315,13 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
     <!-- Main Header (converted to Bootstrap responsive navbar) -->
     <header class="app-header navbar navbar-expand-lg navbar-dark bg-primary">
       <div class="container-fluid d-flex align-items-center">
+        <button class="mobile-menu-button" *ngIf="isMobile" type="button" aria-label="Open menu" [attr.aria-expanded]="mobileSidebarOpen" (click)="toggleSidebar()">
+          <span class="material-symbols-outlined">menu</span>
+        </button>
+
         <div class="d-flex align-items-center col-auto">
-          <a class="navbar-brand d-flex align-items-center" routerLink="/home">
-            <img src="/logo.jfif" alt="Logo" class="logo-img img-fluid" />
+          <a class="navbar-brand d-flex align-items-center" routerLink="/login">
+            <img src="/logo.jfif" alt="Logo" class="logo-img  -fluid" />
             <div class="logo-text ms-2 d-none d-lg-block">ICCC SMART DASHBOARD</div>
           </a>
         </div>
@@ -307,19 +345,37 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
                     <div class="user-info-text">{{ user.username }} ({{ user.role }})</div>
                   </div>
                   <div class="dropdown-divider"></div>
-                  <button class="dropdown-item btn-logout" (click)="logout()">Logout</button>
+                  <button class="dropdown-item btn-logout" (click)="logout()">
+                    <span class="material-symbols-outlined menu-icon">logout</span>
+                    Logout
+                  </button>
                   <div class="dropdown-divider"></div>
-                  <a routerLink="/login" (click)="closeUserDropdown()" class="dropdown-item">Login with another ID</a>
+                  <a routerLink="/login" (click)="closeUserDropdown()" class="dropdown-item">
+                    <span class="material-symbols-outlined menu-icon">switch_account</span>
+                    Login with another ID
+                  </a>
 
                   <ng-container *ngIf="isAdmin">
-                    <a routerLink="/register" (click)="closeUserDropdown()" class="dropdown-item">Create Account</a>
-                    <a routerLink="/forgot-password" (click)="closeUserDropdown()" class="dropdown-item">Forgot password?</a>
+                    <a routerLink="/register" (click)="closeUserDropdown()" class="dropdown-item">
+                      <span class="material-symbols-outlined menu-icon">person_add</span>
+                      Create Account
+                    </a>
+                    <a routerLink="/forgot-password" (click)="closeUserDropdown()" class="dropdown-item">
+                      <span class="material-symbols-outlined menu-icon">lock_reset</span>
+                      Forgot password?
+                    </a>
                   </ng-container>
                 </ng-container>
 
                 <ng-template #guestOptions>
-                  <a routerLink="/login" (click)="closeUserDropdown()" class="dropdown-item">Login</a>
-                  <a routerLink="/register" (click)="closeUserDropdown()" class="dropdown-item">Register</a>
+                  <a routerLink="/login" (click)="closeUserDropdown()" class="dropdown-item">
+                    <span class="material-symbols-outlined menu-icon">login</span>
+                    Login
+                  </a>
+                  <a routerLink="/register" (click)="closeUserDropdown()" class="dropdown-item">
+                    <span class="material-symbols-outlined menu-icon">person_add</span>
+                    Register
+                  </a>
                 </ng-template>
               </div>
             </div>
@@ -328,8 +384,8 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
       </div>
     </header>
 
-      <!-- Mobile Overlay -->
-      <div class="mobile-overlay" *ngIf="isMobile && !isSidebarCollapsed" (click)="toggleSidebar()"></div>
+      <!-- Mobile Overlay (only when sidebar visible and user logged in) -->
+      <div class="mobile-overlay" *ngIf="user && isMobile && mobileSidebarOpen" (click)="closeMobileSidebar()"></div>
     </div>
   `,
   styles: [`
@@ -338,54 +394,72 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
       display: contents;
     }
 
-    /* Mobile Toggle */
-    .mobile-toggle {
-      position: fixed;
-      top: 15px;
-      left: 15px;
-      z-index: 1002;
-      background: #122e52;
-      color: white;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      display: flex;
+    /* Mobile menu button lives inside the fixed header. */
+    .mobile-menu-button {
+      display: none;
+      width: 42px;
+      height: 42px;
+      margin-right: 8px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      flex: 0 0 auto;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-menu-button:hover,
+    .mobile-menu-button:focus-visible {
+      background: rgba(255,255,255,0.16);
+      outline: none;
+    }
+
+    .sidebar-close-button {
+      display: none;
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 9px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
     }
 
     /* Sidebar Styles */
     .sidebar {
-      width: 250px;
-      background: linear-gradient(180deg, #122e52 0%, #1a3a6a 100%);
+      width: 260px;
+      background: linear-gradient(180deg, #0e2543 0%, #16345e 100%);
       color: white;
       display: flex;
       flex-direction: column;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-      z-index: 1000;
+      box-shadow: 2px 0 16px rgba(0, 0, 0, 0.25);
+      z-index: 1095;
       position: fixed;
       left: 0;
-      /* keep sidebar below header */
       top: 64px;
       height: calc(100vh - 64px);
       flex-shrink: 0;
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .sidebar.collapsed {
-      width: 70px;
+      width: 72px;
     }
 
-    /* Mobile: force sidebar to icon-only on screens < 768px */
     @media (max-width: 767px) {
       .sidebar {
-        width: 70px;
+        width: 72px;
       }
-
       .sidebar.collapsed {
-        width: 70px;
+        width: 72px;
       }
     }
 
@@ -394,125 +468,162 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
     }
 
     .sidebar-header {
-      padding: 20px 15px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 18px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      height: 70px;
+      height: 68px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .brand-icon {
+      font-size: 22px;
+      color: #4fc3f7;
     }
 
     .dashboard-title {
       margin: 0;
-      font-size: 1.2rem;
+      font-size: 1.05rem;
       font-weight: 600;
       color: white;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      letter-spacing: 0.2px;
     }
 
     .sidebar-toggle {
-      width: 35px;
-      height: 35px;
+      border: 0;
+      padding: 0;
+      width: 34px;
+      height: 34px;
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.08);
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       transition: all 0.2s ease;
+      flex-shrink: 0;
     }
 
     .sidebar-toggle:hover {
-      background: rgba(255, 255, 255, 0.2);
-      transform: scale(1.05);
+      background: rgba(79, 195, 247, 0.25);
+      transform: scale(1.06);
     }
 
     .toggle-icon {
-      font-size: 1.2rem;
+      font-size: 20px;
       color: white;
     }
 
     .sidebar-nav {
       flex: 1;
-      padding: 15px 0;
+      padding: 10px 0;
       overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .nav-section {
-      padding: 15px 20px 5px;
+      padding: 16px 20px 6px;
     }
 
     .section-label {
-      font-size: 0.8rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: rgba(255, 255, 255, 0.6);
-      font-weight: 500;
+      letter-spacing: 1.1px;
+      color: rgba(255, 255, 255, 0.45);
+      font-weight: 600;
     }
 
     .dropdown-container {
-      margin-bottom: 5px;
+      margin: 2px 10px;
     }
 
     .dropdown-container.collapsed {
       display: flex;
       justify-content: center;
+      margin: 4px 8px;
     }
 
     .dropdown-header {
       display: flex;
       align-items: center;
-      padding: 12px 20px;
+      padding: 11px 12px;
       cursor: pointer;
-      transition: all 0.2s ease;
-      border-left: 3px solid transparent;
+      transition: all 0.18s ease;
+      border-radius: 8px;
+      position: relative;
     }
 
     .dropdown-header:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-left-color: #00bfff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .dropdown-header.open {
+      background: rgba(79, 195, 247, 0.12);
     }
 
     .dropdown-icon {
-      font-size: 1.2rem;
-      margin-right: 12px;
-      min-width: 24px;
+      font-size: 20px;
+      margin-right: 14px;
+      min-width: 20px;
       text-align: center;
+      color: #9fd3f5;
     }
 
     .dropdown-container.collapsed .dropdown-icon {
       margin-right: 0;
+      color: #cfe8fb;
     }
 
     .dropdown-title {
       flex: 1;
-      font-size: 0.95rem;
+      font-size: 0.92rem;
+      font-weight: 500;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .dropdown-arrow {
-      font-size: 0.8rem;
-      opacity: 0.7;
+      font-size: 18px;
+      opacity: 0.6;
+      transition: transform 0.2s ease;
+    }
+
+    .dropdown-arrow.rotated {
+      transform: rotate(180deg);
+      opacity: 0.9;
     }
 
     .dropdown-content {
-      background: rgba(0, 0, 0, 0.2);
-      border-left: 3px solid #00bfff;
-      margin-left: 20px;
+      background: rgba(0, 0, 0, 0.18);
+      border-radius: 8px;
+      margin: 4px 0 4px 14px;
+      padding: 4px 0;
+      border-left: 2px solid rgba(79, 195, 247, 0.4);
+      animation: fadeIn 0.15s ease;
     }
 
     .dropdown-item {
       display: flex;
       align-items: center;
-      padding: 10px 15px 10px 35px;
-      color: rgba(255, 255, 255, 0.8);
+      padding: 9px 14px 9px 18px;
+      color: rgba(255, 255, 255, 0.78);
       text-decoration: none;
-      transition: all 0.2s ease;
+      transition: all 0.18s ease;
       cursor: pointer;
+      font-size: 0.87rem;
+      border-radius: 6px;
+      margin: 1px 6px;
     }
 
     .dropdown-item:hover {
@@ -521,22 +632,42 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
     }
 
     .dropdown-item.active {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(79, 195, 247, 0.18);
       color: white;
-      font-weight: 500;
+      font-weight: 600;
+      box-shadow: inset 3px 0 0 #4fc3f7;
     }
 
     .item-icon {
-      margin-right: 10px;
-      font-size: 1rem;
-      min-width: 20px;
+      margin-right: 12px;
+      font-size: 18px;
+      min-width: 18px;
       text-align: center;
+      color: #9fd3f5;
+    }
+
+    .dropdown-item.active .item-icon {
+      color: #4fc3f7;
+    }
+
+    .pinned-section {
+      padding: 10px 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: 8px;
+    }
+
+    .pinned-item {
+      padding: 10px 14px;
+      margin: 0;
+      font-weight: 500;
+      font-size: 0.9rem;
     }
 
     /* Sidebar Footer */
     .sidebar-footer {
-      padding: 15px 20px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 16px 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.12);
     }
 
     .user-info {
@@ -550,41 +681,46 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
       height: 40px;
       border-radius: 50%;
       object-fit: cover;
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      border: 2px solid rgba(79, 195, 247, 0.4);
       margin-right: 10px;
     }
 
     .user-details {
       flex: 1;
+      overflow: hidden;
     }
 
     .user-name {
       font-weight: 600;
       font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .user-role {
-      font-size: 0.8rem;
-      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.76rem;
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .version-info {
-      font-size: 0.8rem;
-      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.4);
       text-align: center;
     }
 
-    /* Main Header — fixed to top so sidebar starts below it */
+    /* Main Header */
     .app-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-top:12px;
-      padding-bottom:12px;
+      padding-top: 12px;
+      padding-bottom: 12px;
       height: 64px;
-      border-bottom: 1px solid #eee;
-      background-color: #122e52ff;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      background-color: #0f2847;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
       position: fixed;
       top: 0;
       left: 0;
@@ -596,33 +732,22 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
       width: 100%;
     }
 
-    .logo-container {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      position: relative;
-    }
-
     .logo-img {
-      width: 48px;
-      height: 48px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       object-fit: cover;
     }
 
     .logo-text {
       font-weight: 600;
-      font-size: 1.25rem;
-      font-family: 'Raleway';
+      font-size: 1.2rem;
+      font-family: 'Raleway', sans-serif;
       color: #fff;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    .auth {
-      position: relative;
+      letter-spacing: 0.3px;
     }
 
     .profile {
@@ -635,36 +760,33 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
       height: 38px;
       border-radius: 50%;
       object-fit: cover;
-      border: 2px solid #ddd;
+      border: 2px solid rgba(255,255,255,0.5);
       background-color: #fff;
-      transition: transform 0.1s ease-in;
+      transition: transform 0.15s ease-in;
     }
 
     .profile-icon:hover {
-      transform: scale(1.05);
+      transform: scale(1.06);
     }
 
-    /* user dropdown — use Bootstrap dropdown-menu with small custom tweaks */
     .user-dropdown-menu {
       background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-      min-width: 220px;
+      border: 1px solid #e2e6ea;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      min-width: 240px;
       padding: 0;
       z-index: 1200;
+      overflow: hidden;
     }
 
-    /* Use fixed positioning so the dropdown is not clipped by parent containers
-       and appears in the viewport even when sidebars/transforms are present. */
     .user-dropdown-menu.fixed-menu {
       position: fixed;
-      top: 74px; /* below the header */
+      top: 74px;
       right: 16px;
       left: auto;
     }
 
-    /* On small screens center the menu horizontally so it doesn't stick to the edge */
     @media (max-width: 768px) {
       .user-dropdown-menu.fixed-menu {
         left: 50%;
@@ -675,27 +797,30 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
     }
 
     .user-dropdown-menu .user-info-section {
-      background: #f8f9fa;
+      background: #f4f7fa;
       border-bottom: 1px solid #e9ecef;
     }
 
     .user-info-text {
       font-size: 14px;
       font-weight: 600;
-      color: #212529;
+      color: #1c2b3a;
     }
 
     .user-dropdown-menu .dropdown-divider {
-      margin: 6px 0;
+      margin: 4px 0;
       border-top: 1px solid #e9ecef;
     }
 
     .user-dropdown-menu .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       padding: 10px 16px;
       color: #333;
       font-size: 14px;
       font-weight: 500;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       border: none;
       background: none;
       width: 100%;
@@ -704,9 +829,18 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
       text-decoration: none;
     }
 
+    .menu-icon {
+      font-size: 18px;
+      color: #6c7a89;
+    }
+
     .user-dropdown-menu .dropdown-item:hover {
-      background-color: #f8f9fa;
-      color: #0056b3;
+      background-color: #f2f8ff;
+      color: #0d6efd;
+    }
+
+    .user-dropdown-menu .dropdown-item:hover .menu-icon {
+      color: #0d6efd;
     }
 
     .user-dropdown-menu .dropdown-item:active {
@@ -718,6 +852,10 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
       font-weight: 600;
     }
 
+    .user-dropdown-menu .btn-logout .menu-icon {
+      color: #dc3545;
+    }
+
     .user-dropdown-menu .btn-logout:hover {
       background-color: #fff5f5;
       color: #c82333;
@@ -726,47 +864,131 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
     /* Mobile Overlay */
     .mobile-overlay {
       position: fixed;
-      top: 64px; /* below header */
+      top: 64px;
       left: 0;
       right: 0;
       bottom: 0;
       background: rgba(0, 0, 0, 0.5);
       z-index: 1090;
+      touch-action: none;
     }
 
     /* Responsive */
     @media (max-width: 768px) {
       .sidebar {
-        transform: translateX(-100%);
-        width: 250px;
+        top: 64px;
+        width: min(82vw, 320px);
+        max-width: calc(100vw - 24px);
+        height: calc(100dvh - 64px);
+        transform: translate3d(-105%, 0, 0);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        box-shadow: 8px 0 28px rgba(0,0,0,0.28);
+        overflow: hidden;
+        visibility: hidden;
+        pointer-events: none;
       }
 
       .sidebar.mobile-open {
-        transform: translateX(0);
+        transform: translate3d(0, 0, 0);
+        visibility: visible;
+        pointer-events: auto;
       }
 
-      .sidebar.collapsed {
-        width: 70px;
-        transform: translateX(0);
+      .sidebar-header {
+        height: 64px;
+        min-height: 64px;
+        padding: 12px 14px;
+      }
+
+      .sidebar-close-button {
+        display: flex;
+      }
+
+      .sidebar-nav {
+        min-height: 0;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
       }
 
       .app-header {
+        height: 64px;
+        min-height: 64px;
         margin-left: 0 !important;
         width: 100% !important;
+        padding: 8px 12px;
+        z-index: 1100;
+      }
+
+      .mobile-menu-button {
+        display: flex;
+      }
+
+      .logo-img {
+        width: 38px;
+        height: 38px;
+      }
+
+      .navbar-brand {
+        margin-right: 0;
       }
 
       .logo-text {
-        font-size: 1rem;
+        font-size: 0.95rem;
       }
 
-      .mobile-toggle {
-        display: flex;
+      .app-header .container-fluid {
+        min-width: 0;
       }
+
+      .app-header .navbar-toggler {
+        display: none !important;
+      }
+
+      .app-header .navbar-collapse {
+        display: flex !important;
+        flex: 1 1 auto;
+        justify-content: flex-end;
+        min-width: 0;
+      }
+
+      .app-header .navbar-nav {
+        display: none !important;
+      }
+
+      .profile-icon {
+        width: 36px;
+        height: 36px;
+      }
+
+      .mobile-overlay {
+        top: 64px;
+        z-index: 1090;
+        touch-action: none;
+      }
+
     }
 
     @media (min-width: 769px) {
-      .mobile-toggle {
+      .mobile-menu-button,
+      .sidebar-close-button {
         display: none;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .sidebar {
+        width: min(88vw, 300px);
+        max-width: calc(100vw - 16px);
+      }
+
+      .logo-img {
+        width: 34px;
+        height: 34px;
+      }
+
+      .mobile-menu-button {
+        width: 40px;
+        height: 40px;
       }
     }
 
@@ -776,11 +998,11 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
     }
 
     .sidebar-nav::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.06);
     }
 
     .sidebar-nav::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.25);
       border-radius: 2px;
     }
 
@@ -789,7 +1011,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-5px); }
+      from { opacity: 0; transform: translateY(-4px); }
       to { opacity: 1; transform: translateY(0); }
     }
   `]
@@ -797,8 +1019,14 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
 export class HeaderComponent implements OnInit, OnDestroy {
   isSidebarCollapsed = false;
   isMobile = false;
+  mobileSidebarOpen = false;
+
+  /** True when the sidebar content should use the compact desktop rail. */
+  get sidebarContentCollapsed(): boolean {
+    return !this.isMobile && this.isSidebarCollapsed;
+  }
   userDropdownOpen = false;
-  openDropdown: 'inventory' | 'tasks' | 'swm' | 'pbs' | 'cimsAdmin' | 'cimsSupport' | 'cimsFieldPerson' | 'cimsReviewer' | null = null;
+  openDropdown: 'inventory' | 'tasks' | 'swm' | 'pbs' | 'tram' | 'cimsAdmin' | 'cimsSupport' | 'cimsFieldPerson' | 'cimsReviewer' | null = null;
   user: any = null;
   userRole: string = ''; // Store the user's role for sidebar visibility
   isAdmin = false;
@@ -809,6 +1037,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   sidebarCollapsedSignal = signal(false);
 
   private destroy$ = new Subject<void>();
+  private bodyOverflowBeforeLock = '';
 
   constructor(private auth: AuthService, private router: Router, private sidebarService: SidebarService) {}
 
@@ -844,7 +1073,6 @@ export class HeaderComponent implements OnInit, OnDestroy {
     if (savedSidebarState !== null) {
       this.isSidebarCollapsed = JSON.parse(savedSidebarState);
       this.sidebarService.setSidebarState(this.isSidebarCollapsed);
-      // reflect collapsed state on body for layout offset
       if (this.isSidebarCollapsed) {
         document.body.classList.add('sidebar-collapsed');
       } else {
@@ -855,23 +1083,31 @@ export class HeaderComponent implements OnInit, OnDestroy {
     // Check mobile on init
     this.checkMobile();
 
-    // Listen for window resize
-    window.addEventListener('resize', () => this.checkMobile());
   }
 
   toggleSidebar() {
+    if (this.isMobile) {
+      this.mobileSidebarOpen = !this.mobileSidebarOpen;
+      this.updateBodyScrollLock();
+      return;
+    }
+
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
     this.sidebarService.setSidebarState(this.isSidebarCollapsed);
     localStorage.setItem('sidebarCollapsed', JSON.stringify(this.isSidebarCollapsed));
-    // toggle body class to adjust main content offset
-    if (this.isSidebarCollapsed) {
-      document.body.classList.add('sidebar-collapsed');
-    } else {
-      document.body.classList.remove('sidebar-collapsed');
-    }
   }
 
-  toggleDropdown(dropdownName: 'inventory' | 'tasks' | 'swm' | 'pbs' | 'cimsAdmin' | 'cimsSupport' | 'cimsFieldPerson' | 'cimsReviewer') {
+  closeMobileSidebar() {
+    if (!this.isMobile) {
+      return;
+    }
+
+    this.mobileSidebarOpen = false;
+    this.openDropdown = null;
+    this.updateBodyScrollLock();
+  }
+
+  toggleDropdown(dropdownName: 'inventory' | 'tasks' | 'swm' | 'pbs' | 'tram' | 'cimsAdmin' | 'cimsSupport' | 'cimsFieldPerson' | 'cimsReviewer') {
     if (this.openDropdown === dropdownName) {
       this.openDropdown = null;
     } else {
@@ -881,8 +1117,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
   closeSidebarIfMobile() {
     if (this.isMobile) {
-      this.isSidebarCollapsed = true;
-      document.body.classList.add('sidebar-collapsed');
+      this.closeMobileSidebar();
     }
   }
 
@@ -895,16 +1130,46 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.userDropdownOpen = false;
   }
 
+  @HostListener('window:resize')
+  onWindowResize() {
+    this.checkMobile();
+  }
+
   checkMobile() {
-    this.isMobile = window.innerWidth <= 768;
-    this.sidebarService.setMobileState(this.isMobile);
-    if (this.isMobile) {
-      // Auto-collapse sidebar on mobile by default
-      this.isSidebarCollapsed = true;
-      this.sidebarService.setSidebarState(true);
-      localStorage.setItem('sidebarCollapsed', JSON.stringify(true));
-      document.body.classList.add('sidebar-collapsed');
+    const wasMobile = this.isMobile;
+    const nowMobile = window.innerWidth <= 768;
+
+    if (wasMobile !== nowMobile) {
+      this.isMobile = nowMobile;
+      this.mobileSidebarOpen = false;
+      this.openDropdown = null;
+      this.updateBodyScrollLock();
+    } else {
+      this.isMobile = nowMobile;
     }
+
+    this.sidebarService.setMobileState(this.isMobile);
+
+    if (!this.isMobile) {
+      this.sidebarService.setSidebarState(this.isSidebarCollapsed);
+      localStorage.setItem('sidebarCollapsed', JSON.stringify(this.isSidebarCollapsed));
+    }
+  }
+
+  private updateBodyScrollLock() {
+    const shouldLock = this.isMobile && this.mobileSidebarOpen;
+
+    if (shouldLock) {
+      if (!document.body.classList.contains('mobile-sidebar-open')) {
+        this.bodyOverflowBeforeLock = document.body.style.overflow;
+      }
+      document.body.classList.add('mobile-sidebar-open');
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+
+    document.body.classList.remove('mobile-sidebar-open');
+    document.body.style.overflow = this.bodyOverflowBeforeLock;
   }
 
   logout() {
@@ -923,6 +1188,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-    window.removeEventListener('resize', () => this.checkMobile());
+    document.body.classList.remove('mobile-sidebar-open');
+    document.body.style.overflow = this.bodyOverflowBeforeLock;
   }
 }

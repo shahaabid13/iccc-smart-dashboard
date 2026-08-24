@@ -1,6 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -69,20 +69,21 @@ import { OfflineBannerComponent } from 'src/app/components/offline-banner.compon
 })
 export class TicketDetailPage implements OnInit, OnDestroy {
   ticket?: Ticket;
+  reviewers: Array<{ id: number; name: string }> = [];
   loading = true;
   loadingError: string | null = null;
   isSubmittingAck = false;
-  isSubmittingReviewer = false;
-  ackForm = new FormGroup({ notes: new FormControl('', Validators.required) });
-  reviewers: { id: number; name: string }[] = [];
-  showReviewerPicker = false;
-  selectedReviewerId?: number;
+  ackForm = new FormGroup({
+    notes: new FormControl('', Validators.required),
+    reviewerId: new FormControl<number | null>(null)
+  });
   isOnline$ = this.offlineService.isOnline$;
   
   private readonly destroy$ = new Subject<void>();
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private ticketService: TicketService,
     private offlineService: OfflineService,
     private actionQueue: ActionQueueService,
@@ -121,11 +122,55 @@ export class TicketDetailPage implements OnInit, OnDestroy {
           this.loadingError = `Failed to load ticket: ${error?.status ? `(${error.status})` : error?.message || 'Unknown error'}`;
         }
       });
+
+    this.ticketService.getReviewers()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: reviewers => {
+          this.reviewers = (reviewers || []).map((reviewer: any) => ({
+            id: reviewer.id,
+            name: reviewer.name || reviewer.username || reviewer.fullName || `Reviewer ${reviewer.id}`
+          }));
+        },
+        error: () => this.reviewers = []
+      });
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  normalizeTicketStatus(status?: string): string {
+    switch (status) {
+      case 'COORDINATOR_REVIEW':
+      case 'COORDINATOR_REVIEWED':
+      case 'PENDING_COORDINATOR_REVIEW':
+      case 'REVIEWER_REVIEW':
+      case 'ASSIGNED_TO_REVIEWER':
+        return 'Awaiting reviewer';
+      case 'REOPENED':
+        return 'Reopened';
+      default:
+        return status || 'OPEN';
+    }
+  }
+
+  statusColor(status?: string): string {
+    switch (status) {
+      case 'OPEN':
+        return 'primary';
+      case 'ASSIGNED_TO_REVIEWER':
+      case 'COORDINATOR_REVIEW':
+      case 'REVIEWER_REVIEW':
+        return 'warning';
+      case 'RESOLVED':
+        return 'success';
+      case 'REJECTED':
+        return 'danger';
+      default:
+        return 'medium';
+    }
   }
 
   async showProfile() {
@@ -152,92 +197,59 @@ export class TicketDetailPage implements OnInit, OnDestroy {
       console.warn('[TicketDetailPage] Acknowledge form invalid or no ticket');
       return;
     }
-    
+
     this.isSubmittingAck = true;
     const notes = this.ackForm.value.notes || '';
+    const reviewerId = this.ackForm.value.reviewerId ?? null;
     const ticketId = this.ticket.id;
-    console.log('[TicketDetailPage] Acknowledging ticket:', { ticketId, notes });
+    console.log('[TicketDetailPage] Acknowledging ticket:', { ticketId, notes, reviewerId });
 
     const isOnline = await this.offlineService.isOnline();
     if (!isOnline) {
       console.log('[TicketDetailPage] App is offline. Queuing acknowledgement.');
       void this.actionQueue.addAckTicket(ticketId, notes);
-      this.showReviewerPicker = true; // Optimistically move to next UI state
+      if (reviewerId) {
+        void this.actionQueue.addAssignReviewer(ticketId, reviewerId);
+      }
       this.isSubmittingAck = false;
-      this.loadReviewers(); // Also optimistically load reviewers, might fail if offline
+      void this.router.navigate(['/tickets']);
       return;
     }
-    
+
     this.ticketService.acknowledge(ticketId, notes)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
+          if (reviewerId) {
+            this.ticketService.assignReviewer(ticketId, reviewerId)
+              .pipe(takeUntil(this.destroy$))
+              .subscribe({
+                next: () => {
+                  console.log('[TicketDetailPage] Reviewer assigned successfully.');
+                  this.isSubmittingAck = false;
+                  void this.router.navigate(['/tickets']);
+                },
+                error: (error) => {
+                  console.error('[TicketDetailPage] Failed to assign reviewer after acknowledgement:', error);
+                  this.isSubmittingAck = false;
+                  void this.router.navigate(['/tickets']);
+                }
+              });
+            return;
+          }
+
           console.log('[TicketDetailPage] Acknowledgement submitted successfully ONLINE.');
-          this.showReviewerPicker = true;
           this.isSubmittingAck = false;
-          this.loadReviewers();
+          void this.router.navigate(['/tickets']);
         },
         error: (error) => {
           console.error('[TicketDetailPage] Failed to acknowledge ticket online. Queuing action.');
           void this.actionQueue.addAckTicket(ticketId, notes);
-          this.showReviewerPicker = true; // Still move to next UI state optimistically
+          if (reviewerId) {
+            void this.actionQueue.addAssignReviewer(ticketId, reviewerId);
+          }
           this.isSubmittingAck = false;
-          this.loadReviewers(); // Also optimistically load reviewers
-        }
-      });
-  }
-
-  async assignReviewer() {
-    if (!this.ticket || !this.selectedReviewerId) {
-      console.warn('[TicketDetailPage] No ticket or reviewer selected');
-      return;
-    }
-    
-    this.isSubmittingReviewer = true;
-    const ticketId = this.ticket.id;
-    const reviewerId = this.selectedReviewerId;
-    console.log('[TicketDetailPage] Assigning reviewer:', { ticketId, reviewerId });
-
-    const isOnline = await this.offlineService.isOnline();
-    if (!isOnline) {
-      console.log('[TicketDetailPage] App is offline. Queuing reviewer assignment.');
-      void this.actionQueue.addAssignReviewer(ticketId, reviewerId);
-      this.showReviewerPicker = false; // Optimistically update UI
-      this.isSubmittingReviewer = false;
-      this.refreshTicket(ticketId); // Optimistically refresh ticket state
-      return;
-    }
-    
-    this.ticketService.assignReviewer(ticketId, reviewerId)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          console.log('[TicketDetailPage] Reviewer assigned successfully ONLINE.');
-          this.isSubmittingReviewer = false;
-          this.showReviewerPicker = false;
-          this.refreshTicket(ticketId);
-        },
-        error: (error) => {
-          console.error('[TicketDetailPage] Failed to assign reviewer online. Queuing action.');
-          void this.actionQueue.addAssignReviewer(ticketId, reviewerId);
-          this.isSubmittingReviewer = false;
-          this.showReviewerPicker = false;
-          this.refreshTicket(ticketId); // Optimistically refresh
-        }
-      });
-  }
-
-  private loadReviewers() {
-    this.ticketService.getReviewers()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (list) => {
-          console.log('[TicketDetailPage] Reviewers loaded:', list.length);
-          this.reviewers = list;
-        },
-        error: (error) => {
-          console.error('[TicketDetailPage] Failed to load reviewers:', error);
-          this.reviewers = [];
+          void this.router.navigate(['/tickets']);
         }
       });
   }

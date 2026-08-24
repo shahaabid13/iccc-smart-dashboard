@@ -1,3 +1,70 @@
+.detail-page-content {
+  --padding-bottom: calc(120px + env(safe-area-inset-bottom));
+}
+
+.detail-form {
+  padding-bottom: 28px;
+}
+
+.detail-form ion-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  margin-bottom: 10px;
+  align-items: flex-start;
+}
+
+.detail-form ion-label[position='stacked'] {
+  margin-bottom: 8px;
+  color: var(--ion-color-medium-shade);
+  font-size: 0.83rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.select-item {
+  --background: var(--ion-color-light);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+
+// Input-style fields only — buttons removed from this shared rule
+.compact-select,
+.detail-form ion-textarea {
+  min-height: 48px;
+  border-radius: 12px;
+  --background: var(--ion-color-light);
+  --color: var(--ion-color-dark);
+  --placeholder-color: var(--ion-color-medium);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+// Buttons get their own solid, high-contrast styling
+.detail-form ion-button {
+  min-height: 48px;
+  border-radius: 12px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  --background: var(--ion-color-primary);
+  --background-activated: var(--ion-color-primary-shade);
+  --background-hover: var(--ion-color-primary-tint);
+  --color: var(--ion-color-primary-contrast);
+  font-weight: 600;
+}
+
+// Keep disabled state visibly muted but still readable, not invisible
+.detail-form ion-button[disabled] {
+  --background: var(--ion-color-medium);
+  --color: var(--ion-color-medium-contrast);
+  opacity: 0.6;
+}
+
 ion-card-content p {
   margin: 6px 0;
+}
+
+ion-item {
+  margin-top: 16px;
 }

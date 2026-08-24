@@ -10,6 +10,7 @@ export interface TicketHistoryEntry {
 }
 
 export interface Ticket {
+updatedAt: any;
   id: number;
   incidentTypeId: number;
   incidentTypeName: string;

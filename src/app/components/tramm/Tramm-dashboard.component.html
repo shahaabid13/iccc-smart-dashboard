@@ -1,0 +1,84 @@
+<div class="tramm-panel">
+  <div class="tramm-panel-header">
+    <h3>TraMM Live Signal Status</h3>
+    <span *ngIf="lastUpdated" class="last-updated">
+      Updated {{ lastUpdated | date:'mediumTime' }}
+    </span>
+  </div>
+
+  <div *ngIf="errorMessage" class="tramm-error">{{ errorMessage }}</div>
+
+  <div class="tramm-selectors">
+    <div class="selector-group">
+      <label>Corridor</label>
+      <select [disabled]="loadingCorridors" (change)="onCorridorChange($any($event.target).value)">
+        <option value="">-- Select corridor --</option>
+        <option *ngFor="let c of corridors" [value]="c">{{ c }}</option>
+      </select>
+      <span *ngIf="loadingCorridors" class="hint">Loading...</span>
+    </div>
+
+    <div class="selector-group">
+      <label>Junction</label>
+      <select [disabled]="!selectedCorridor || loadingJunctions" (change)="onJunctionChange($any($event.target).value)">
+        <option value="">-- Select junction --</option>
+        <option *ngFor="let j of junctions" [value]="j">{{ j }}</option>
+      </select>
+      <span *ngIf="loadingJunctions" class="hint">Loading...</span>
+    </div>
+  </div>
+
+  <div *ngIf="junctionDetails" class="junction-details">
+    <div class="detail-header">
+      <h4>{{ junctionDetails.sName }}</h4>
+      <span class="status-badge" [class.status-off]="junctionDetails.sStatus === 'JUNCTION OFF'">
+        {{ junctionDetails.sStatus }}
+      </span>
+    </div>
+
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Mode</span>
+        <span class="detail-value">{{ junctionDetails.sMode || '-' }}</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Current Stage</span>
+        <span class="detail-value">{{ junctionDetails.nCurrentStageNo }}</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Current Cycle</span>
+        <span class="detail-value">{{ junctionDetails.nCurrentCycleNo }}</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Cumulative Volume</span>
+        <span class="detail-value">{{ junctionDetails.nCumulativeVolume }}</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Cumulative Violations</span>
+        <span class="detail-value">{{ junctionDetails.nCumulativeViolations }}</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">System Time</span>
+        <span class="detail-value">{{ junctionDetails.tSystemTime }}</span>
+      </div>
+    </div>
+
+    <div class="poles-section" *ngIf="junctionDetails.alPoleJSON?.length">
+      <h5>Signal Poles</h5>
+      <div class="poles-grid">
+        <div class="pole-card" *ngFor="let pole of junctionDetails.alPoleJSON">
+          <div class="pole-title">Pole {{ pole.nPoleNo }}</div>
+          <div class="lamp-row">
+            <span class="lamp" *ngFor="let lamp of pole.alLinkedLampJSON" [ngClass]="lampClasses(lamp)"
+              [title]="'Lamp ' + lamp.nLampNo + ': ' + lamp.sLampColor + ' (' + (lamp.bLampStatus === 1 ? 'ON' : 'OFF') + ')'">
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!junctionDetails && selectedJunction" class="hint">
+    Waiting for first live update...
+  </div>
+</div>

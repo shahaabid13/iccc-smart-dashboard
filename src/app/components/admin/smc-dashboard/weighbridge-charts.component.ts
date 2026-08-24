@@ -121,7 +121,7 @@ import * as XLSX from 'xlsx';
 
       <div class="charts-grid" *ngIf="!loading && !error">
         <div class="chart-card">
-          <h3>Monthly/Daily Net Weight Trend</h3>
+          <h3>Monthly Net Weight Trend</h3>
           <div class="chart-container">
             <div *ngIf="!netTrendChartData.labels || netTrendChartData.labels.length === 0" class="no-data-message">
               No data available for the selected period
@@ -130,7 +130,7 @@ import * as XLSX from 'xlsx';
               *ngIf="netTrendChartData.labels && netTrendChartData.labels.length > 0"
               baseChart
               [data]="netTrendChartData"
-              [options]="getWeightTrendChartOptions('Day')"
+              [options]="getWeightTrendChartOptions('Month')"
               [type]="barChartType"
             >
             </canvas>
@@ -176,7 +176,7 @@ import * as XLSX from 'xlsx';
               </div>
               <div class="timeframe-dropdown" *ngIf="secondaryFilterOptions.length > 0">
                 <label for="secondary-filter">
-                  {{ selectedTimeframe === 'WEEKLY' ? 'Month' : selectedTimeframe === 'YEARLY' ? 'Fiscal Year' : 'Year' }}:
+                  {{ selectedTimeframe === 'WEEKLY' ? 'Month' : 'Year' }}:
                 </label>
                 <select 
                   id="secondary-filter" 
@@ -234,8 +234,20 @@ import * as XLSX from 'xlsx';
             </div>
           </div>
           
+          <!-- Timeframe-scoped loading state (does NOT affect upper charts) -->
+          <div *ngIf="timeframeLoading" class="timeframe-loading">
+            Loading timeframe data...
+          </div>
+
+          <!-- Timeframe-scoped error state (does NOT affect upper charts) -->
+          <div *ngIf="!timeframeLoading && timeframeError" class="timeframe-error">
+            <h3>Failed to load timeframe data</h3>
+            <p>{{ timeframeErrorMessage }}</p>
+            <button (click)="loadTimeframeData()" class="retry-btn">Retry</button>
+          </div>
+
           <!-- Timeframe Data Tabs -->
-          <div class="timeframe-tabs" *ngIf="timeframeData?.length">
+          <div class="timeframe-tabs" *ngIf="!timeframeLoading && !timeframeError && timeframeData?.length">
             <div class="tab-buttons">
               <button 
                 (click)="activeTab = 'chart'" 
@@ -343,7 +355,7 @@ import * as XLSX from 'xlsx';
           </div>
           
           <!-- Timeframe Summary -->
-          <div class="timeframe-summary" *ngIf="timeframeData?.length">
+          <div class="timeframe-summary" *ngIf="!timeframeLoading && !timeframeError && timeframeData?.length">
             <div class="timeframe-summary-item">
               <span class="summary-label">Total Periods</span>
               <span class="summary-value">{{ timeframeData.length }}</span>
@@ -891,6 +903,37 @@ import * as XLSX from 'xlsx';
       text-align: center;
     }
 
+    /* Timeframe Analysis section only — never affects the upper charts */
+    .timeframe-loading {
+      color: #007bff;
+      padding: 20px;
+      text-align: center;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin: 10px 0 20px;
+    }
+
+    .timeframe-error {
+      color: #dc3545;
+      padding: 20px;
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      border-radius: 8px;
+      margin: 10px 0 20px;
+      text-align: center;
+    }
+
+    .timeframe-error h3 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+    }
+
+    .timeframe-error p {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+      word-break: break-word;
+    }
+
     @media (max-width: 768px) {
       .charts-grid {
         grid-template-columns: 1fr;
@@ -993,6 +1036,14 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
   selectedTimeframe: string = 'WEEKLY';
   timeframeChartData: ChartConfiguration['data'] = { datasets: [], labels: [] };
   timeframeData: TimeFrameDataDTO[] = [];
+
+  // Timeframe Analysis has its OWN loading/error state, scoped to that
+  // section only. It never touches the page-wide `loading`/`error` flags,
+  // so switching the Timeframe/Month/Year controls never hides or blanks
+  // out the Monthly Net Weight Trend or Last 24 Hours charts above it.
+  timeframeLoading: boolean = false;
+  timeframeError: boolean = false;
+  timeframeErrorMessage: string = '';
 
   get effectiveWbId(): string {
     return this.selectedWbId || this.wbId;
@@ -1112,6 +1163,12 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
     if (this.selectedWbId) {
       this.wbId = this.selectedWbId;
     }
+
+    this.generateSecondaryFilterOptions();
+    this.selectedSecondaryFilter = this.secondaryFilterOptions.length > 0
+      ? this.secondaryFilterOptions[0].value
+      : '';
+
     this.loadCharts();
   }
 
@@ -1191,7 +1248,10 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
     
     this.loadSummary();
     this.loadNetTrend();
-    this.loadTimeframeData();
+    // NOTE: the top-level period buttons intentionally do NOT touch the
+    // Timeframe Analysis section — that section is driven entirely by its
+    // own Timeframe / Month / Year selectors (see onTimeframeChange /
+    // onSecondaryFilterChange below).
   }
 
   onDateChange(): void {
@@ -1219,9 +1279,28 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
     this.loadCharts();
   }
 
+  /**
+   * Timeframe selector behaviour:
+   * WEEKLY      -> select a month, then show weekly bars for that month.
+   * MONTHLY     -> select a year, then show exactly one bar per month of that year.
+   * QUARTERLY   -> select a year, then show exactly one bar per quarter of that year.
+   * HALF_YEARLY -> select a year, then show exactly one bar per half-year of that year.
+   * YEARLY      -> no secondary selector; one bar per year, from the first
+   *                year data exists (2025) through the current year.
+   *
+   * The bars are NOT taken as-is from the API response. Whatever periods the
+   * API returns are re-bucketed on the frontend into a canonical set of
+   * periods for the selected timeframe/month/year (see getCanonicalPeriods),
+   * so the chart always shows the correct number of bars with correct
+   * labels, even if the API's own period breakdown or labelling is
+   * inconsistent.
+   */
   onTimeframeChange(): void {
     this.generateSecondaryFilterOptions();
-    this.selectedSecondaryFilter = this.secondaryFilterOptions.length > 0 ? this.secondaryFilterOptions[0].value : '';
+    this.selectedSecondaryFilter = this.secondaryFilterOptions.length > 0
+      ? this.secondaryFilterOptions[0].value
+      : '';
+    // Only reloads the Timeframe Analysis section — upper charts untouched.
     this.loadTimeframeData();
   }
 
@@ -1229,77 +1308,105 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
+
+    const dataStartDate = new Date(this.allTimeStartDate + 'T00:00:00');
+    const dataStartYear = dataStartDate.getFullYear();
+    const dataStartMonth = dataStartDate.getMonth();
+
     this.secondaryFilterOptions = [];
 
     if (this.selectedTimeframe === 'WEEKLY') {
-      // Generate months from November 2025 to current month
-      const startMonth = 10; // November (0-indexed)
-      const startYear = 2025;
-      
-      for (let year = startYear; year <= currentYear; year++) {
-        const endMonth = year === currentYear ? currentMonth : 11;
-        const start = year === startYear ? startMonth : 0;
-        
-        for (let month = start; month <= endMonth; month++) {
-          const monthName = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      // Month selector: newest month first.
+      for (let year = currentYear; year >= dataStartYear; year--) {
+        const firstMonth = year === dataStartYear ? dataStartMonth : 0;
+        const lastMonth = year === currentYear ? currentMonth : 11;
+
+        for (let month = lastMonth; month >= firstMonth; month--) {
+          const monthDate = new Date(year, month, 1);
           this.secondaryFilterOptions.push({
-            label: monthName,
+            label: monthDate.toLocaleDateString('en-US', {
+              month: 'long',
+              year: 'numeric'
+            }),
             value: `${year}-${String(month + 1).padStart(2, '0')}`
           });
         }
       }
-    } else if (this.selectedTimeframe === 'MONTHLY' || this.selectedTimeframe === 'QUARTERLY' || this.selectedTimeframe === 'HALF_YEARLY') {
-      // Generate years from 2025 to current year
-      for (let year = 2025; year <= currentYear; year++) {
-        this.secondaryFilterOptions.push({
-          label: year.toString(),
-          value: year.toString()
-        });
-      }
-    } else if (this.selectedTimeframe === 'YEARLY') {
-      // Generate fiscal year ranges (e.g., 2025-2026)
-      for (let year = 2025; year <= currentYear; year++) {
-        const fiscalYear = `${year}-${year + 1}`;
-        this.secondaryFilterOptions.push({
-          label: fiscalYear,
-          value: fiscalYear
-        });
-      }
+      return;
     }
+
+    if (
+      this.selectedTimeframe === 'MONTHLY' ||
+      this.selectedTimeframe === 'QUARTERLY' ||
+      this.selectedTimeframe === 'HALF_YEARLY'
+    ) {
+      // Year selector: newest year first.
+      for (let year = currentYear; year >= dataStartYear; year--) {
+        this.secondaryFilterOptions.push({
+          label: String(year),
+          value: String(year)
+        });
+      }
+      return;
+    }
+
+    // YEARLY has no secondary selector.
   }
 
   onSecondaryFilterChange(): void {
+    // Only reloads the Timeframe Analysis section — upper charts untouched.
     this.loadTimeframeData();
   }
 
   getTimeframeDateRange(): string {
-    // If secondary filter is selected, show the range for that selection
-    if (this.selectedSecondaryFilter && this.secondaryFilterOptions.length > 0) {
-      if (this.selectedTimeframe === 'WEEKLY') {
-        // For weekly: show the month range
-        const [year, month] = this.selectedSecondaryFilter.split('-');
-        const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const monthName = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        const firstDay = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const lastDay = new Date(parseInt(year), parseInt(month), 0);
-        return `${firstDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to ${lastDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-      } else if (this.selectedTimeframe === 'YEARLY') {
-        // For yearly: show the fiscal year range
-        const [startYear, endYear] = this.selectedSecondaryFilter.split('-');
-        return `${startYear}-${endYear}`;
-      } else {
-        // For monthly, quarterly, half-yearly: show the year
-        return `Year: ${this.selectedSecondaryFilter}`;
+    const today = new Date();
+
+    if (this.selectedTimeframe === 'WEEKLY' && this.selectedSecondaryFilter) {
+      const [yearString, monthString] = this.selectedSecondaryFilter.split('-');
+      const year = Number(yearString);
+      const month = Number(monthString) - 1;
+
+      const firstDay = new Date(year, month, 1);
+      let lastDay = new Date(year, month + 1, 0);
+
+      if (year === today.getFullYear() && month === today.getMonth()) {
+        lastDay = today;
       }
+
+      return `${this.formatDate(this.toDateString(firstDay))} to ${this.formatDate(this.toDateString(lastDay))}`;
     }
-    
-    // Fallback to the original date range
+
+    if (
+      (this.selectedTimeframe === 'MONTHLY' ||
+       this.selectedTimeframe === 'QUARTERLY' ||
+       this.selectedTimeframe === 'HALF_YEARLY') &&
+      this.selectedSecondaryFilter
+    ) {
+      const year = Number(this.selectedSecondaryFilter);
+      const firstDay = new Date(year, 0, 1);
+      let lastDay = new Date(year, 11, 31);
+
+      if (year === today.getFullYear()) {
+        lastDay = today;
+      }
+
+      return `${this.formatDate(this.toDateString(firstDay))} to ${this.formatDate(this.toDateString(lastDay))}`;
+    }
+
+    if (this.selectedTimeframe === 'YEARLY') {
+      return `${this.formatDate(this.allTimeStartDate)} to ${this.formatDate(this.toDateString(today))}`;
+    }
+
     if (this.startDate === this.endDate) {
       return `Date: ${this.formatDate(this.startDate)}`;
     }
+
     return `Date Range: ${this.formatDate(this.startDate)} to ${this.formatDate(this.endDate)}`;
   }
 
+  private toDateString(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
 
 
   loadCharts(): void {
@@ -1330,27 +1437,212 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
     });
   }
 
+  /**
+   * Load the monthly net-weight trend.
+   *
+   * This chart intentionally uses the full available history from
+   * November 21, 2025 through the current date instead of the
+   * currently selected dashboard date filter. The returned daily
+   * records are aggregated into monthly totals by
+   * createMonthlyNetWeightChartData().
+   */
   loadNetTrend(): Promise<void> {
     const wbId = this.effectiveWbId;
+
     return new Promise((resolve) => {
-      this.smcService.getNetTrend(wbId, this.startDate, this.endDate).subscribe({
+      const chartStartDate = this.allTimeStartDate;
+      const today = new Date();
+      const chartEndDate = today.toISOString().split('T')[0];
+
+      this.smcService.getNetTrend(
+        wbId,
+        chartStartDate,
+        chartEndDate
+      ).subscribe({
         next: (data: any[]) => {
-          console.log('Net Trend Data:', data);
-          this.netTrendChartData = this.createBarChartData(
+          console.log('Raw Net Trend Data:', data);
+
+          this.netTrendChartData = this.createMonthlyNetWeightChartData(
             data,
             'Net Weight (kg)',
-            '#007bff',
-            'daily'
+            '#007bff'
           );
+
+          console.log(
+            'Monthly Net Trend Chart Data:',
+            this.netTrendChartData
+          );
+
           resolve();
         },
         error: (err) => {
-          console.error('Error loading net trend:', err);
-          // Don't set global error flag, just resolve
+          console.error('Error loading monthly net trend:', err);
+          this.netTrendChartData = {
+            labels: [],
+            datasets: []
+          };
           resolve();
         }
       });
     });
+  }
+
+  /**
+   * Convert the daily net-weight API response into monthly totals.
+   *
+   * Behaviour:
+   * - Data starts from November 2025.
+   * - The current month is always included.
+   * - At most 12 months are displayed.
+   * - Before 12 months of data are available, all available months
+   *   from November 2025 are displayed.
+   * - Once more than 12 months are available, the chart becomes a
+   *   rolling 12-month chart.
+   *
+   * Examples:
+   * - Aug 2026 -> Nov 2025 through Aug 2026
+   * - Nov 2026 -> Dec 2025 through Nov 2026
+   * - Dec 2026 -> Jan 2026 through Dec 2026
+   */
+  private createMonthlyNetWeightChartData(
+    apiData: any[],
+    label: string,
+    backgroundColor: string
+  ): ChartConfiguration['data'] {
+
+    if (!apiData || apiData.length === 0) {
+      return {
+        labels: [],
+        datasets: []
+      };
+    }
+
+    const today = new Date();
+
+    // First day of the current month.
+    const currentMonth = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      1
+    );
+
+    // Available data starts on November 21, 2025, so the first
+    // month that can be displayed is November 2025.
+    const dataStartMonth = new Date(2025, 10, 1);
+
+    // Start with a rolling 12-month window.
+    let chartStartMonth = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth() - 11,
+      1
+    );
+
+    // Never display a month before the available data starts.
+    if (chartStartMonth < dataStartMonth) {
+      chartStartMonth = new Date(dataStartMonth);
+    }
+
+    // Map: YYYY-MM -> total monthly net weight.
+    const monthlyTotals = new Map<string, number>();
+
+    // Initialize every month in the visible range, including months
+    // with no records, so missing months appear as zero-value bars.
+    const monthCursor = new Date(chartStartMonth);
+
+    while (monthCursor <= currentMonth) {
+      const key =
+        `${monthCursor.getFullYear()}-${String(monthCursor.getMonth() + 1).padStart(2, '0')}`;
+
+      monthlyTotals.set(key, 0);
+      monthCursor.setMonth(monthCursor.getMonth() + 1);
+    }
+
+    // Aggregate each API record into its YYYY-MM bucket.
+    apiData.forEach((item: any) => {
+      const dateValue =
+        item.dateTime ||
+        item.date ||
+        item.time ||
+        item.day ||
+        item.label ||
+        item.period;
+
+      if (!dateValue) {
+        return;
+      }
+
+      const date = new Date(dateValue);
+
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date in net trend data:', dateValue);
+        return;
+      }
+
+      const key =
+        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      // Ignore records outside the rolling 12-month window.
+      if (!monthlyTotals.has(key)) {
+        return;
+      }
+
+      const weight = Number(
+        item.weight ??
+        item.netWeight ??
+        item.value ??
+        item.totalWeight ??
+        0
+      );
+
+      if (weight > 0) {
+        monthlyTotals.set(
+          key,
+          (monthlyTotals.get(key) || 0) + weight
+        );
+      }
+    });
+
+    const labels: string[] = [];
+    const data: number[] = [];
+
+    monthlyTotals.forEach((totalWeight, key) => {
+      const [yearString, monthString] = key.split('-');
+
+      const date = new Date(
+        Number(yearString),
+        Number(monthString) - 1,
+        1
+      );
+
+      labels.push(
+        date.toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric'
+        })
+      );
+
+      data.push(totalWeight);
+    });
+
+    console.log('Monthly Chart Labels:', labels);
+    console.log('Monthly Chart Totals:', data);
+
+    return {
+      labels,
+      datasets: [
+        {
+          label,
+          data,
+          backgroundColor,
+          borderColor: this.darkenHex(backgroundColor, 30),
+          borderWidth: 2,
+          hoverBackgroundColor: this.darkenHex(backgroundColor, 15),
+          barPercentage: 0.70,
+          categoryPercentage: 0.80,
+          maxBarThickness: 55
+        }
+      ]
+    };
   }
 
   loadLast24Trend(): Promise<void> {
@@ -1534,101 +1826,345 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
     }
   }
 
+  /**
+   * Load exactly the period represented by the Timeframe Analysis controls.
+   *
+   * The API is asked for the overall date range covered by the current
+   * timeframe/month/year selection, but whatever periods it returns are
+   * immediately re-bucketed into a canonical, deterministic set of periods
+   * (see getCanonicalPeriods / mergeIntoCanonicalPeriods) before being
+   * rendered. This guarantees the chart always shows the right number of
+   * bars with the right labels for the selected timeframe, regardless of
+   * how the API itself buckets or names its periods.
+   */
   loadTimeframeData(): Promise<void> {
     return new Promise((resolve) => {
-      this.loading = true;
-      
-      // Create TimeFrameRequest object
+      // Scoped to this section only — never sets the page-wide `loading`
+      // flag, so the upper charts stay visible and untouched while this
+      // fetch runs (whether triggered by the top date filters or by the
+      // Timeframe/Month/Year selectors below).
+      this.timeframeLoading = true;
+      this.timeframeError = false;
+      this.timeframeErrorMessage = '';
+
+      const range = this.getSelectedTimeframeDateRange();
+
+      if (!range) {
+        this.timeframeData = [];
+        this.timeframeChartData = { labels: [], datasets: [] };
+        this.timeframeLoading = false;
+        resolve();
+        return;
+      }
+
       const request: TimeFrameRequest = {
         wbId: this.effectiveWbId,
-        startDate: this.startDate,
-        endDate: this.endDate,
+        startDate: range.startDate,
+        endDate: range.endDate,
         timeframe: this.selectedTimeframe as TimeFrame
       };
 
-      // Call the timeframe service
+      console.log('========== TIMEFRAME ANALYSIS ==========', request);
+
       this.smcService.getTimeframeData(request).subscribe({
         next: (data: TimeFrameDataDTO[]) => {
-          console.log('Timeframe Data from API:', data);
-          
-          // Filter data based on secondary filter selection
-          const filteredData = this.filterDataBySecondarySelection(data);
-          this.timeframeData = filteredData;
-          
-          // Prepare chart data
-          this.prepareTimeframeChartData(filteredData);
-          
-          // Calculate max weight and highest period
+          this.timeframeError = false;
+          const merged = this.mergeIntoCanonicalPeriods(data || []);
+          this.timeframeData = merged;
+          this.prepareTimeframeChartData(merged);
           this.calculateTimeframeMetrics();
-          
           resolve();
         },
         error: (err) => {
           console.error('Error loading timeframe data:', err);
-          // Don't set global error flag, just resolve
+          // Surface the real failure instead of silently rendering a
+          // zero-filled table that looks like a legitimate "no data"
+          // result for the period.
+          this.timeframeError = true;
+          this.timeframeErrorMessage =
+            err?.error?.message ||
+            err?.message ||
+            (err?.status ? `Server responded with status ${err.status}` : 'Failed to load timeframe data');
           this.timeframeData = [];
           this.timeframeChartData = { labels: [], datasets: [] };
           resolve();
         },
         complete: () => {
-          this.loading = false;
+          this.timeframeLoading = false;
         }
       });
     });
   }
 
-  private filterDataBySecondarySelection(data: TimeFrameDataDTO[]): TimeFrameDataDTO[] {
-    if (!this.selectedSecondaryFilter || this.selectedTimeframe !== 'WEEKLY') {
-      return data;
+  private getSelectedTimeframeDateRange(): { startDate: string; endDate: string } | null {
+    const today = new Date();
+    const todayString = this.toDateString(today);
+
+    // Weekly = selected month.
+    if (this.selectedTimeframe === 'WEEKLY') {
+      if (!this.selectedSecondaryFilter) return null;
+
+      const [yearString, monthString] = this.selectedSecondaryFilter.split('-');
+      const year = Number(yearString);
+      const month = Number(monthString) - 1;
+
+      const start = new Date(year, month, 1);
+      let end = new Date(year, month + 1, 0);
+
+      if (year === today.getFullYear() && month === today.getMonth()) {
+        end = today;
+      }
+
+      return {
+        startDate: this.toDateString(start),
+        endDate: this.toDateString(end)
+      };
     }
 
-    // For WEEKLY timeframe, filter by selected month
-    const [year, month] = this.selectedSecondaryFilter.split('-');
-    const selectedYear = parseInt(year);
-    const selectedMonth = parseInt(month);
+    // Monthly / Quarterly / Half-Yearly = selected year.
+    if (
+      this.selectedTimeframe === 'MONTHLY' ||
+      this.selectedTimeframe === 'QUARTERLY' ||
+      this.selectedTimeframe === 'HALF_YEARLY'
+    ) {
+      if (!this.selectedSecondaryFilter) return null;
 
-    // Get the first and last day of the selected month
-    const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
-    const monthEnd = new Date(selectedYear, selectedMonth, 0);
-    monthEnd.setHours(23, 59, 59, 999);
+      const year = Number(this.selectedSecondaryFilter);
+      const start = new Date(year, 0, 1);
+      let end = new Date(year, 11, 31);
 
-    return data.filter(item => {
-      const itemStart = new Date(item.startDate);
-      const itemEnd = new Date(item.endDate);
-      
-      // Check if period overlaps with the selected month
-      // Period overlaps if: itemStart <= monthEnd AND itemEnd >= monthStart
-      return itemStart <= monthEnd && itemEnd >= monthStart;
+      if (year === today.getFullYear()) {
+        end = today;
+      }
+
+      // Data begins on Nov 21, 2025.
+      if (year === 2025) {
+        return {
+          startDate: this.allTimeStartDate,
+          endDate: this.toDateString(end)
+        };
+      }
+
+      return {
+        startDate: this.toDateString(start),
+        endDate: this.toDateString(end)
+      };
+    }
+
+    // Yearly = entire history, producing one bar per year.
+    if (this.selectedTimeframe === 'YEARLY') {
+      return {
+        startDate: this.allTimeStartDate,
+        endDate: todayString
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Build the exact, deterministic list of periods that should be shown
+   * for the current Timeframe / Month / Year selection. This is computed
+   * purely on the frontend from calendar rules — it never depends on
+   * whatever period breakdown the API happens to return.
+   *
+   * WEEKLY      -> every 7-day week within the selected month (clipped to
+   *                data start / today).
+   * MONTHLY     -> every calendar month of the selected year (clipped).
+   * QUARTERLY   -> Q1–Q4 of the selected year (clipped, future quarters skipped).
+   * HALF_YEARLY -> H1–H2 of the selected year (clipped, future half skipped).
+   * YEARLY      -> one entry per year from the first year with data (2025)
+   *                through the current year.
+   */
+  private getCanonicalPeriods(): { label: string; start: Date; end: Date }[] {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dataStart = new Date(this.allTimeStartDate + 'T00:00:00');
+    const periods: { label: string; start: Date; end: Date }[] = [];
+
+    if (this.selectedTimeframe === 'WEEKLY') {
+      if (!this.selectedSecondaryFilter) return periods;
+
+      const [yearString, monthString] = this.selectedSecondaryFilter.split('-');
+      const year = Number(yearString);
+      const month = Number(monthString) - 1;
+
+      let monthStart = new Date(year, month, 1);
+      const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
+      const monthEnd = isCurrentMonth ? new Date(today) : new Date(year, month + 1, 0);
+
+      if (monthStart < dataStart) {
+        monthStart = new Date(dataStart);
+      }
+      if (monthStart > monthEnd) return periods;
+
+      let weekStart = new Date(monthStart);
+      let weekNumber = 1;
+
+      while (weekStart <= monthEnd) {
+        let weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        if (weekEnd > monthEnd) {
+          weekEnd = new Date(monthEnd);
+        }
+
+        const days = Math.round((weekEnd.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+        periods.push({
+          label: `Week ${weekNumber} (${days}d)`,
+          start: new Date(weekStart),
+          end: new Date(weekEnd)
+        });
+
+        weekStart = new Date(weekEnd);
+        weekStart.setDate(weekStart.getDate() + 1);
+        weekNumber++;
+      }
+
+      return periods;
+    }
+
+    if (this.selectedTimeframe === 'MONTHLY') {
+      if (!this.selectedSecondaryFilter) return periods;
+      const year = Number(this.selectedSecondaryFilter);
+
+      const firstMonth = year === dataStart.getFullYear() ? dataStart.getMonth() : 0;
+      const lastMonth = year === today.getFullYear() ? today.getMonth() : 11;
+
+      for (let m = firstMonth; m <= lastMonth; m++) {
+        let start = new Date(year, m, 1);
+        let end = (year === today.getFullYear() && m === today.getMonth())
+          ? new Date(today)
+          : new Date(year, m + 1, 0);
+
+        if (start < dataStart) start = new Date(dataStart);
+
+        const label = start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        periods.push({ label, start, end });
+      }
+
+      return periods;
+    }
+
+    if (this.selectedTimeframe === 'QUARTERLY') {
+      if (!this.selectedSecondaryFilter) return periods;
+      const year = Number(this.selectedSecondaryFilter);
+
+      for (let q = 0; q < 4; q++) {
+        const startMonth = q * 3;
+        const rawStart = new Date(year, startMonth, 1);
+        let end = new Date(year, startMonth + 3, 0);
+
+        if (rawStart > today) break; // quarter hasn't started yet
+        if (end > today) end = new Date(today);
+        if (end < dataStart) continue; // quarter fully before data exists
+
+        const start = rawStart < dataStart ? new Date(dataStart) : rawStart;
+
+        periods.push({
+          label: `Q${q + 1} ${year}`,
+          start,
+          end
+        });
+      }
+
+      return periods;
+    }
+
+    if (this.selectedTimeframe === 'HALF_YEARLY') {
+      if (!this.selectedSecondaryFilter) return periods;
+      const year = Number(this.selectedSecondaryFilter);
+
+      for (let h = 0; h < 2; h++) {
+        const startMonth = h * 6;
+        const rawStart = new Date(year, startMonth, 1);
+        let end = new Date(year, startMonth + 6, 0);
+
+        if (rawStart > today) break; // half hasn't started yet
+        if (end > today) end = new Date(today);
+        if (end < dataStart) continue; // half fully before data exists
+
+        const start = rawStart < dataStart ? new Date(dataStart) : rawStart;
+
+        periods.push({
+          label: `H${h + 1} ${year}`,
+          start,
+          end
+        });
+      }
+
+      return periods;
+    }
+
+    if (this.selectedTimeframe === 'YEARLY') {
+      const startYear = dataStart.getFullYear();
+      const endYear = today.getFullYear();
+
+      for (let y = startYear; y <= endYear; y++) {
+        const start = y === startYear ? new Date(dataStart) : new Date(y, 0, 1);
+        const end = y === endYear ? new Date(today) : new Date(y, 11, 31);
+        periods.push({ label: String(y), start, end });
+      }
+
+      return periods;
+    }
+
+    return periods;
+  }
+
+  /**
+   * Bucket whatever the API returned into the canonical periods for the
+   * current selection, summing overlapping records into each bucket. This
+   * makes the chart/table/summary correct even if the API's own
+   * timeframe-bucketing is inconsistent or mislabeled.
+   */
+  private mergeIntoCanonicalPeriods(apiData: TimeFrameDataDTO[]): TimeFrameDataDTO[] {
+    const canonicalPeriods = this.getCanonicalPeriods();
+
+    if (canonicalPeriods.length === 0) {
+      return [];
+    }
+
+    return canonicalPeriods.map(period => {
+      const matches = (apiData || []).filter(item => {
+        const itemStart = new Date(item.startDate);
+        const itemEnd = new Date(item.endDate);
+        // Overlap test: item overlaps this canonical period at all.
+        return itemStart <= period.end && itemEnd >= period.start;
+      });
+
+      const totalEntries = matches.reduce((sum, m) => sum + (m.totalEntries || 0), 0);
+      const totalNetWeight = matches.reduce((sum, m) => sum + (m.totalNetWeight || 0), 0);
+      const totalGrossWeight = matches.reduce((sum, m) => sum + (m.totalGrossWeight || 0), 0);
+
+      return {
+        periodName: period.label,
+        startDate: this.toDateString(period.start),
+        endDate: this.toDateString(period.end),
+        totalEntries,
+        totalNetWeight,
+        totalGrossWeight,
+        averageNetWeight: totalEntries > 0 ? totalNetWeight / totalEntries : 0,
+        averageGrossWeight: totalEntries > 0 ? totalGrossWeight / totalEntries : 0
+      } as TimeFrameDataDTO;
     });
   }
 
+  /**
+   * Build the chart directly from the already-canonicalized period data.
+   */
   private prepareTimeframeChartData(data: TimeFrameDataDTO[]): void {
     if (!data || data.length === 0) {
       this.timeframeChartData = { labels: [], datasets: [] };
       return;
     }
 
-    // Include ALL periods, even those with zero trips (don't filter them out)
-    const allData = data.sort((a, b) => {
-      const dateA = new Date(a.startDate).getTime();
-      const dateB = new Date(b.startDate).getTime();
-      return dateA - dateB;
-    });
-
-    const labels = allData.map(period => {
-      // Extract short label and calculate days
-      const shortLabel = this.extractShortLabel(period.periodName);
-      const daysInPeriod = this.calculateDaysInPeriod(period.startDate, period.endDate);
-      return `${shortLabel}\n(${daysInPeriod}d)`;
-    });
-
-    const netWeights = allData.map(period => period.totalNetWeight || 0);
-    const grossWeights = allData.map(period => period.totalGrossWeight || 0);
-    const tripCounts = allData.map(period => period.totalEntries || 0);
+    const labels = data.map(period => period.periodName);
+    const netWeights = data.map(period => Number(period.totalNetWeight || 0));
+    const tripCounts = data.map(period => Number(period.totalEntries || 0));
 
     const backgroundColor = this.getTimeframeColor(this.selectedTimeframe);
 
-    // Create datasets for the chart
     this.timeframeChartData = {
       labels,
       datasets: [
@@ -1641,8 +2177,8 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
           hoverBackgroundColor: this.darkenHex(backgroundColor, 18),
           barPercentage: 0.75,
           categoryPercentage: 0.85,
-          maxBarThickness: 60,
-          yAxisID: 'y',
+          maxBarThickness: 70,
+          yAxisID: 'y'
         },
         {
           label: 'Number of Trips',
@@ -1657,66 +2193,6 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
         }
       ]
     };
-  }
-
-  private calculateDaysInPeriod(startDate: any, endDate: any): number {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
-    return diffDays;
-  }
-
-  private extractShortLabel(periodName: string): string {
-    if (!periodName) return 'Unknown';
-    
-    switch (this.selectedTimeframe) {
-      case 'WEEKLY':
-        // Format: "Week 1: 02 Dec to 08 Dec (7 days)" -> "W1"
-        const weekMatch = periodName.match(/Week (\d+)/);
-        return weekMatch ? `W${weekMatch[1]}` : periodName;
-      
-      case 'MONTHLY':
-        // Format: "December 2024" -> "Dec'24"
-        const monthMatch = periodName.match(/(\w+) (\d+)/);
-        if (monthMatch) {
-          const month = monthMatch[1].substring(0, 3);
-          const year = monthMatch[2].substring(2);
-          return `${month}'${year}`;
-        }
-        return periodName;
-      
-      case 'QUARTERLY':
-        // Format: "Quarter 1, 2024" -> "Q1'24"
-        const quarterMatch = periodName.match(/Quarter (\d+), (\d+)/);
-        if (quarterMatch) {
-          const quarter = quarterMatch[1];
-          const year = quarterMatch[2].substring(2);
-          return `Q${quarter}'${year}`;
-        }
-        return periodName;
-      
-      case 'HALF_YEARLY':
-        // Format: "First Half, 2024" -> "H1'24"
-        if (periodName.includes('First Half')) {
-          const yearMatch = periodName.match(/\d+/);
-          const year = yearMatch ? yearMatch[0].substring(2) : '';
-          return `H1'${year}`;
-        } else if (periodName.includes('Second Half')) {
-          const yearMatch = periodName.match(/\d+/);
-          const year = yearMatch ? yearMatch[0].substring(2) : '';
-          return `H2'${year}`;
-        }
-        return periodName;
-      
-      case 'YEARLY':
-        // Format: "Year 2024" -> "2024"
-        const yearMatch = periodName.match(/\d+/);
-        return yearMatch ? yearMatch[0] : periodName;
-      
-      default:
-        return periodName;
-    }
   }
 
   private calculateTimeframeMetrics(): void {
@@ -2164,7 +2640,7 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
     return String(labelString);
   }
 
-  getWeightTrendChartOptions(xAxisLabel: 'Day' | 'Hour'): ChartConfiguration['options'] {
+  getWeightTrendChartOptions(xAxisLabel: 'Day' | 'Hour' | 'Month'): ChartConfiguration['options'] {
     return {
       ...this.baseChartOptions,
       scales: {
@@ -2175,8 +2651,9 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
             text: xAxisLabel
           },
           ticks: {
-            maxRotation: 45,
-            minRotation: 45
+            autoSkip: false,
+            maxRotation: xAxisLabel === 'Month' ? 0 : 45,
+            minRotation: xAxisLabel === 'Month' ? 0 : 45
           }
         }
       }
@@ -2184,8 +2661,15 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
   }
 
   getTimeframeChartOptions(): ChartConfiguration['options'] {
+    const isWeekly = this.selectedTimeframe === 'WEEKLY';
+
     return {
-      ...this.baseChartOptions,
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
       scales: {
         y: {
           beginAtZero: true,
@@ -2212,7 +2696,7 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
             text: 'Number of Trips'
           },
           grid: {
-            drawOnChartArea: false,
+            drawOnChartArea: false
           },
           beginAtZero: true
         },
@@ -2222,37 +2706,34 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
             text: this.getTimeframeXAxisLabel()
           },
           ticks: {
-            maxRotation: 45,
-            minRotation: 45
+            autoSkip: false,
+            maxRotation: isWeekly ? 45 : 0,
+            minRotation: isWeekly ? 45 : 0,
+            padding: 8
           }
         }
       },
       plugins: {
         legend: {
           display: true,
-          position: 'top',
+          position: 'top'
         },
         tooltip: {
           callbacks: {
             label: (context) => {
               let label = context.dataset.label || '';
-              if (label) {
-                label += ': ';
-              }
+              if (label) label += ': ';
+
               const value = Number(context.parsed.y);
-              
+
               if (context.datasetIndex === 0) {
-                // Weight dataset
-                if (value >= 1000) {
-                  label += (value / 1000).toFixed(2) + ' tons';
-                } else {
-                  label += value + ' kg';
-                }
+                label += value >= 1000
+                  ? (value / 1000).toFixed(2) + ' tons'
+                  : value.toFixed(0) + ' kg';
               } else {
-                // Trip count dataset
-                label += value + ' trips';
+                label += value.toFixed(0) + ' trips';
               }
-              
+
               return label;
             }
           }
@@ -2271,6 +2752,7 @@ export class WeighbridgeChartsComponent implements OnInit, OnChanges {
       default: return 'Period';
     }
   }
+
 
   private handleError(error: any): void {
     this.error = true;

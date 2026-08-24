@@ -35,6 +35,16 @@ export class AuthInterceptor implements HttpInterceptor {
     return from(this.authService.getToken()).pipe(
       switchMap(token => {
         console.log('[AuthInterceptor] Adding auth header, token exists:', !!token);
+        if (token && token.split('.').length === 3) {
+          try {
+            const payload = token.split('.')[1];
+            const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+            console.log('[AuthInterceptor] Auth token user:', decoded.username || decoded.preferred_username || decoded.sub || 'unknown');
+          } catch {
+            console.log('[AuthInterceptor] Could not decode auth token payload');
+          }
+        }
+
         const authReq = token
           ? req.clone({
               setHeaders: {

@@ -29,7 +29,9 @@ import { OfflineBannerComponent } from 'src/app/components/offline-banner.compon
 })
 export class TicketsPage implements OnInit, OnDestroy {
   tickets: Ticket[] = [];
+  history: Ticket[] = [];
   loading = false;
+  selectedTab: 'queue' | 'history' = 'queue';
   private isLoadingInProgress = false;
 
   /** Emits on destroy to cancel any in-flight request. */
@@ -50,6 +52,7 @@ export class TicketsPage implements OnInit, OnDestroy {
   ngOnInit() {
     console.log('[TicketsPage] ngOnInit called');
     this.load();
+    this.loadHistory();
   }
 
   ionViewWillEnter() {
@@ -80,7 +83,6 @@ export class TicketsPage implements OnInit, OnDestroy {
   }
 
   load(event?: any) {
-    // Prevent simultaneous duplicate requests
     if (this.isLoadingInProgress) {
       console.log('[TicketsPage] Load already in progress, skipping duplicate request');
       if (event) event.target.complete();
@@ -96,9 +98,8 @@ export class TicketsPage implements OnInit, OnDestroy {
       )
       .subscribe({
         next: data => {
-          console.log('[TicketsPage] Received data:', data);
-          console.log('[TicketsPage] Data length:', data?.length);
           this.tickets = data;
+          this.loadHistory();
           this.loading = false;
           this.isLoadingInProgress = false;
           if (event) event.target.complete();
@@ -109,6 +110,15 @@ export class TicketsPage implements OnInit, OnDestroy {
           this.isLoadingInProgress = false;
           if (event) event.target.complete();
         }
+      });
+  }
+
+  loadHistory() {
+    this.ticketService.getMyHistory()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: data => this.history = data,
+        error: () => this.history = []
       });
   }
 

@@ -7,10 +7,10 @@ const normalizedHost = runtimeHost === '10.0.2.2' || runtimeHost === '127.0.0.1'
 
 export const environment = {
   production: true,
-  apiBaseUrl: `http://${normalizedHost}:8080`,
-  // Real LAN IP for local device testing over Wi-Fi. Change to your HTTPS domain before real production release.
-  mobileApiBaseUrl: 'http://localhost:8080'
+    apiBaseUrl: `http://${normalizedHost}:8080`,
+  mobileApiBaseUrl: 'https://iccc.jk.gov.in',
 };
+
 
 // Reliable native-platform check using Capacitor's own API
 const isNativeMobile = (): boolean => {

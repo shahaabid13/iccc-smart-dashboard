@@ -15,7 +15,7 @@
     </ion-toolbar>
   </ion-header>
 
-  <ion-content class="ion-padding" [fullscreen]="true">
+  <ion-content class="ion-padding detail-page-content" [fullscreen]="true">
     <ng-container *ngIf="loading">
       <ion-card>
         <ion-card-content>
@@ -48,9 +48,9 @@
           <ion-item lines="none">
             <ion-label>
               <h3>Status</h3>
-              <p>{{ ticket.status }}</p>
+              <p>{{ normalizeTicketStatus(ticket.status) }}</p>
             </ion-label>
-            <ion-badge [color]="ticket.status === 'OPEN' ? 'primary' : ticket.status === 'RESOLVED' ? 'success' : ticket.status === 'REJECTED' ? 'danger' : ticket.status === 'HOLD' ? 'warning' : 'medium'" slot="end">{{ ticket.status }}</ion-badge>
+            <ion-badge [color]="statusColor(ticket.status)" slot="end">{{ normalizeTicketStatus(ticket.status) }}</ion-badge>
           </ion-item>
 
           <ion-item lines="none">
@@ -79,11 +79,21 @@
           <ion-card-title>Field acknowledgement</ion-card-title>
         </ion-card-header>
         <ion-card-content>
-          <form [formGroup]="ackForm" (ngSubmit)="acknowledge()" class="form-stack">
+          <form [formGroup]="ackForm" (ngSubmit)="acknowledge()" class="form-stack detail-form">
             <ion-item lines="none">
               <ion-label position="stacked">Acknowledgement notes</ion-label>
               <ion-textarea formControlName="notes" autoGrow="true" [disabled]="isSubmittingAck"></ion-textarea>
             </ion-item>
+
+            <ion-item lines="none" *ngIf="reviewers.length" class="select-item">
+              <ion-label position="stacked">Assign reviewer</ion-label>
+              <ion-select formControlName="reviewerId" interface="action-sheet" placeholder="Select reviewer" [disabled]="isSubmittingAck" class="compact-select">
+                <ion-select-option *ngFor="let reviewer of reviewers" [value]="reviewer.id">
+                  {{ reviewer.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
             <ion-button expand="block" type="submit" [disabled]="ackForm.invalid || isSubmittingAck">
               <span *ngIf="!isSubmittingAck">Acknowledge</span>
               <span *ngIf="isSubmittingAck">Acknowledging...</span>
@@ -92,24 +102,6 @@
         </ion-card-content>
       </ion-card>
 
-      <ion-card *ngIf="showReviewerPicker">
-        <ion-card-header>
-          <ion-card-title>Review assignment</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-          <ion-item lines="none">
-            <ion-label position="stacked">Assign reviewer</ion-label>
-            <ion-select [(ngModel)]="selectedReviewerId" interface="action-sheet" [disabled]="isSubmittingReviewer || reviewers.length === 0">
-              <ion-select-option *ngFor="let r of reviewers" [value]="r.id">{{ r.name }}</ion-select-option>
-            </ion-select>
-            <p *ngIf="reviewers.length === 0" style="font-size: smaller; color: var(--ion-color-medium); padding-top: 4px;">No reviewers available to assign.</p>
-          </ion-item>
-          <ion-button expand="block" (click)="assignReviewer()" [disabled]="!selectedReviewerId || isSubmittingReviewer">
-            <span *ngIf="!isSubmittingReviewer">Assign reviewer</span>
-            <span *ngIf="isSubmittingReviewer">Assigning...</span>
-          </ion-button>
-        </ion-card-content>
-      </ion-card>
-    </ng-container>
-  </ion-content>
-</ion-page>
+      </ng-container>
+      </ion-content>
+      </ion-page>

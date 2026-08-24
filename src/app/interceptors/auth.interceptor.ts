@@ -30,7 +30,8 @@ const PROTECTED_ROUTES = [
   '/api/tasks',
   '/api/locations',
   '/api/approach-roads',
-  '/api/device-types'
+  '/api/device-types',
+   '/api/tramm',  
 ];
 
 function isLoginRoute(url: string): boolean {

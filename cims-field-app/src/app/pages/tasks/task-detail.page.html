@@ -14,7 +14,7 @@
     </ion-toolbar>
   </ion-header>
 
-  <ion-content class="ion-padding" [fullscreen]="true">
+  <ion-content class="ion-padding detail-page-content" [fullscreen]="true">
     <div class="page-shell">
       <ng-container *ngIf="loading">
         <ion-card>
@@ -85,10 +85,10 @@
             <ion-card-title>Update task</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <form [formGroup]="actionForm" (ngSubmit)="submitAction()" class="form-stack">
-              <ion-item lines="none">
+            <form [formGroup]="actionForm" (ngSubmit)="submitAction()" class="form-stack detail-form">
+              <ion-item lines="none" class="select-item">
                 <ion-label position="stacked">Action</ion-label>
-                <ion-select formControlName="status" interface="action-sheet" [disabled]="isSubmitting">
+                <ion-select formControlName="status" interface="action-sheet" [disabled]="isSubmitting" class="compact-select">
                   <ion-select-option *ngFor="let action of availableActions" [value]="action.value">
                     {{ action.label }}
                   </ion-select-option>

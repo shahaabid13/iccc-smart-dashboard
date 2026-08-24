@@ -53,21 +53,6 @@ import autoTable from 'jspdf-autotable';
           >
         </div>
 
-        <div class="filter-group">
-          <label for="itemsPerPage">Items per page:</label>
-          <select 
-            id="itemsPerPage" 
-            [(ngModel)]="itemsPerPage" 
-            (change)="onPageSizeChange()"
-            class="filter-select"
-          >
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </div>
-
         <div class="action-buttons">
           <button (click)="applyFilters()" class="btn btn-primary">Apply Filters</button>
 
@@ -167,28 +152,36 @@ import autoTable from 'jspdf-autotable';
           </tbody>
         </table>
 
-        <!-- Pagination -->
+        <!-- Pagination (inventory-system style: < 1 2 3 ... 182 183 184 >) -->
         <div class="pagination" *ngIf="totalPages > 1">
-          <button 
-            (click)="previousPage()" 
+          <button
+            (click)="previousPage()"
             [disabled]="currentPage === 1"
-            class="pagination-btn"
-          >
-            Previous
+            class="pagination-arrow">
+            &lt;
           </button>
-          
-          <span class="pagination-info">
-            Page {{ currentPage }} of {{ totalPages }} 
-            ({{ filteredRecords.length }} total records)
-          </span>
 
-          <button 
-            (click)="nextPage()" 
+          <ng-container *ngFor="let p of getPageNumbers()">
+            <button
+              *ngIf="p !== '...'"
+              (click)="goToPage(p)"
+              class="pagination-number"
+              [class.active]="p === currentPage">
+              {{ p }}
+            </button>
+            <span *ngIf="p === '...'" class="pagination-dots">...</span>
+          </ng-container>
+
+          <button
+            (click)="nextPage()"
             [disabled]="currentPage === totalPages"
-            class="pagination-btn"
-          >
-            Next
+            class="pagination-arrow">
+            &gt;
           </button>
+        </div>
+
+        <div class="pagination-summary" *ngIf="filteredRecords.length">
+          Page {{ currentPage }} of {{ totalPages }} • {{ filteredRecords.length }} total records
         </div>
       </div>
 
@@ -361,38 +354,63 @@ import autoTable from 'jspdf-autotable';
         background: #e9ecef;
       }
 
+      /* Inventory-style numbered pagination: < 1 2 3 ... 182 183 184 > */
       .pagination {
         display: flex;
-        justify-content: space-between;
+        justify-content: center;
         align-items: center;
-        padding: 15px 20px;
+        gap: 6px;
+        padding: 16px 20px 6px;
         background: #f8f9fa;
         border-top: 1px solid #ddd;
+        flex-wrap: wrap;
       }
 
-      .pagination-btn {
-        padding: 8px 16px;
+      .pagination-arrow,
+      .pagination-number {
+        min-width: 34px;
+        height: 34px;
+        padding: 0 8px;
         border: 1px solid #ddd;
         background: white;
-        border-radius: 4px;
+        border-radius: 6px;
         cursor: pointer;
+        font-size: 14px;
+        color: #333;
+        transition: all 0.15s ease;
       }
 
-      .pagination-btn:disabled {
+      .pagination-arrow:disabled {
         background: #f8f9fa;
-        color: #6c757d;
+        color: #adb5bd;
         cursor: not-allowed;
       }
 
-      .pagination-btn:not(:disabled):hover {
+      .pagination-arrow:not(:disabled):hover,
+      .pagination-number:not(.active):hover {
+        background: #e9ecef;
+        border-color: #ccc;
+      }
+
+      .pagination-number.active {
         background: #007bff;
         color: white;
         border-color: #007bff;
+        font-weight: 600;
       }
 
-      .pagination-info {
-        color: #666;
+      .pagination-dots {
+        min-width: 20px;
+        text-align: center;
+        color: #888;
         font-size: 14px;
+      }
+
+      .pagination-summary {
+        text-align: center;
+        color: #666;
+        font-size: 13px;
+        padding: 6px 20px 16px;
       }
 
       .loading {
@@ -454,12 +472,6 @@ import autoTable from 'jspdf-autotable';
           justify-content: center;
         }
         
-        .pagination {
-          flex-direction: column;
-          gap: 10px;
-          text-align: center;
-        }
-        
         .summary-stats {
           grid-template-columns: 1fr;
         }
@@ -485,9 +497,9 @@ export class SmcDashboardComponent implements OnInit {
   fromDate: string = '';
   toDate: string = '';
 
-  // Pagination properties
+  // Pagination properties (fixed page size, inventory-style numbered pagination)
   currentPage: number = 1;
-  itemsPerPage: number = 25;
+  readonly itemsPerPage: number = 10;
   totalPages: number = 1;
 
   // UI dropdown states
@@ -579,11 +591,6 @@ export class SmcDashboardComponent implements OnInit {
     this.selectedPeriod = 'custom';
   }
 
-  onPageSizeChange(): void {
-    this.currentPage = 1;
-    this.updatePagination();
-  }
-
   applyFilters(): void {
     this.currentPage = 1;
     
@@ -605,6 +612,13 @@ export class SmcDashboardComponent implements OnInit {
         return false;
       }
       return true;
+    });
+
+    // Sort latest first
+    this.filteredRecords.sort((a, b) => {
+      const dateA = this.getRecordDate(a)?.getTime() ?? 0;
+      const dateB = this.getRecordDate(b)?.getTime() ?? 0;
+      return dateB - dateA;
     });
 
     this.updatePagination();
@@ -638,6 +652,46 @@ export class SmcDashboardComponent implements OnInit {
       this.currentPage++;
       this.updatePagination();
     }
+  }
+
+  goToPage(page: number | string): void {
+    if (typeof page !== 'number' || page === this.currentPage) return;
+    this.currentPage = page;
+    this.updatePagination();
+  }
+
+  /**
+   * Builds a windowed page-number list with ellipses, e.g.
+   * [1, '...', 4, 5, 6, '...', 184] — matching the inventory system's
+   * "< 1 2 3 ... 182 183 184 >" pagination style.
+   */
+  getPageNumbers(): (number | string)[] {
+    const total = this.totalPages;
+    const current = this.currentPage;
+    const delta = 1;
+    const range: number[] = [];
+    const withDots: (number | string)[] = [];
+    let last: number | undefined;
+
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+
+    for (const i of range) {
+      if (last !== undefined) {
+        if (i - last === 2) {
+          withDots.push(last + 1);
+        } else if (i - last > 2) {
+          withDots.push('...');
+        }
+      }
+      withDots.push(i);
+      last = i;
+    }
+
+    return withDots;
   }
 
   getRecordDate(record: any): Date | null {

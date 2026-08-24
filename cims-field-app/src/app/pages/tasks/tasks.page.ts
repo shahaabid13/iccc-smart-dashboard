@@ -1,12 +1,10 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
   IonContent, IonRefresher, IonRefresherContent, IonList, IonItem,
-  IonLabel, IonSkeletonText, IonBadge, IonCard, IonCardHeader,
-  IonCardTitle, IonCardSubtitle, IonCardContent,
-  ActionSheetController
+  IonLabel, IonSkeletonText, IonBadge, IonCard, ActionSheetController
 } from '@ionic/angular/standalone';
 import type { RefresherCustomEvent } from '@ionic/angular/standalone';
 import { Subject, finalize, takeUntil } from 'rxjs';
@@ -19,11 +17,10 @@ import { OfflineBannerComponent } from 'src/app/components/offline-banner.compon
   selector: 'app-tasks',
   standalone: true,
   imports: [
-    CommonModule, RouterLink, OfflineBannerComponent,
+    CommonModule, OfflineBannerComponent,
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonContent, IonRefresher, IonRefresherContent, IonList, IonItem,
-    IonLabel, IonSkeletonText, IonBadge, IonCard, IonCardHeader,
-    IonCardTitle, IonCardSubtitle, IonCardContent
+    IonLabel, IonSkeletonText, IonBadge, IonCard
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './tasks.page.html',
@@ -31,7 +28,9 @@ import { OfflineBannerComponent } from 'src/app/components/offline-banner.compon
 })
 export class TasksPage implements OnDestroy, OnInit {
   tasks: Task[] = [];
+  history: Task[] = [];
   loading = false;
+  selectedTab: 'queue' | 'history' = 'queue';
   private isLoadingInProgress = false;
 
   /** Emits on destroy to cancel any in-flight request. */
@@ -40,7 +39,8 @@ export class TasksPage implements OnDestroy, OnInit {
   constructor(
     private taskService: TaskService,
     private actionSheetCtrl: ActionSheetController,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router
   ) {}
 
   ngOnDestroy() {
@@ -51,6 +51,7 @@ export class TasksPage implements OnDestroy, OnInit {
   ngOnInit() {
     console.log('[TasksPage] ngOnInit called');
     this.load();
+    this.loadHistory();
   }
 
   ionViewWillEnter() {
@@ -62,7 +63,6 @@ export class TasksPage implements OnDestroy, OnInit {
   }
 
   load(event?: RefresherCustomEvent) {
-    // Prevent simultaneous duplicate requests
     if (this.isLoadingInProgress) {
       console.log('[TasksPage] Load already in progress, skipping duplicate request');
       if (event) event.target.complete();
@@ -84,9 +84,8 @@ export class TasksPage implements OnDestroy, OnInit {
       )
       .subscribe({
         next: data => {
-          console.log('[TasksPage] Received data:', data);
-          console.log('[TasksPage] Data length:', data?.length);
           this.tasks = data;
+          this.loadHistory();
         },
         error: (error) => {
           console.error('[TasksPage] Failed to load tasks:', error);
@@ -94,8 +93,22 @@ export class TasksPage implements OnDestroy, OnInit {
       });
   }
 
+  loadHistory() {
+    this.taskService.getMyTaskHistory()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: data => this.history = data,
+        error: () => this.history = []
+      });
+  }
+
   trackByTaskId(_index: number, task: Task): number {
     return task.id;
+  }
+
+  openTask(task: Task): void {
+    const route = task.category === 'TICKET' ? ['/tickets', task.id] : ['/tasks', task.id];
+    void this.router.navigate(route);
   }
 
   colorForStatus(status: string): string {

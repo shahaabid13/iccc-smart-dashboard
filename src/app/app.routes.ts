@@ -109,24 +109,31 @@ export const routes: Routes = [
 		loadComponent: () => import('./components/admin/pbs-analytics/pbs-analytics.component').then((m) => m.PbsAnalyticsComponent),
 	},
 	{
-		path: 'chartered-bike',
-		loadComponent: () => import('./components/admin/chartered-bike-dashboard/chartered-bike-dashboard.component').then((m) => m.CharteredBikeDashboardComponent),
+		path: 'tramm',
+		loadComponent: () => import('./components/tramm/Tramm-dashboard.component').then((m) => m.TrammDashboardComponent),
 	},
 	{
-		path: 'chartered-bike/stations',
-		loadComponent: () => import('./components/admin/chartered-bike-stations/chartered-bike-stations.component').then((m) => m.CharteredBikeStationsComponent),
+		path: 'tramm/live-signal-status',
+		loadComponent: () => import('./components/tramm/live-signal-status.component').then((m) => m.LiveSignalStatusComponent),
 	},
 	{
-		path: 'chartered-bike/history',
-		loadComponent: () => import('./components/admin/chartered-bike-history/chartered-bike-history.component').then((m) => m.CharteredBikeHistoryComponent),
+		path: 'tramm/junction-monitor',
+		loadComponent: () => import('./components/tramm/junction-monitor.component').then((m) => m.JunctionMonitorComponent),
 	},
 	{
-		path: 'chartered-bike/statistics',
-		loadComponent: () => import('./components/admin/chartered-bike-stats/chartered-bike-stats.component').then((m) => m.CharteredBikeStatsComponent),
+		path: 'tramm/junction-map',
+		loadComponent: () =>
+			import('./components/tramm/Junction-map.component').then(m => m.JunctionMapComponent),
 	},
 	{
-		path: 'chartered-bike/reports',
-		loadComponent: () => import('./components/admin/chartered-bike-reports/chartered-bike-reports.component').then((m) => m.CharteredBikeReportsComponent),
+		path: 'tramm/dashboard',
+		redirectTo: 'tramm',
+		pathMatch: 'full',
+	},
+	{
+		path: 'tram',
+		redirectTo: 'tramm',
+		pathMatch: 'full',
 	},
 
 	// ============ CAMERA INCIDENT MANAGEMENT SYSTEM (CIMS) ============
