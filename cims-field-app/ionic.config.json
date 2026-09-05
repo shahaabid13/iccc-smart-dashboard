@@ -1,0 +1,7 @@
+{
+  "name": "cims-field-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}

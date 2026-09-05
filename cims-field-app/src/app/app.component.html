@@ -1,0 +1,107 @@
+<!-- Side Menu (Overlay Drawer) -->
+<ion-menu contentId="main-content" type="overlay">
+  <!-- Menu Header with Logo -->
+  <ion-header>
+    <ion-toolbar>
+      <div class="menu-logo-container">
+        <img src="assets/IMG_20251203_100849.jpg" alt="Logo" class="menu-logo">
+      </div>
+    </ion-toolbar>
+  </ion-header>
+
+  <!-- Menu Content -->
+  <ion-content>
+    <!-- Navigation Items -->
+    <ion-list>
+      <!-- Tickets Section with Accordion -->
+      <ion-accordion-group>
+        <ion-accordion value="tickets" toggleIconSlot="start">
+          <ion-item slot="header" button>
+            <ion-icon name="document-text-outline" slot="start"></ion-icon>
+            <ion-label>Tickets</ion-label>
+          </ion-item>
+          <div slot="content">
+            <!-- Tickets Queue -->
+            <ion-item class="nested-item">
+              <ion-menu-toggle>
+                <ion-item button routerLink="/tickets" routerDirection="root" detail="false" [routerLinkActive]="'active'" [routerLinkActiveOptions]="{ exact: true }">
+                  <ion-label>Tickets Queue</ion-label>
+                </ion-item>
+              </ion-menu-toggle>
+            </ion-item>
+            
+            <!-- Tickets Details -->
+            <ion-item class="nested-item">
+              <ion-menu-toggle>
+                <ion-item button (click)="navigateToRecentTicketDetail()" detail="false">
+                  <ion-label>Tickets Details</ion-label>
+                </ion-item>
+              </ion-menu-toggle>
+            </ion-item>
+          </div>
+        </ion-accordion>
+      </ion-accordion-group>
+
+      <!-- Tasks Section with Accordion -->
+      <ion-accordion-group>
+        <ion-accordion value="tasks" toggleIconSlot="start">
+          <ion-item slot="header" button>
+            <ion-icon name="checkmark-done-outline" slot="start"></ion-icon>
+            <ion-label>Tasks</ion-label>
+          </ion-item>
+          <div slot="content">
+            <!-- Tasks Queue -->
+            <ion-item class="nested-item">
+              <ion-menu-toggle>
+                <ion-item button routerLink="/tasks" routerDirection="root" detail="false" [routerLinkActive]="'active'" [routerLinkActiveOptions]="{ exact: true }">
+                  <ion-label>Tasks Queue</ion-label>
+                </ion-item>
+              </ion-menu-toggle>
+            </ion-item>
+            
+            <!-- Tasks Details -->
+            <ion-item class="nested-item">
+              <ion-menu-toggle>
+                <ion-item button (click)="navigateToRecentTaskDetail()" detail="false">
+                  <ion-label>Tasks Details</ion-label>
+                </ion-item>
+              </ion-menu-toggle>
+            </ion-item>
+          </div>
+        </ion-accordion>
+      </ion-accordion-group>
+
+      <!-- About -->
+      <ion-menu-toggle>
+        <ion-item button (click)="openAbout()">
+          <ion-icon name="information-circle-outline" slot="start"></ion-icon>
+          <ion-label>About</ion-label>
+        </ion-item>
+      </ion-menu-toggle>
+    </ion-list>
+  </ion-content>
+
+  <!-- Menu Footer (User Profile & Logout) -->
+  <ion-footer class="menu-footer">
+    <ion-toolbar>
+      <div class="user-profile-section">
+        <div class="user-avatar">
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </div>
+        <div class="user-info">
+          <p class="username">{{ username || 'User' }}</p>
+          <p class="user-label">Connected</p>
+        </div>
+      </div>
+      <ion-menu-toggle>
+        <ion-button expand="block" color="danger" (click)="handleLogout()">
+          <ion-icon name="log-out-outline" slot="start"></ion-icon>
+          Logout
+        </ion-button>
+      </ion-menu-toggle>
+    </ion-toolbar>
+  </ion-footer>
+</ion-menu>
+
+<!-- Main Content -->
+<ion-router-outlet id="main-content"></ion-router-outlet>

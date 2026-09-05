@@ -1,0 +1,117 @@
+<div class="channels-container">
+  <mat-card class="filters-card">
+    <mat-card-title>Filter Channels</mat-card-title>
+    <form [formGroup]="filterForm" class="filter-form">
+      <!-- Server Filter -->
+      <mat-form-field appearance="fill">
+        <mat-label>Server</mat-label>
+        <mat-select formControlName="serverId" (selectionChange)="onFilterChange()">
+          <mat-option value="">All Servers</mat-option>
+          <mat-option *ngFor="let server of servers()" [value]="server.serverId">
+            {{ server.serverName }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Camera Type Filter -->
+      <mat-form-field appearance="fill">
+        <mat-label>Camera Type</mat-label>
+        <mat-select formControlName="type" (selectionChange)="onFilterChange()">
+          <mat-option value="">All Types</mat-option>
+          <mat-option *ngFor="let type of cameraTypes" [value]="type">
+            {{ type }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Location Search -->
+      <mat-form-field appearance="fill">
+        <mat-label>Search Location/Name</mat-label>
+        <input
+          matInput
+
+          formControlName="location"
+          placeholder="Type to search..."
+          (keyup)="onFilterChange()"
+        />
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+    </form>
+  </mat-card>
+
+  <!-- Channels Table -->
+  <mat-card class="channels-card">
+    <mat-card-title>
+      Channels
+      <span class="channel-count">({{ filteredChannels().length }})</span>
+    </mat-card-title>
+
+    <div *ngIf="loading()" class="loading">
+      <mat-spinner></mat-spinner>
+    </div>
+
+    <div *ngIf="!loading() && paginatedChannels.length === 0" class="no-data">
+      <p>No channels found</p>
+    </div>
+
+    <table mat-table [dataSource]="paginatedChannels" *ngIf="!loading() && paginatedChannels.length > 0">
+      <!-- Name Column -->
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <td mat-cell *matCellDef="let element">{{ element.name }}</td>
+      </ng-container>
+
+      <!-- Type Column -->
+      <ng-container matColumnDef="type">
+        <th mat-header-cell *matHeaderCellDef>Type</th>
+        <td mat-cell *matCellDef="let element">
+          <mat-chip [color]="element.type === 'ANPR' ? 'primary' : 'accent'">
+            {{ element.type }}
+          </mat-chip>
+        </td>
+      </ng-container>
+
+      <!-- Location Column -->
+      <ng-container matColumnDef="location">
+        <th mat-header-cell *matHeaderCellDef>Location</th>
+        <td mat-cell *matCellDef="let element">{{ element.location }}</td>
+      </ng-container>
+
+      <!-- Status Column -->
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let element">
+          <mat-chip [color]="getStatusColor(element.status)">
+            {{ element.status || 'UNKNOWN' }}
+          </mat-chip>
+        </td>
+      </ng-container>
+
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let element">
+          <button
+            mat-icon-button
+            color="primary"
+            (click)="viewChannelDetails(element)"
+            matTooltip="View Details"
+          >
+            <mat-icon>info</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+
+    <!-- Paginator -->
+    <mat-paginator
+      [length]="filteredChannels().length"
+      [pageSize]="pageSize"
+      [pageSizeOptions]="[10, 20, 50]"
+      (page)="onPageChange($event)"
+    ></mat-paginator>
+  </mat-card>
+</div>

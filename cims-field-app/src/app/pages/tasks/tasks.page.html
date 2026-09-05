@@ -1,0 +1,81 @@
+<ion-page class="tabbed-page">
+  <app-offline-banner></app-offline-banner>
+  <app-header></app-header>
+
+  <ion-content class="ion-padding">
+    <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+      <ion-refresher-content pullingText="Pull to refresh" refreshingSpinner="crescent"></ion-refresher-content>
+    </ion-refresher>
+
+    <div class="page-shell">
+      <ng-container *ngIf="loading; else list">
+        <ion-card>
+          <ion-card-content>
+            <ion-list>
+              <ion-item *ngFor="let i of [1,2,3]">
+                <ion-label>
+                  <h3><ion-skeleton-text animated style="width: 70%"></ion-skeleton-text></h3>
+                  <p><ion-skeleton-text animated style="width: 50%"></ion-skeleton-text></p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+      </ng-container>
+
+      <ng-template #list>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <ion-button fill="clear" [color]="selectedTab === 'queue' ? 'primary' : 'medium'" (click)="selectedTab = 'queue'">
+            My Queue ({{ tasks.length }})
+          </ion-button>
+          <ion-button fill="clear" [color]="selectedTab === 'history' ? 'primary' : 'medium'" (click)="selectedTab = 'history'">
+            My History ({{ history.length }})
+          </ion-button>
+        </div>
+
+        <ng-container *ngIf="selectedTab === 'queue'; else historyTab">
+          <ion-list *ngIf="tasks.length; else emptyState">
+            <ion-item *ngFor="let task of tasks; trackBy: trackByTaskId" button detail="false"
+                      (click)="openTask(task)">
+              <ion-label>
+                <h3>{{ task.title }}</h3>
+                <p class="ion-text-wrap ion-text-muted">{{ task.status }} • {{ task.dueDate || 'No due date' }}</p>
+              </ion-label>
+              <ion-badge [color]="colorForStatus(task.status)" slot="end">{{ task.status }}</ion-badge>
+              <ion-button slot="end" fill="clear" color="primary" (click)="$event.stopPropagation(); openTask(task)">Action</ion-button>
+            </ion-item>
+          </ion-list>
+
+          <ng-template #emptyState>
+            <ion-card>
+              <ion-card-content class="empty-state">
+                <p class="ion-no-margin">No tasks assigned.</p>
+                <p class="ion-text-muted">Once tasks are assigned, they’ll appear here for review.</p>
+              </ion-card-content>
+            </ion-card>
+          </ng-template>
+        </ng-container>
+
+        <ng-template #historyTab>
+          <ion-list *ngIf="history.length; else historyEmptyState">
+            <ion-item *ngFor="let task of history; trackBy: trackByTaskId" button detail="false" (click)="openTask(task)">
+              <ion-label>
+                <h3>{{ task.title }}</h3>
+                <p>{{ task.status }} • {{ task.updatedAt || task.createdAt || 'No date' }}</p>
+              </ion-label>
+              <ion-badge [color]="colorForStatus(task.status)" slot="end">{{ task.status }}</ion-badge>
+            </ion-item>
+          </ion-list>
+
+          <ng-template #historyEmptyState>
+            <ion-card>
+              <ion-card-content class="empty-state">
+                <p class="ion-no-margin">No task history yet.</p>
+              </ion-card-content>
+            </ion-card>
+          </ng-template>
+        </ng-template>
+      </ng-template>
+    </div>
+  </ion-content>
+</ion-page>

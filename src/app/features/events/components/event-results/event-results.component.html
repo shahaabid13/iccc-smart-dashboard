@@ -1,0 +1,91 @@
+<div class="events-results-container">
+  <mat-card class="results-card">
+    <mat-card-title>
+      Search Results
+      <span class="results-count" *ngIf="totalRecords() > 0">
+        ({{ totalRecords() }} total, page {{ currentPage() }} of {{ totalPages() }})
+      </span>
+    </mat-card-title>
+
+    <div class="results-actions">
+      <button mat-stroked-button color="primary" (click)="backToSearch()">
+        <mat-icon>arrow_back</mat-icon>
+        Back to Search
+      </button>
+    </div>
+
+    <div *ngIf="warning()" class="results-warning" role="status">
+      <mat-icon>warning</mat-icon>
+      <span>{{ warning() }}</span>
+    </div>
+
+    <div *ngIf="events().length === 0" class="no-data">
+      <p>No events found. Try adjusting your search filters, or your results may have been lost on refresh — please search again.</p>
+    </div>
+
+    <table mat-table [dataSource]="events()" *ngIf="events().length > 0">
+      <!-- Event Time Column -->
+      <ng-container matColumnDef="eventtime">
+        <th mat-header-cell *matHeaderCellDef>Time</th>
+        <td mat-cell *matCellDef="let element">{{ formatEventTime(element.eventtime) }}</td>
+      </ng-container>
+
+      <!-- Alert Name Column -->
+      <ng-container matColumnDef="alertname">
+        <th mat-header-cell *matHeaderCellDef>Alert</th>
+        <td mat-cell *matCellDef="let element">
+          <mat-chip color="primary">{{ element.alertname || 'Alert ' + element.alerttype }}</mat-chip>
+        </td>
+      </ng-container>
+
+      <!-- Channel Name Column -->
+      <ng-container matColumnDef="channelname">
+        <th mat-header-cell *matHeaderCellDef>Channel</th>
+        <td mat-cell *matCellDef="let element">{{ element.channelname || element.channelid }}</td>
+      </ng-container>
+
+      <!-- Location Column -->
+      <ng-container matColumnDef="eventlocation">
+        <th mat-header-cell *matHeaderCellDef>Location</th>
+        <td mat-cell *matCellDef="let element">{{ element.eventlocation || '—' }}</td>
+      </ng-container>
+
+      <!-- Message Column -->
+      <ng-container matColumnDef="message">
+        <th mat-header-cell *matHeaderCellDef>Message</th>
+        <td mat-cell *matCellDef="let element">{{ element.message || '—' }}</td>
+      </ng-container>
+
+      <!-- Evidence Column -->
+      <ng-container matColumnDef="evidence">
+        <th mat-header-cell *matHeaderCellDef>Evidence</th>
+        <td mat-cell *matCellDef="let element">
+          <a
+            *ngIf="element.clipurl"
+            [href]="element.clipurl"
+            target="_blank"
+            rel="noopener noreferrer"
+            mat-icon-button
+            color="primary"
+            matTooltip="View evidence clip"
+          >
+            <mat-icon>videocam</mat-icon>
+          </a>
+          <span *ngIf="!element.clipurl">—</span>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+
+    <mat-paginator
+      *ngIf="totalRecords() > 0"
+      [length]="totalRecords()"
+      [pageIndex]="currentPage() - 1"
+      [pageSize]="searchRequestPageSize"
+      [pageSizeOptions]="[10, 20, 50]"
+      (page)="onPageChange($event)"
+    ></mat-paginator>
+  </mat-card>
+</div>

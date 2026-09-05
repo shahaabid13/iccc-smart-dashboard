@@ -1,0 +1,100 @@
+<ion-page class="tabbed-page">
+  <app-offline-banner></app-offline-banner>
+  <app-header></app-header>
+
+  <ion-content class="ion-padding">
+    <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+      <ion-refresher-content pullingText="Pull to refresh" refreshingSpinner="crescent"></ion-refresher-content>
+    </ion-refresher>
+
+    <ng-container *ngIf="loading; else list">
+      <ion-list>
+        <ion-item *ngFor="let item of [1, 2, 3]" lines="none">
+          <ion-avatar slot="start">
+            <ion-skeleton-text animated style="width: 42px; height: 42px"></ion-skeleton-text>
+          </ion-avatar>
+          <ion-label>
+            <h3><ion-skeleton-text animated style="width: 60%"></ion-skeleton-text></h3>
+            <p><ion-skeleton-text animated style="width: 40%"></ion-skeleton-text></p>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </ng-container>
+
+    <ng-template #list>
+      <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+        <ion-button fill="clear" [color]="selectedTab === 'queue' ? 'primary' : 'medium'" (click)="selectedTab = 'queue'">
+          My Queue ({{ tickets.length }})
+        </ion-button>
+        <ion-button fill="clear" [color]="selectedTab === 'history' ? 'primary' : 'medium'" (click)="selectedTab = 'history'">
+          Ticket History ({{ history.length }})
+        </ion-button>
+      </div>
+
+      <ng-container *ngIf="selectedTab === 'queue'; else historyTab">
+        <ion-list *ngIf="tickets.length; else emptyState">
+          <ion-item *ngFor="let ticket of tickets" button detail="false" (click)="open(ticket)" class="ticket-row">
+            <div class="ticket-content">
+              <div class="ticket-top-row">
+                <div class="ticket-meta-left">
+                  <ion-badge [color]="colorForPriority(ticket.priority)">{{ ticket.priority }}</ion-badge>
+                </div>
+                <div class="ticket-meta-right">
+                  <ion-button fill="clear" color="primary" size="small" (click)="$event.stopPropagation(); open(ticket)">Action</ion-button>
+                </div>
+              </div>
+
+              <div class="ticket-bottom-row">
+                <ion-label class="ticket-label">
+                  <h3>{{ ticket.incidentTypeName }}</h3>
+                  <p>{{ ticket.locationName }}</p>
+                </ion-label>
+                <ion-badge [color]="ticket.status === 'OPEN' ? 'primary' : ticket.status === 'RESOLVED' ? 'success' : ticket.status === 'REJECTED' ? 'danger' : ticket.status === 'HOLD' ? 'warning' : 'medium'" class="ticket-status-badge">{{ ticket.status }}</ion-badge>
+              </div>
+            </div>
+          </ion-item>
+        </ion-list>
+
+        <ng-template #emptyState>
+          <ion-card>
+            <ion-card-content class="empty-state">
+              <p class="ion-no-margin">No active tickets.</p>
+            </ion-card-content>
+          </ion-card>
+        </ng-template>
+      </ng-container>
+
+      <ng-template #historyTab>
+        <ion-list *ngIf="history.length; else historyEmptyState">
+          <ion-item *ngFor="let ticket of history" button detail="false" (click)="open(ticket)" class="ticket-row">
+            <div class="ticket-content">
+              <div class="ticket-top-row">
+                <div class="ticket-meta-left">
+                  <ion-badge [color]="colorForPriority(ticket.priority)">{{ ticket.priority }}</ion-badge>
+                </div>
+                <div class="ticket-meta-right">
+                  <ion-badge [color]="ticket.status === 'OPEN' ? 'primary' : ticket.status === 'RESOLVED' ? 'success' : ticket.status === 'REJECTED' ? 'danger' : ticket.status === 'HOLD' ? 'warning' : 'medium'">{{ ticket.status }}</ion-badge>
+                </div>
+              </div>
+
+              <div class="ticket-bottom-row">
+                <ion-label class="ticket-label">
+                  <h3>{{ ticket.incidentTypeName }}</h3>
+                  <p>{{ ticket.locationName }} • {{ ticket.updatedAt || ticket.createdAt || 'No date' }}</p>
+                </ion-label>
+              </div>
+            </div>
+          </ion-item>
+        </ion-list>
+
+        <ng-template #historyEmptyState>
+          <ion-card>
+            <ion-card-content class="empty-state">
+              <p class="ion-no-margin">No ticket history yet.</p>
+            </ion-card-content>
+          </ion-card>
+        </ng-template>
+      </ng-template>
+    </ng-template>
+  </ion-content>
+</ion-page>

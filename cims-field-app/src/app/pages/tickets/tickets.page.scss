@@ -1,0 +1,80 @@
+ion-chip {
+  margin-left: 0;
+}
+
+.empty {
+  text-align: center;
+  margin: 24px 0;
+  color: var(--ion-color-medium);
+}
+
+ion-list {
+  background: transparent;
+}
+
+.ticket-row {
+  --min-height: auto;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  align-items: flex-start;
+}
+
+.ticket-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ticket-top-row,
+.ticket-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.ticket-meta-left,
+.ticket-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-label h3,
+.ticket-label p {
+  margin: 0;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.ticket-label h3 {
+  margin-bottom: 4px;
+}
+
+.ticket-status-badge {
+  flex-shrink: 0;
+  max-width: 50%;
+  white-space: normal;
+  text-align: center;
+}
+
+ion-button[fill='clear'] {
+  --padding-start: 0;
+  --padding-end: 0;
+  margin: 0;
+}
+
+ion-badge {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}

@@ -1,0 +1,141 @@
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
+import {
+  IonContent, IonRefresher, IonRefresherContent, IonList, IonItem, IonAvatar,
+  IonLabel, IonSkeletonText, IonBadge, IonCard, IonCardContent,
+  ActionSheetController
+} from '@ionic/angular/standalone';
+import { TicketService } from '../../services/ticket.service';
+import { AuthService } from '../../services/auth.service';
+import { Ticket } from '../../models/ticket';
+import { OfflineBannerComponent } from 'src/app/components/offline-banner.component';
+import { AppHeaderComponent } from 'src/app/components/app-header.component';
+
+@Component({
+  selector: 'app-tickets',
+  standalone: true,
+  imports: [
+    CommonModule, OfflineBannerComponent, AppHeaderComponent,
+    IonContent, IonRefresher, IonRefresherContent, IonList, IonItem, IonAvatar,
+    IonLabel, IonSkeletonText, IonBadge, IonCard, IonCardContent
+  ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  templateUrl: './tickets.page.html',
+  styleUrls: ['./tickets.page.scss']
+})
+export class TicketsPage implements OnInit, OnDestroy {
+  tickets: Ticket[] = [];
+  history: Ticket[] = [];
+  loading = false;
+  selectedTab: 'queue' | 'history' = 'queue';
+  private isLoadingInProgress = false;
+
+  /** Emits on destroy to cancel any in-flight request. */
+  private readonly destroy$ = new Subject<void>();
+
+  constructor(
+    private ticketService: TicketService,
+    private router: Router,
+    private route: ActivatedRoute,
+    private actionSheetCtrl: ActionSheetController,
+    private authService: AuthService
+  ) {}
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  ngOnInit() {
+    console.log('[TicketsPage] ngOnInit called');
+    this.selectedTab = this.route.snapshot.queryParamMap.get('tab') === 'history' ? 'history' : 'queue';
+    this.load();
+    this.loadHistory();
+  }
+
+  ionViewWillEnter() {
+    console.log('[TicketsPage] ionViewWillEnter called');
+    this.selectedTab = this.route.snapshot.queryParamMap.get('tab') === 'history' ? 'history' : 'queue';
+    // Also load here for Ionic page caching - only load if not already loaded recently
+    if (!this.tickets || this.tickets.length === 0) {
+      this.load();
+    }
+  }
+
+  async showProfile() {
+    const username = await this.authService.getUsername();
+    const header = username || 'Account';
+    const actionSheet = await this.actionSheetCtrl.create({
+      header,
+      buttons: [
+        {
+          text: 'Logout',
+          role: 'destructive',
+          handler: async () => {
+            await this.authService.logout();
+          }
+        },
+        { text: 'Cancel', role: 'cancel' }
+      ]
+    });
+    await actionSheet.present();
+  }
+
+  load(event?: any) {
+    if (this.isLoadingInProgress) {
+      console.log('[TicketsPage] Load already in progress, skipping duplicate request');
+      if (event) event.target.complete();
+      return;
+    }
+
+    console.log('[TicketsPage] Starting load()');
+    this.isLoadingInProgress = true;
+    this.loading = true;
+    this.ticketService.getMyQueue()
+      .pipe(
+        takeUntil(this.destroy$)
+      )
+      .subscribe({
+        next: data => {
+          this.tickets = data;
+          this.loadHistory();
+          this.loading = false;
+          this.isLoadingInProgress = false;
+          if (event) event.target.complete();
+        },
+        error: (error) => {
+          console.error('[TicketsPage] Failed to load tickets:', error);
+          this.loading = false;
+          this.isLoadingInProgress = false;
+          if (event) event.target.complete();
+        }
+      });
+  }
+
+  loadHistory() {
+    this.ticketService.getMyHistory()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: data => this.history = data,
+        error: () => this.history = []
+      });
+  }
+
+  open(ticket: Ticket) {
+    // Store the last viewed ticket ID for menu navigation
+    sessionStorage.setItem('lastViewedTicketId', String(ticket.id));
+    void this.router.navigate([`/tickets/${ticket.id}`]);
+  }
+
+  colorForPriority(p: string) {
+    switch (p) {
+      case 'CRITICAL': return 'danger';
+      case 'HIGH': return 'warning';
+      case 'MEDIUM': return 'tertiary';
+      default: return 'success';
+    }
+  }
+}

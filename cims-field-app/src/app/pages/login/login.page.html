@@ -1,0 +1,63 @@
+<ion-page>
+  <app-offline-banner></app-offline-banner>
+  <ion-header translucent>
+    <ion-toolbar>
+      <div class="header-branding">
+        <img src="assets/IMG_20251203_100849.jpg" alt="Logo" class="header-logo" />
+        <ion-title>CIMS Field App</ion-title>
+      </div>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content class="ion-padding login-content" [fullscreen]="true">
+    <div class="login-wrapper">
+      <ion-card class="login-card">
+        <ion-card-header>
+          <ion-card-title>Field-person login</ion-card-title>
+          <ion-card-subtitle>Sign in to access incident assignments</ion-card-subtitle>
+        </ion-card-header>
+
+        <ion-card-content>
+          <form [formGroup]="form" (ngSubmit)="submit()" class="form-stack">
+            <ion-input
+              label="Username"
+              label-placement="floating"
+              fill="outline"
+              formControlName="username"
+              type="text"
+              autocomplete="username"
+              class="form-field"
+            ></ion-input>
+
+            <ion-input
+              label="Password"
+              label-placement="floating"
+              fill="outline"
+              formControlName="password"
+              [type]="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              class="form-field"
+            >
+              <ion-button
+                slot="end"
+                fill="clear"
+                (click)="togglePasswordVisibility()"
+                size="small"
+                class="visibility-toggle"
+              >
+                <ion-icon [name]="showPassword ? 'eye-outline' : 'eye-off-outline'"></ion-icon>
+              </ion-button>
+            </ion-input>
+
+            <div class="error-message" *ngIf="error">{{ error }}</div>
+
+            <ion-button expand="block" type="submit" color="primary" [disabled]="isSubmitting" class="submit-btn">
+              <ion-spinner *ngIf="isSubmitting" name="crescent" slot="start"></ion-spinner>
+              {{ isSubmitting ? 'Signing in...' : 'Sign In' }}
+            </ion-button>
+          </form>
+        </ion-card-content>
+      </ion-card>
+    </div>
+  </ion-content>
+</ion-page>

@@ -1,0 +1,186 @@
+<div class="stats-container">
+  <mat-card class="header-card">
+    <div class="header-content">
+      <h1>Chartered Bike Statistics</h1>
+      <p class="subtitle">View min, max, and average bike availability statistics</p>
+    </div>
+  </mat-card>
+
+  <!-- Error Message -->
+  <mat-card *ngIf="error" class="error-card">
+    <div class="error-content">
+      <mat-icon>error</mat-icon>
+      <span>{{ error }}</span>
+      <button mat-icon-button (click)="dismissError()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- Filters -->
+  <mat-card class="filters-card">
+    <form [formGroup]="statsForm" class="filter-form">
+      <div class="filter-row">
+        <mat-form-field class="filter-field">
+          <mat-label>Station</mat-label>
+          <mat-select formControlName="stationName">
+            <mat-optgroup label="Select a Station">
+              <mat-option *ngFor="let station of stationNames" [value]="station.stationName">
+                {{ station.stationName }}
+              </mat-option>
+            </mat-optgroup>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field class="filter-field">
+          <mat-label>Start Date</mat-label>
+          <input matInput [matDatepicker]="startPicker" formControlName="startDate" />
+          <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+          <mat-datepicker #startPicker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field class="filter-field">
+          <mat-label>End Date</mat-label>
+          <input matInput [matDatepicker]="endPicker" formControlName="endDate" />
+          <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+          <mat-datepicker #endPicker></mat-datepicker>
+        </mat-form-field>
+      </div>
+
+      <div class="button-row">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="loadStats()"
+          [disabled]="loading || statsForm.invalid"
+        >
+          <mat-icon>bar_chart</mat-icon>
+          Load Statistics
+        </button>
+      </div>
+    </form>
+  </mat-card>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>Loading statistics...</p>
+  </div>
+
+  <!-- Stats Display -->
+  <div *ngIf="!loading && selectedStats" class="stats-display">
+    <!-- Main Stats Card -->
+    <mat-card class="main-stats-card">
+      <div class="stats-header">
+        <h2>{{ selectedStats.stationName }}</h2>
+        <span class="period">{{ formatDate(selectedStats.startDate) }} to {{ formatDate(selectedStats.endDate) }}</span>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon min">
+            <mat-icon>trending_down</mat-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">Minimum Bikes</div>
+            <div class="stat-value">{{ selectedStats.minBikes }}</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon avg">
+            <mat-icon>show_chart</mat-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">Average Bikes</div>
+            <div class="stat-value">{{ selectedStats.avgBikes | number: '1.0-0' }}</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon max">
+            <mat-icon>trending_up</mat-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">Maximum Bikes</div>
+            <div class="stat-value">{{ selectedStats.maxBikes }}</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon trend">
+            <mat-icon>{{ getTrendArrow(selectedStats.trend) }}</mat-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">Trend</div>
+            <div class="stat-value" [style.color]="getTrendColor(selectedStats.trend)">
+              {{ selectedStats.trend }}
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon rack">
+            <mat-icon>storage</mat-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">Avg Rack Available</div>
+            <div class="stat-value">{{ selectedStats.avgRackAvailable | number: '1.0-0' }}</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon data">
+            <mat-icon>dataset</mat-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">Data Points</div>
+            <div class="stat-value">{{ selectedStats.dataPoints }}</div>
+          </div>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- Chart -->
+    <mat-card class="chart-card">
+      <h3>Availability Range</h3>
+      <div class="chart-container">
+        <canvas
+          baseChart
+          [data]="lineChartData"
+          [options]="lineChartOptions"
+          type="line"
+          #lineChart
+        ></canvas>
+      </div>
+    </mat-card>
+
+    <!-- Rack Statistics -->
+    <mat-card class="rack-stats-card">
+      <h3>Bike Rack Statistics</h3>
+      <div class="rack-stats">
+        <div class="rack-stat">
+          <div class="rack-label">Minimum</div>
+          <div class="rack-value">{{ selectedStats.minRackAvailable }}</div>
+        </div>
+        <div class="rack-stat">
+          <div class="rack-label">Average</div>
+          <div class="rack-value">{{ selectedStats.avgRackAvailable | number: '1.0-0' }}</div>
+        </div>
+        <div class="rack-stat">
+          <div class="rack-label">Maximum</div>
+          <div class="rack-value">{{ selectedStats.maxRackAvailable }}</div>
+        </div>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Empty State -->
+  <mat-card *ngIf="!loading && !selectedStats && statsData.length === 0" class="empty-card">
+    <div class="empty-content">
+      <mat-icon class="empty-icon">bar_chart</mat-icon>
+      <h3>No Statistics Found</h3>
+      <p>Select a station and date range to view statistics.</p>
+    </div>
+  </mat-card>
+</div>

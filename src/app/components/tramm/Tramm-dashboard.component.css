@@ -1,0 +1,162 @@
+.tramm-panel {
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+}
+
+.tramm-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.last-updated {
+  font-size: 12px;
+  color: #888;
+}
+
+.tramm-error {
+  background: #fdecea;
+  color: #b02a37;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.tramm-selectors {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.selector-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+}
+
+.selector-group select {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.hint {
+  font-size: 12px;
+  color: #999;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.detail-header h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.status-badge {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e6f4ea;
+  color: #1e7e34;
+}
+
+.status-badge.status-off {
+  background: #fdecea;
+  color: #b02a37;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.detail-item {
+  background: #f7f7f7;
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.detail-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #222;
+}
+
+.poles-section h5 {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #555;
+  text-transform: uppercase;
+}
+
+.poles-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pole-card {
+  background: #1c1c1c;
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 120px;
+}
+
+.pole-title {
+  color: #ccc;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.lamp-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lamp {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  background: #444;
+  border: 1px solid #000;
+}
+
+.lamp-red { background: #e53935; box-shadow: 0 0 6px #e53935; }
+.lamp-amber { background: #fbc02d; box-shadow: 0 0 6px #fbc02d; }
+.lamp-green { background: #43a047; box-shadow: 0 0 6px #43a047; }
+.lamp-off {
+  box-shadow: none;
+  opacity: 0.5;
+}

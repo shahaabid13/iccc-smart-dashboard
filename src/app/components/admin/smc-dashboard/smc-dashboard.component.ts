@@ -1,0 +1,1561 @@
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { SmcService } from '../../../services/smc.service';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+@Component({
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  selector: 'app-smc-dashboard',
+  template: `
+    <div class="smc-dashboard">
+      <h2>Solid Waste Management Dashboard</h2>
+
+      <!-- Filters Section -->
+      <div class="filters-section">
+        <div class="filter-group">
+          <label for="periodFilter">Time Period:</label>
+          <select 
+            id="periodFilter" 
+            [(ngModel)]="selectedPeriod" 
+            (change)="onPeriodChange()"
+            class="filter-select"
+          >
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="all">All Data</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="fromDate">From Date:</label>
+          <input 
+            id="fromDate" 
+            type="date" 
+            [(ngModel)]="fromDate" 
+            (change)="onCustomDateChange()"
+            class="filter-input"
+          >
+        </div>
+
+        <div class="filter-group">
+          <label for="toDate">To Date:</label>
+          <input 
+            id="toDate" 
+            type="date" 
+            [(ngModel)]="toDate" 
+            (change)="onCustomDateChange()"
+            class="filter-input"
+          >
+        </div>
+
+        <div class="action-buttons">
+          <button (click)="applyFilters()" class="btn btn-primary">Apply Filters</button>
+
+          <!-- Export dropdown -->
+          <div class="dropdown" [class.open]="exportDropdownOpen">
+            <button (click)="toggleExportDropdown()" class="btn btn-secondary" [disabled]="!filteredRecords.length">
+              <span class="export-icon">📤</span> Export
+            </button>
+            <ul class="dropdown-menu" *ngIf="exportDropdownOpen">
+              <li><button class="dropdown-item" (click)="exportToExcel(); toggleExportDropdown(false)">Export as Excel</button></li>
+              <li><button class="dropdown-item" (click)="exportToPDF(); toggleExportDropdown(false)">Export as PDF</button></li>
+            </ul>
+          </div>
+
+          <!-- Report dropdown (limited columns + totals) -->
+          <div class="dropdown" [class.open]="reportDropdownOpen">
+            <button (click)="toggleReportDropdown()" class="btn btn-secondary" [disabled]="!filteredRecords.length">
+              <span class="export-icon">📑</span> Report
+            </button>
+            <ul class="dropdown-menu" *ngIf="reportDropdownOpen">
+              <li><button class="dropdown-item" (click)="exportReportToExcel(); toggleReportDropdown(false)">Report as Excel</button></li>
+              <li><button class="dropdown-item" (click)="exportReportToPDF(); toggleReportDropdown(false)">Report as PDF</button></li>
+              <li><button class="dropdown-item" (click)="exportDailyDataReportToPDF(); toggleReportDropdown(false)">Daily Data Report (PDF)</button></li>
+            </ul>
+          </div>
+
+          <button (click)="resetFilters()" class="btn btn-outline">Reset</button>
+        </div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div *ngIf="filteredRecords.length > 0" class="summary-stats">
+        <div class="stat-card">
+          <span class="stat-label">Total Records:</span>
+          <span class="stat-value">{{ filteredRecords.length }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Total Weight:</span>
+          <span class="stat-value">{{ getTotalWeight() | number }} kg</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Date Range:</span>
+          <span class="stat-value">{{ getDateRangeLabel() }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Average Weight:</span>
+          <span class="stat-value">{{ getAverageWeight() | number }} kg</span>
+        </div>
+      </div>
+
+      <div *ngIf="loading" class="loading">Loading SMC data...</div>
+      
+      <div *ngIf="error" class="error">
+        <h3>Failed to load data</h3>
+        <p>{{ errorMessage }}</p>
+        <button (click)="load()" class="retry-btn">Retry</button>
+      </div>
+
+      <div *ngIf="apiUnavailable" class="warning">
+        <h3>⚠️ API Connection Issue</h3>
+        <p>Showing fallback data. The live API might be unavailable.</p>
+        <button (click)="load()" class="retry-btn">Retry Connection</button>
+      </div>
+
+      <!-- Data Table -->
+      <div *ngIf="!loading && !error && paginatedRecords.length" class="table-container">
+        <table class="smc-table">
+          <thead>
+            <tr>
+              <th>Slip No</th>
+              <th>VNo</th>
+              <th>VName</th>
+              <th>SName</th>
+              <th>TWeight</th>
+              <th>GWeight</th>
+              <th>GDate</th>
+              <th>NWeight</th>
+              <th>Driver</th>
+              <th>EDate</th>
+              <th>WB_ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of paginatedRecords">
+              <td>{{ r.id?.slipno || '-' }}</td>
+              <td>{{ r.vno || '-' }}</td>
+              <td>{{ r.vname || '-' }}</td>
+              <td>{{ r.sname || '-' }}</td>
+              <td>{{ r.tweight || '0' }}</td>
+              <td>{{ r.gweight || '0' }}</td>
+              <td>{{ formatDate(r.gdate) }}</td>
+              <td>{{ r.nweight || '0' }}</td>
+              <td>{{ r.driver || '-' }}</td>
+              <td>{{ formatDate(r.edate) }}</td>
+              <td>{{ r.id?.wbId || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Pagination (inventory-system style: < 1 2 3 ... 182 183 184 >) -->
+        <div class="pagination" *ngIf="totalPages > 1">
+          <button
+            (click)="previousPage()"
+            [disabled]="currentPage === 1"
+            class="pagination-arrow">
+            &lt;
+          </button>
+
+          <ng-container *ngFor="let p of getPageNumbers()">
+            <button
+              *ngIf="p !== '...'"
+              (click)="goToPage(p)"
+              class="pagination-number"
+              [class.active]="p === currentPage">
+              {{ p }}
+            </button>
+            <span *ngIf="p === '...'" class="pagination-dots">...</span>
+          </ng-container>
+
+          <button
+            (click)="nextPage()"
+            [disabled]="currentPage === totalPages"
+            class="pagination-arrow">
+            &gt;
+          </button>
+        </div>
+
+        <div class="pagination-summary" *ngIf="filteredRecords.length">
+          Page {{ currentPage }} of {{ totalPages }} • {{ filteredRecords.length }} total records
+        </div>
+      </div>
+
+      <div *ngIf="!loading && !filteredRecords.length && !error" class="no-data">
+        No records found for the selected filters.
+      </div>
+    </div>
+  `,
+  styles: [
+    `
+      .smc-dashboard { 
+        padding: 20px; 
+        background: #f8f9fa;
+        min-height: 100vh;
+      }
+
+      .filters-section {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: end;
+      }
+
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .filter-group label {
+        font-weight: bold;
+        font-size: 12px;
+        color: #555;
+      }
+
+      .filter-select, .filter-input {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        min-width: 120px;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-left: auto;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.3s;
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: #007bff;
+        color: white;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: #0056b3;
+      }
+
+      .btn-secondary {
+        background: #6c757d;
+        color: white;
+      }
+
+      .btn-secondary:hover:not(:disabled) {
+        background: #545b62;
+      }
+
+      .btn-outline {
+        background: white;
+        color: #007bff;
+        border: 1px solid #007bff;
+      }
+
+      .btn-outline:hover:not(:disabled) {
+        background: #007bff;
+        color: white;
+      }
+
+      .export-icon {
+        margin-right: 5px;
+      }
+
+      /* Dropdown styles for Export and Report buttons */
+      .dropdown { position: relative; display: inline-block; }
+      .dropdown .dropdown-menu { display: none; position: absolute; right: 0; top: calc(100% + 6px); background: white; min-width: 180px; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 6px 12px rgba(0,0,0,0.08); z-index: 2000; padding: 6px 0; }
+      .dropdown.open .dropdown-menu { display: block; }
+      .dropdown .dropdown-item { background: transparent; border: none; width: 100%; text-align: left; padding: 8px 12px; cursor: pointer; font-size: 14px; color: #333; }
+      .dropdown .dropdown-item:hover { background: #f1f1f1; }
+
+      .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+
+      .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        font-weight: bold;
+      }
+
+      .stat-value {
+        font-size: 18px;
+        font-weight: bold;
+        color: #122e52;
+      }
+
+      .table-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+      }
+
+      .smc-table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        font-size: 14px;
+      }
+      .smc-table th, .smc-table td { 
+        border: 1px solid #ddd; 
+        padding: 12px; 
+        text-align: left; 
+      }
+      .smc-table th { 
+        background: #122e52; 
+        color: #fff; 
+        position: sticky;
+        top: 0;
+        font-weight: 600;
+      }
+      .smc-table tr:nth-child(even) {
+        background: #f8f9fa;
+      }
+      .smc-table tr:hover {
+        background: #e9ecef;
+      }
+
+      /* Inventory-style numbered pagination: < 1 2 3 ... 182 183 184 > */
+      .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        padding: 16px 20px 6px;
+        background: #f8f9fa;
+        border-top: 1px solid #ddd;
+        flex-wrap: wrap;
+      }
+
+      .pagination-arrow,
+      .pagination-number {
+        min-width: 34px;
+        height: 34px;
+        padding: 0 8px;
+        border: 1px solid #ddd;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #333;
+        transition: all 0.15s ease;
+      }
+
+      .pagination-arrow:disabled {
+        background: #f8f9fa;
+        color: #adb5bd;
+        cursor: not-allowed;
+      }
+
+      .pagination-arrow:not(:disabled):hover,
+      .pagination-number:not(.active):hover {
+        background: #e9ecef;
+        border-color: #ccc;
+      }
+
+      .pagination-number.active {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+        font-weight: 600;
+      }
+
+      .pagination-dots {
+        min-width: 20px;
+        text-align: center;
+        color: #888;
+        font-size: 14px;
+      }
+
+      .pagination-summary {
+        text-align: center;
+        color: #666;
+        font-size: 13px;
+        padding: 6px 20px 16px;
+      }
+
+      .loading {
+        color: #007bff;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        text-align: center;
+        margin: 20px 0;
+      }
+      .error {
+        color: #dc3545;
+        padding: 20px;
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .warning {
+        color: #856404;
+        padding: 20px;
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 4px;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .retry-btn {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      .retry-btn:hover {
+        background: #0056b3;
+      }
+      .no-data {
+        padding: 40px;
+        text-align: center;
+        color: #6c757d;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin: 20px 0;
+      }
+
+      @media (max-width: 768px) {
+        .filters-section {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        
+        .action-buttons {
+          margin-left: 0;
+          justify-content: center;
+        }
+        
+        .summary-stats {
+          grid-template-columns: 1fr;
+        }
+        
+        .filter-select, .filter-input {
+          min-width: unset;
+        }
+      }
+    `,
+  ],
+})
+export class SmcDashboardComponent implements OnInit {
+  records: any[] = [];
+  filteredRecords: any[] = [];
+  paginatedRecords: any[] = [];
+  loading = false;
+  error = false;
+  errorMessage = '';
+  apiUnavailable = false;
+
+  // Filter properties
+  selectedPeriod: string = 'all';
+  fromDate: string = '';
+  toDate: string = '';
+
+  // Pagination properties (fixed page size, inventory-style numbered pagination)
+  currentPage: number = 1;
+  readonly itemsPerPage: number = 10;
+  totalPages: number = 1;
+
+  // UI dropdown states
+  exportDropdownOpen = false;
+  reportDropdownOpen = false;
+
+  constructor(private smc: SmcService) {
+    this.initializeDates();
+  }
+
+  ngOnInit(): void {
+    this.load();
+  }
+
+  initializeDates(): void {
+    if (this.selectedPeriod === 'all') {
+      this.fromDate = '';
+      this.toDate = '';
+    } else {
+      const today = new Date();
+      this.toDate = today.toISOString().split('T')[0];
+      
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      this.fromDate = weekAgo.toISOString().split('T')[0];
+    }
+  }
+
+  load() {
+    this.loading = true;
+    this.error = false;
+    this.apiUnavailable = false;
+    this.errorMessage = '';
+
+    this.smc.getAllWeighbridgeData('SRNGR_LANDFILL_WB1').subscribe({
+      next: (res: any[]) => {
+        this.records = res || [];
+        this.applyFilters();
+        this.loading = false;
+        
+        // Check if we're using fallback data
+        if (this.records.length === 1 && this.records[0].id?.slipno === 1) {
+          this.apiUnavailable = true;
+        }
+      },
+      error: (err: any) => {
+        console.error('SMC load error', err);
+        this.error = true;
+        this.loading = false;
+        this.errorMessage = err?.message || 'Unknown error occurred';
+        
+        // Show fallback data even on error
+        this.records = this.smc['getFallbackData'] ? this.smc['getFallbackData']() : [];
+        this.applyFilters();
+      },
+    });
+  }
+
+  onPeriodChange(): void {
+    const today = new Date();
+    
+    switch (this.selectedPeriod) {
+      case 'today':
+        this.fromDate = today.toISOString().split('T')[0];
+        this.toDate = today.toISOString().split('T')[0];
+        break;
+      case 'week':
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        this.fromDate = weekAgo.toISOString().split('T')[0];
+        this.toDate = today.toISOString().split('T')[0];
+        break;
+      case 'month':
+        const monthAgo = new Date(today);
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        this.fromDate = monthAgo.toISOString().split('T')[0];
+        this.toDate = today.toISOString().split('T')[0];
+        break;
+      case 'all':
+        this.fromDate = '';
+        this.toDate = '';
+        break;
+    }
+    
+    this.applyFilters();
+  }
+
+  onCustomDateChange(): void {
+    this.selectedPeriod = 'custom';
+  }
+
+  applyFilters(): void {
+    this.currentPage = 1;
+    
+    if (!this.records.length) {
+      this.filteredRecords = [];
+      this.updatePagination();
+      return;
+    }
+
+    // Filter by date range
+    this.filteredRecords = this.records.filter(record => {
+      const recordDate = this.getRecordDate(record);
+      if (!recordDate) return true;
+
+      if (this.fromDate && recordDate < new Date(this.fromDate)) {
+        return false;
+      }
+      if (this.toDate && recordDate > new Date(this.toDate + 'T23:59:59')) {
+        return false;
+      }
+      return true;
+    });
+
+    // Sort latest first
+    this.filteredRecords.sort((a, b) => {
+      const dateA = this.getRecordDate(a)?.getTime() ?? 0;
+      const dateB = this.getRecordDate(b)?.getTime() ?? 0;
+      return dateB - dateA;
+    });
+
+    this.updatePagination();
+  }
+
+  resetFilters(): void {
+    this.selectedPeriod = 'all';
+    this.initializeDates();
+    this.applyFilters();
+  }
+
+  updatePagination(): void {
+    this.totalPages = Math.ceil(this.filteredRecords.length / this.itemsPerPage);
+    this.currentPage = Math.min(this.currentPage, this.totalPages || 1);
+    
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    
+    this.paginatedRecords = this.filteredRecords.slice(startIndex, endIndex);
+  }
+
+  previousPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+      this.updatePagination();
+    }
+  }
+
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.updatePagination();
+    }
+  }
+
+  goToPage(page: number | string): void {
+    if (typeof page !== 'number' || page === this.currentPage) return;
+    this.currentPage = page;
+    this.updatePagination();
+  }
+
+  /**
+   * Builds a windowed page-number list with ellipses, e.g.
+   * [1, '...', 4, 5, 6, '...', 184] — matching the inventory system's
+   * "< 1 2 3 ... 182 183 184 >" pagination style.
+   */
+  getPageNumbers(): (number | string)[] {
+    const total = this.totalPages;
+    const current = this.currentPage;
+    const delta = 1;
+    const range: number[] = [];
+    const withDots: (number | string)[] = [];
+    let last: number | undefined;
+
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+
+    for (const i of range) {
+      if (last !== undefined) {
+        if (i - last === 2) {
+          withDots.push(last + 1);
+        } else if (i - last > 2) {
+          withDots.push('...');
+        }
+      }
+      withDots.push(i);
+      last = i;
+    }
+
+    return withDots;
+  }
+
+  getRecordDate(record: any): Date | null {
+    const dateStr = record.edate || record.gdate;
+    if (!dateStr) return null;
+    
+    try {
+      return new Date(dateStr);
+    } catch {
+      return null;
+    }
+  }
+
+  getTotalWeight(): number {
+    return this.filteredRecords.reduce((total, record) => {
+      return total + (parseFloat(record.nweight) || 0);
+    }, 0);
+  }
+
+  getAverageWeight(): number {
+    if (this.filteredRecords.length === 0) return 0;
+    return this.getTotalWeight() / this.filteredRecords.length;
+  }
+
+  getDateRangeLabel(): string {
+    if (!this.fromDate && !this.toDate) return 'All Dates';
+    if (this.fromDate === this.toDate) return this.fromDate;
+    return `${this.fromDate} to ${this.toDate}`;
+  }
+
+  exportToExcel(): void {
+    if (!this.filteredRecords.length) {
+      alert('No data to export');
+      return;
+    }
+
+    try {
+      // Prepare data for Excel
+      const excelData = this.filteredRecords.map(record => ({
+        'Slip No': record.id?.slipno || '-',
+        'Vehicle No': record.vno || '-',
+        'Vehicle Name': record.vname || '-',
+        'Supplier Name': record.sname || '-',
+        'Tare Weight (kg)': record.tweight || '0',
+        'Gross Weight (kg)': record.gweight || '0',
+        'Gross Date': this.formatDateForExport(record.gdate),
+        'Net Weight (kg)': record.nweight || '0',
+        'Driver': record.driver || '-',
+        'Entry Date': this.formatDateForExport(record.edate),
+        'Weighbridge ID': record.id?.wbId || '-'
+      }));
+
+      // Create worksheet
+      const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(excelData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 10 }, // Slip No
+        { wch: 15 }, // Vehicle No
+        { wch: 20 }, // Vehicle Name
+        { wch: 20 }, // Supplier Name
+        { wch: 15 }, // Tare Weight
+        { wch: 15 }, // Gross Weight
+        { wch: 20 }, // Gross Date
+        { wch: 15 }, // Net Weight
+        { wch: 15 }, // Driver
+        { wch: 20 }, // Entry Date
+        { wch: 15 }  // Weighbridge ID
+      ];
+      worksheet['!cols'] = colWidths;
+
+      // Create workbook
+      const workbook: XLSX.WorkBook = {
+        Sheets: { 'Weighbridge Data': worksheet },
+        SheetNames: ['Weighbridge Data']
+      };
+
+      // Generate file name
+      const fileName = `Weighbridge_Data_${this.getDateRangeLabel().replace(/ /g, '_')}_${new Date().getTime()}.xlsx`;
+
+      // Export to Excel
+      XLSX.writeFile(workbook, fileName);
+      
+      console.log('Excel export completed successfully');
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Error exporting to Excel. Please try again.');
+    }
+  }
+
+ exportToPDF(): void {
+  if (!this.filteredRecords.length) {
+    alert('No data to export');
+    return;
+  }
+
+  try {
+    const loadImage = (url: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          canvas.getContext('2d')!.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg'));
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    };
+
+    loadImage('/download.jpg')
+      .then(logoBase64 => this.generatePDF(logoBase64))
+      .catch(() => this.generatePDF(null));
+
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    alert('Error exporting to PDF. Please try again.');
+  }
+}
+
+private formatDateDDMMYYYY(date: Date | string | null): string {
+  if (!date) return '-';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '-';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const mm = months[d.getMonth()];
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+private formatNumberWithCommas(value: string | number): string {
+  if (value === null || value === undefined || value === '') return '0';
+  const cleanValue = value.toString().replace(/,/g, '').trim();
+  const numberValue = parseFloat(cleanValue);
+  if (isNaN(numberValue)) return value.toString();
+  return numberValue.toLocaleString('en-US', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: Number.isInteger(numberValue) ? 0 : 2
+  });
+}
+
+private getFromToDates(): { from: string; to: string } {
+  const dates = this.filteredRecords
+    .map(r => new Date(r.gdate))
+    .filter(d => !isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (!dates.length) return { from: '-', to: '-' };
+
+  return {
+    from: this.formatDateDDMMYYYY(dates[0]),
+    to: this.formatDateDDMMYYYY(dates[dates.length - 1])
+  };
+}
+
+private generatePDF(logoBase64: string | null): void {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const { from, to } = this.getFromToDates();
+  const totalRecords = this.filteredRecords.length;
+  const totalNetWeight = this.getTotalWeight();
+  const totalGrossWeight = this.filteredRecords.reduce(
+    (sum, r) => sum + (Number(r.gweight) || 0), 0
+  );
+
+  const corporation = 'Corporation: SMC, Srinagar';
+  const weighbridgeId = this.filteredRecords[0]?.id?.wbId || 'SRNGR_LANDFILL_WB1';
+
+  const fmt = (n: number) => n.toLocaleString('en-US');
+
+  // ---------- LOGO (top right, like inventory report) ----------
+  const drawLogo = () => {
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'JPEG', pageWidth - 50, 6, 34, 26);
+    }
+  };
+
+  // ---------- WATERMARK (same logo image, low opacity, centered) ----------
+  const drawWatermark = () => {
+    if (!logoBase64) return;
+    doc.saveGraphicsState();
+    (doc as any).setGState(new (doc as any).GState({ opacity: 0.12 }));
+    doc.addImage(logoBase64, 'JPEG', pageWidth / 2 - 50, pageHeight / 2 - 40, 100, 80);
+    doc.restoreGraphicsState();
+  };
+
+  // ---------- HEADER (drawn on every page) ----------
+  const drawHeader = () => {
+    drawLogo();
+
+    doc.setFontSize(15);
+    doc.setTextColor(18, 46, 82);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Cumulative Logbook: Achan Biomining', 14, 18);
+
+    doc.setFontSize(9);
+    doc.setTextColor(40, 40, 40);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated on: ${this.formatDateDDMMYYYY(new Date())}`, 14, 25);
+
+    doc.setFontSize(11);
+    doc.setTextColor(18, 46, 82);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Summary', 14, 33);
+
+    doc.setDrawColor(18, 46, 82);
+    doc.setLineWidth(0.5);
+    doc.line(14, 40, pageWidth - 14, 40);
+  };
+
+  drawHeader();
+  drawWatermark();
+
+  // ---------- SUMMARY PANEL ----------
+  const summaryStartY = 46;
+  const summaryRows = [
+    ['Date Range', `${from}  to  ${to}`],
+    ['Total Records', fmt(totalRecords)],
+    ['Total Net Weight', `${fmt(totalNetWeight)} KG`],
+    ['Total Gross Weight', `${fmt(totalGrossWeight)} KG`],
+    ['Corporation', corporation],
+    ['Weighbridge', weighbridgeId]
+  ];
+
+  autoTable(doc, {
+    startY: summaryStartY,
+    body: summaryRows,
+    theme: 'plain',
+    styles: { fontSize: 9, cellPadding: 1.5 },
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: [18, 46, 82], cellWidth: 45 },
+      1: { textColor: [20, 20, 20] }
+    },
+    margin: { left: 14, right: 14 },
+    tableWidth: pageWidth - 28,
+    didParseCell: function(data) {
+      // Make KG text bold in the second column
+      if (data.column.index === 1 && data.cell.text && data.cell.text[0]?.includes('KG')) {
+        data.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+
+  const summaryEndY = (doc as any).lastAutoTable.finalY;
+  doc.setDrawColor(200);
+  doc.roundedRect(12, summaryStartY - 4, pageWidth - 24, summaryEndY - summaryStartY + 8, 2, 2, 'S');
+
+  // ---------- TABLE ----------
+  // Place a bold "Detail:" heading with extra padding below the summary panel
+  doc.setFontSize(11);
+  doc.setTextColor(18, 46, 82);
+  doc.setFont('helvetica', 'bold');
+  const detailsY = summaryEndY + 14; // increased padding
+  doc.text('Detail:', 14, detailsY);
+  // restore normal text style for the table
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+
+  const tableData = this.filteredRecords.map(record => [
+    record.id?.slipno || '-',
+    record.vno || '-',
+    // record.vname || '-',
+    this.formatDateDDMMYYYY(record.edate),
+    this.formatNumberWithCommas(record.gweight || '0'),
+    this.formatNumberWithCommas(record.tweight || '0'),
+    this.formatNumberWithCommas(record.nweight || '0'),
+    //record.driver || '-',
+    
+  ]);
+
+  const tableColumns = ['Slip No', 'Vehicle No.', 'Date', 'Gross Weight (kg)', 'Truck Weight (kg)', 'Net Weight (kg)'];
+
+  autoTable(doc, {
+    head: [tableColumns],
+    body: tableData,
+    startY: summaryEndY + 22,
+    styles: { fontSize: 8, cellPadding: 2.5, lineColor: [220, 220, 220], lineWidth: 0.1 },
+    headStyles: { fillColor: [18, 46, 82], textColor: 255, fontStyle: 'bold', halign: 'center' },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    bodyStyles: { halign: 'center' },
+    margin: { top: 45, bottom: 25 },
+
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        drawHeader();
+      }
+      drawWatermark();
+
+      const footerY = pageHeight - 18;
+      doc.setDrawColor(200);
+      doc.setLineWidth(0.2);
+      doc.line(14, footerY - 4, pageWidth - 14, footerY - 4);
+
+      doc.setFontSize(7.5);
+      doc.setTextColor(90);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${corporation}  |  Date Range: ${from} to ${to} | Total Records: ${fmt(totalRecords)}`, 14, footerY);
+      
+      // Draw second line with normal KG spacing
+      let xPos = 14;
+      const netText = `Total Net Wt: ${fmt(totalNetWeight)} KG`;
+      doc.text(netText, xPos, footerY + 5);
+      xPos += doc.getTextWidth(netText) + 8;
+      const grossText = `|  Total Gross Wt: ${fmt(totalGrossWeight)} KG`;
+      doc.text(grossText, xPos, footerY + 5);
+    }
+  });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7.5);
+    doc.setTextColor(90);
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - 14, pageHeight - 18, { align: 'right' });
+  }
+
+  const fileName = `Cumulative Logbook_Achan Biomining${from.replace(/\//g, '-')}_to_${to.replace(/\//g, '-')}_${new Date().getTime()}.pdf`;
+  doc.save(fileName);
+
+  console.log('PDF export completed successfully');
+}
+
+  // Toggle export dropdown
+  toggleExportDropdown(force?: boolean) {
+    if (typeof force === 'boolean') {
+      this.exportDropdownOpen = force;
+    } else {
+      this.exportDropdownOpen = !this.exportDropdownOpen;
+    }
+    // close report dropdown when opening export
+    if (this.exportDropdownOpen) this.reportDropdownOpen = false;
+  }
+
+  // Toggle report dropdown
+  toggleReportDropdown(force?: boolean) {
+    if (typeof force === 'boolean') {
+      this.reportDropdownOpen = force;
+    } else {
+      this.reportDropdownOpen = !this.reportDropdownOpen;
+    }
+    if (this.reportDropdownOpen) this.exportDropdownOpen = false;
+  }
+
+  // Generate report rows (limited columns)
+  private getReportRows() {
+    return this.filteredRecords.map(r => ({
+      'Slip No': r.id?.slipno || '-',
+      'VNo': r.vno || '-',
+      'EDate': this.formatDateForExport(r.edate),
+      'GWeight': parseFloat(r.gweight) || 0,
+      'NWeight': parseFloat(r.nweight) || 0,
+    }));
+  }
+
+  // Export the limited report to Excel with totals
+ // Helper method to format numbers with dots for thousands and optional decimals
+formatNumberWithUnits(num: number | string): string {
+  // Clean the input number
+  const cleanNum = num.toString()
+    .replace(/\./g, '')
+    .replace(/,/g, '.')
+    .replace(/[^\d.-]/g, '');
+  
+  const numberValue = parseFloat(cleanNum);
+  
+  if (isNaN(numberValue)) return '0';
+  
+  // For millions (1,000,000 and above)
+  if (Math.abs(numberValue) >= 1000000) {
+    const millions = numberValue / 1000000;
+    // Format with 2 decimal places only if needed
+    const formatted = millions % 1 === 0 ? 
+      Math.floor(millions).toString() : 
+      millions.toFixed(2).replace('.', ',');
+    
+    // Add thousand separators (dots) to integer part
+    const parts = formatted.split(',');
+    if (parts[0].length > 3) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    
+    return parts.join(',') + ' M';
+  }
+  
+  // For thousands (1,000 and above, below 1,000,000)
+  if (Math.abs(numberValue) >= 1000) {
+    const formatted = numberValue % 1 === 0 ? 
+      Math.floor(numberValue).toString() : 
+      numberValue.toFixed(2).replace('.', ',');
+    
+    // Add thousand separators (dots)
+    const parts = formatted.split(',');
+    if (parts[0].length > 3) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    
+    return parts.join(',') + ' K';
+  }
+  
+  // For numbers below 1000
+  if (numberValue % 1 === 0) {
+    return Math.floor(numberValue).toString();
+  } else {
+    return numberValue.toFixed(2).replace('.', ',');
+  }
+}
+
+// Helper method to format individual weight values (no units for individual rows)
+formatWeightSimple(weight: string | number): string {
+  if (!weight && weight !== 0) return '0';
+  
+  // Clean the input
+  const cleanWeight = weight.toString()
+    .replace(/\./g, '')
+    .replace(/,/g, '.')
+    .replace(/[^\d.-]/g, '');
+  
+  const weightNum = parseFloat(cleanWeight);
+  
+  if (isNaN(weightNum)) return '0';
+  
+  // No decimal places for whole numbers
+  if (weightNum % 1 === 0) {
+    const intPart = Math.floor(Math.abs(weightNum)).toString();
+    const sign = weightNum < 0 ? '-' : '';
+    
+    // Add thousand separators
+    if (intPart.length > 3) {
+      return sign + intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    return sign + intPart;
+  }
+  
+  // With decimal places
+  const formatted = weightNum.toFixed(2).replace('.', ',');
+  const parts = formatted.split(',');
+  
+  // Add thousand separators to integer part
+  if (parts[0].replace('-', '').length > 3) {
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  
+  return parts.join(',');
+}
+
+// Updated export to Excel method
+exportReportToExcel(): void {
+  if (!this.filteredRecords.length) { alert('No data to export'); return; }
+
+  try {
+    const rows = this.getReportRows();
+
+    // Build array-of-arrays: header + data rows
+    const header = ['Slip No', 'VNo', 'EDate', 'GWeight', 'NWeight'];
+    
+    // Format weight values for each row (simple format, no units)
+    const body = rows.map(r => [
+      r['Slip No'], 
+      r['VNo'], 
+      r['EDate'], 
+      this.formatWeightSimple(r['GWeight']),
+      this.formatWeightSimple(r['NWeight'])
+    ]);
+
+    // Calculate totals
+    const sumG = rows.reduce((s, x) => {
+      const value = parseFloat(x['GWeight'].toString()
+        .replace(/\./g, '')
+        .replace(/,/g, '.'));
+      return s + (isNaN(value) ? 0 : value);
+    }, 0);
+    
+    const sumN = rows.reduce((s, x) => {
+      const value = parseFloat(x['NWeight'].toString()
+        .replace(/\./g, '')
+        .replace(/,/g, '.'));
+      return s + (isNaN(value) ? 0 : value);
+    }, 0);
+    
+    const trips = rows.length;
+
+    // Add an empty row then totals rows with units
+    body.push(['', '', '', '', '']);
+    body.push(['', '', 'Totals', 
+      this.formatNumberWithUnits(sumG), 
+      this.formatNumberWithUnits(sumN)
+    ]);
+    body.push(['', '', 'Total Trips', trips.toString(), '']);
+
+    const aoa = [header, ...body];
+    const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Set column widths
+    worksheet['!cols'] = [ 
+      {wch: 12},  // Slip No
+      {wch: 12},  // VNo
+      {wch: 20},  // EDate
+      {wch: 18},  // GWeight
+      {wch: 18}   // NWeight
+    ];
+
+    // Format columns in Excel
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    
+    for (let R = 1; R <= range.e.r; R++) {
+      // Column D (GWeight) and E (NWeight)
+      const gWeightCell = XLSX.utils.encode_cell({r: R, c: 3});
+      const nWeightCell = XLSX.utils.encode_cell({r: R, c: 4});
+      
+      if (worksheet[gWeightCell]) {
+        // Custom format for European style without forcing decimals
+        worksheet[gWeightCell].z = '#.##0';
+      }
+      if (worksheet[nWeightCell]) {
+        worksheet[nWeightCell].z = '#.##0';
+      }
+    }
+
+    const workbook: XLSX.WorkBook = { Sheets: { 'Report': worksheet }, SheetNames: ['Report'] };
+    const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  } catch (err) {
+    console.error('Error exporting report to Excel', err);
+    alert('Error exporting report to Excel');
+  }
+}
+
+// Updated export to PDF method
+exportReportToPDF(): void {
+  if (!this.filteredRecords.length) { alert('No data to export'); return; }
+
+  try {
+    const rows = this.getReportRows();
+    const doc = new jsPDF();
+
+    doc.setFontSize(14);
+    doc.text('SMC Report', 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 22);
+
+    // Helper function to format numbers with commas (international convention)
+    const formatWithCommas = (num: number): string => {
+      return num.toLocaleString('en-US', {
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0,
+        useGrouping: true
+      });
+    };
+
+    // Calculate totals in kg and process individual rows
+    let sumG = 0;
+    let sumN = 0;
+    
+    // Format individual rows with commas
+    const formattedRows = rows.map(row => {
+      // Parse and format GWeight
+      const gWeightStr = row['GWeight'].toString().replace(/,/g, '');
+      const gWeight = parseFloat(gWeightStr);
+      const formattedGWeight = isNaN(gWeight) ? '0' : formatWithCommas(gWeight);
+      sumG += isNaN(gWeight) ? 0 : gWeight;
+      
+      // Parse and format NWeight
+      const nWeightStr = row['NWeight'].toString().replace(/,/g, '');
+      const nWeight = parseFloat(nWeightStr);
+      const formattedNWeight = isNaN(nWeight) ? '0' : formatWithCommas(nWeight);
+      sumN += isNaN(nWeight) ? 0 : nWeight;
+      
+      return {
+        slipNo: row['Slip No'],
+        vNo: row['VNo'],
+        eDate: row['EDate'],
+        gWeight: formattedGWeight, // Comma-formatted
+        nWeight: formattedNWeight  // Comma-formatted
+      };
+    });
+    
+    const trips = rows.length;
+
+    // Create table body with formatted individual rows
+    const tableBody = formattedRows.map(r => [
+      r.slipNo, 
+      r.vNo, 
+      r.eDate, 
+      r.gWeight, // Comma-formatted (e.g., "424,410")
+      r.nWeight  // Comma-formatted (e.g., "424,410")
+    ]);
+
+    // Add an empty row then totals rows with comma-formatted totals
+    tableBody.push(['', '', '', '', '']);
+    tableBody.push(['', '', 'Totals', 
+      formatWithCommas(sumG),  // e.g., "424,410,000"
+      formatWithCommas(sumN)   // e.g., "424,410,000"
+    ]);
+    tableBody.push(['', '', 'Total Trips', trips.toString(), '']);
+
+    autoTable(doc, {
+      head: [['Slip No', 'Vehicle No.', 'Date', 'Gross Weight (kg)', 'Net Weight (kg)']],
+      body: tableBody,
+      startY: 30,
+      margin: { left: 10, right: 10 },
+      tableWidth: 'auto',
+      styles: { 
+        fontSize: 8,
+        cellPadding: 5,
+        font: 'helvetica',
+        lineWidth: 0.1,
+        overflow: 'linebreak',
+        halign: 'center'
+      },
+      columnStyles: {
+        0: { cellWidth: 20, halign: 'center' },
+        1: { cellWidth: 45, halign: 'center' },
+        2: { cellWidth: 45, halign: 'center' },
+        3: { cellWidth: 45, halign: 'right' },
+        4: { cellWidth: 45, halign: 'right' }
+      },
+      headStyles: { 
+        fillColor: [18, 46, 82], 
+        textColor: 255,
+        fontSize: 9,
+        fontStyle: 'bold',
+        lineWidth: 0.1,
+        halign: 'center'
+      },
+      bodyStyles: {
+        fontSize: 8,
+        lineWidth: 0.1,
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      didParseCell: function(data) {
+        if (data.column.index === 3 || data.column.index === 4) {
+          data.cell.styles.halign = 'right';
+          data.cell.styles.font = 'helvetica';
+        }
+        
+        // Style the totals rows differently
+        const lastRows = data.table.body.length;
+        const currentRow = data.row.index;
+        const isTotalsRow = currentRow >= lastRows - 3; // Last 3 rows
+        
+        if (isTotalsRow) {
+          data.cell.styles.fontStyle = 'bold';
+          if (currentRow === lastRows - 2) { // The actual totals row
+            data.cell.styles.fillColor = [220, 230, 241];
+          }
+        }
+      }
+    });
+    
+    const fileName = `SMC_Report_${this.getDateRangeLabel().replace(/ /g,'_')}_${new Date().getTime()}.pdf`;
+    doc.save(fileName);
+  } catch (err) {
+    console.error('Error exporting report to PDF', err);
+    alert('Error exporting report to PDF');
+  }
+}
+  // Helper method to format dates for export
+  private formatDateForExport(dateString: string): string {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).replace(',', '');
+    } catch {
+      return dateString;
+    }
+  }
+
+  formatDate(dateString: string): string {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    } catch {
+      return dateString;
+    }
+  }
+
+  // ==================== DAILY DATA REPORT METHOD ====================
+  /**
+   * Export daily data report to PDF with data organized by date
+   * Shows: S.No, Date (day-month-year), Trips, Net Weight
+   * One row per date with totals
+   */
+  exportDailyDataReportToPDF(): void {
+    if (!this.filteredRecords.length) {
+      alert('No data to export');
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+      
+      // Helper function to format numbers with commas
+      const formatWithCommas = (num: number): string => {
+        return num.toLocaleString('en-US', {
+          maximumFractionDigits: 0,
+          minimumFractionDigits: 0,
+          useGrouping: true
+        });
+      };
+
+      // Helper function to format date as DD-MMM-YYYY
+      const formatDateAsDDMMMYYYY = (dateStr: string): string => {
+        try {
+          const date = new Date(dateStr);
+          return date.toLocaleDateString('en-US', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          });
+        } catch {
+          return dateStr;
+        }
+      };
+
+      // Group records by date and aggregate
+      const recordsByDate = new Map<string, {netWeight: number, trips: number, formattedDate: string}>();
+      
+      this.filteredRecords.forEach(record => {
+        const formattedDate = formatDateAsDDMMMYYYY(record.edate);
+        const nWeight = parseFloat(record.nweight.toString().replace(/,/g, '')) || 0;
+        
+        if (!recordsByDate.has(formattedDate)) {
+          recordsByDate.set(formattedDate, { netWeight: 0, trips: 0, formattedDate: formattedDate });
+        }
+        
+        const dayData = recordsByDate.get(formattedDate)!;
+        dayData.netWeight += nWeight;
+        dayData.trips += 1;
+      });
+
+      // Sort dates in descending order (newest first)
+      const sortedDates = Array.from(recordsByDate.keys()).sort((a, b) => {
+        const dateA = new Date(a);
+        const dateB = new Date(b);
+       return dateA.getTime() - dateB.getTime(); 
+      });
+
+      // Calculate overall totals
+      let overallNetWeight = 0;
+      let overallTrips = 0;
+
+      // Build table rows (one row per date)
+      const tableBody: any[] = [];
+      
+      sortedDates.forEach((date, index) => {
+        const dayData = recordsByDate.get(date)!;
+        overallNetWeight += dayData.netWeight;
+        overallTrips += dayData.trips;
+
+        tableBody.push([
+          (index + 1).toString(),
+          date,
+          dayData.trips.toString(),
+          formatWithCommas(dayData.netWeight)
+        ]);
+      });
+
+      // Add totals row
+      tableBody.push([
+        '',
+        'TOTALS',
+        overallTrips.toString(),
+        formatWithCommas(overallNetWeight)
+      ]);
+
+      // Set up PDF
+      doc.setFontSize(14);
+      doc.setTextColor(40);
+      doc.text('SMC Daily Data Report', 14, 15);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Date Range: ${this.getDateRangeLabel()}`, 14, 22);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 28);
+
+      // Calculate center position for table
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const tableWidth = 150;
+      const leftMargin = (pageWidth - tableWidth) / 2;
+
+      // Create main table centered on the page
+      autoTable(doc, {
+        head: [['S.No', 'Date', 'Trips', 'Net Weight (kg)']],
+        body: tableBody,
+        startY: 35,
+        margin: { left: leftMargin, right: leftMargin },
+        tableWidth: 150,
+        styles: { 
+          fontSize: 9,
+          cellPadding: 5,
+          font: 'helvetica',
+          lineWidth: 0.1,
+          overflow: 'linebreak',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { cellWidth: 25, halign: 'center' },
+          1: { cellWidth: 45, halign: 'center' },
+          2: { cellWidth: 25, halign: 'center' },
+          3: { cellWidth: 55, halign: 'right' }
+        },
+        headStyles: { 
+          fillColor: [18, 46, 82], 
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold',
+          lineWidth: 0.1,
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 9,
+          lineWidth: 0.1,
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        didParseCell: function(data) {
+          // Right align net weight column
+          if (data.column.index === 3) {
+            data.cell.styles.halign = 'right';
+          }
+          
+          // Bold and style the totals row (last row)
+          if (data.row.index === data.table.body.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [220, 230, 241];
+          }
+        }
+      });
+
+      // Add footer with page numbers
+      const pageCount = doc.getNumberOfPages();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      }
+
+      // Save the PDF
+      const fileName = `SMC_All_Data_Report_${this.getDateRangeLabel().replace(/ /g, '_')}_${new Date().getTime()}.pdf`;
+      doc.save(fileName);
+      console.log('✅ Daily data report exported to PDF successfully');
+    } catch (error) {
+      console.error('❌ Error exporting daily data report to PDF', error);
+      alert('Error exporting daily data report to PDF. Please check the console for details.');
+    }
+  }
+}
