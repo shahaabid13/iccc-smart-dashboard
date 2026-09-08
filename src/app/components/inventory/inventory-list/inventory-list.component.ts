@@ -216,6 +216,12 @@ import autoTable from 'jspdf-autotable';
               </td>
             </ng-container>
 
+            <!-- DigiPin -->
+            <ng-container matColumnDef="digiPin">
+              <th mat-header-cell *matHeaderCellDef>DigiPin</th>
+              <td mat-cell *matCellDef="let item">{{ getDigiPin(item) }}</td>
+            </ng-container>
+
             <!-- Approach Road -->
             <ng-container matColumnDef="approachRoad">
               <th mat-header-cell *matHeaderCellDef>Approach Road</th>
@@ -767,6 +773,7 @@ export class InventoryListComponent implements OnInit {
     const baseColumns = [
       'locationName',
       'coordinates',
+      'digiPin',
       'approachRoad',
       'deviceType',
       'serialNumber',
@@ -875,6 +882,56 @@ export class InventoryListComponent implements OnInit {
     return this.deviceTypeMap.get(itemKey) || item.deviceType || 'N/A';
   }
 
+  getDigiPin(item: InventoryItem): string {
+    const latitude = Number(item.latitude);
+    const longitude = Number(item.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return 'N/A';
+    }
+
+    // India Post DigiPin uses a 4 x 4 grid over 2.5-38.5 N and 63.5-99.5 E.
+    const minLatitude = 2.5;
+    const maxLatitude = 38.5;
+    const minLongitude = 63.5;
+    const maxLongitude = 99.5;
+    const grid = [
+      ['F', 'C', '9', '8'],
+      ['J', '3', '2', '7'],
+      ['K', '4', '5', '6'],
+      ['L', 'M', 'N', 'P'],
+    ];
+
+    if (
+      latitude < minLatitude || latitude > maxLatitude ||
+      longitude < minLongitude || longitude > maxLongitude
+    ) {
+      return 'N/A';
+    }
+
+    let lowerLatitude = minLatitude;
+    let upperLatitude = maxLatitude;
+    let lowerLongitude = minLongitude;
+    let upperLongitude = maxLongitude;
+    let digiPin = '';
+
+    for (let level = 0; level < 10; level++) {
+      const latitudeStep = (upperLatitude - lowerLatitude) / 4;
+      const longitudeStep = (upperLongitude - lowerLongitude) / 4;
+      const row = Math.min(3, Math.floor((upperLatitude - latitude) / latitudeStep));
+      const column = Math.min(3, Math.floor((longitude - lowerLongitude) / longitudeStep));
+
+      digiPin += grid[row][column];
+
+      upperLatitude -= row * latitudeStep;
+      lowerLatitude = upperLatitude - latitudeStep;
+      lowerLongitude += column * longitudeStep;
+      upperLongitude = lowerLongitude + longitudeStep;
+    }
+
+    return digiPin;
+  }
+
   // ─── Export ─────────────────────────────────────────────────────────────────
 
   /** Build a human-readable label describing active filters, used in report headers */
@@ -900,6 +957,7 @@ export class InventoryListComponent implements OnInit {
   private prepareExportData(): any[] {
     return this.filteredItems.map((item) => ({
       'Location Name':  item.locationName  || 'N/A',
+      'DigiPin':        this.getDigiPin(item),
       'Approach Road':  item.approachRoad  || 'N/A',
       'Device Type':    this.getDisplayDeviceType(item),
       'Serial Number':  item.serialNumber  || 'N/A',
