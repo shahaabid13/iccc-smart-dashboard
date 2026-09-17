@@ -27,19 +27,36 @@ pipeline {
         stage('Verify Build') {
             steps {
                 echo 'Checking Angular build output...'
-                sh 'find . -type d -name browser -print'
-                sh 'find . -type f -name index.html -print'
+
+                sh '''
+                    test -d ../iccc-smart-dashboard/src/main/resources/static/browser
+                    test -f ../iccc-smart-dashboard/src/main/resources/static/browser/index.html
+
+                    echo "Build output verified:"
+                    du -sh ../iccc-smart-dashboard/src/main/resources/static/browser
+                '''
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                echo 'Deploying frontend to staging server...'
+
+                sh '''
+                    scp -r ../iccc-smart-dashboard/src/main/resources/static/browser/* \
+                    Administrator@172.30.0.116:"F:/nginx-1.29.3/html/"
+                '''
             }
         }
     }
 
     post {
         success {
-            echo 'Frontend build completed successfully.'
+            echo 'Frontend build and staging deployment completed successfully.'
         }
 
         failure {
-            echo 'Frontend build failed.'
+            echo 'Frontend build or deployment failed.'
         }
     }
 }
