@@ -1,6 +1,6 @@
 export const environment = {
   production: false,
-  apiBaseUrl: 'http://localhost:8080',  // Spring Boot backend
+  apiBaseUrl: '',  // Spring Boot backend; use the dev proxy or same-origin deployment
   apiUrl: '/api',
   swmApiUrl: '/api/weighbridge',
   // Chartered Bike API Configuration
@@ -19,7 +19,7 @@ export const environment = {
   },
   // Traffic/Video Management Dashboard Configuration
   trafficDashboard: {
-    apiBaseUrl: 'http://localhost:8080',
+    apiBaseUrl: '',
     apiTimeout: 30000,
     auth: {
       tokenStorageKey: 'token',

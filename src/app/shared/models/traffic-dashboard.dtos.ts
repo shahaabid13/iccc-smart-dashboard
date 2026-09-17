@@ -101,6 +101,7 @@ export interface Event {
 export interface EventSearchRequest {
   serverId?: number;
   channelId?: string;
+  eventType?: string;
   startTimestamp: number; // epoch millis
   endTimestamp: number; // epoch millis
   lpNumber?: string;
@@ -141,6 +142,9 @@ export interface ExternalEventItem {
   latitude: number;
   longitude: number;
   sender: string;
+  vehicleNumber?: string;
+  numberplate?: string;
+  lpnumber?: string;
 }
 
 export interface ExternalEventSearchResponse {

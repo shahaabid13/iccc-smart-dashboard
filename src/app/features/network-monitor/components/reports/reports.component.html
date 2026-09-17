@@ -1,0 +1,182 @@
+<div class="reports-page">
+  <!-- Filter & Action Card -->
+  <div class="report-controls-card">
+    <div class="filter-field">
+      <label class="field-label" for="report-from-date">From Date</label>
+      <div class="field-input-wrap">
+        <span class="material-symbols-outlined input-icon">calendar_today</span>
+        <input id="report-from-date" type="date" [(ngModel)]="fromDate" class="field-input">
+      </div>
+    </div>
+
+    <div class="filter-field">
+      <label class="field-label" for="report-to-date">To Date</label>
+      <div class="field-input-wrap">
+        <span class="material-symbols-outlined input-icon">event</span>
+        <input id="report-to-date" type="date" [(ngModel)]="toDate" class="field-input">
+      </div>
+    </div>
+
+    <div class="filter-field category-field">
+      <label class="field-label" for="report-category">Hardware Category</label>
+      <div class="field-input-wrap">
+        <span class="material-symbols-outlined input-icon">category</span>
+        <select id="report-category" [(ngModel)]="categoryFilter" class="field-select">
+          <option value="">All Categories</option>
+          <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="action-buttons-wrap">
+      <button type="button" class="btn-run" (click)="runReport()">
+        <span class="material-symbols-outlined">refresh</span>
+        <span>Run Report</span>
+      </button>
+      <button type="button" class="btn-pdf" (click)="downloadPdf()">
+        <span class="material-symbols-outlined">picture_as_pdf</span>
+        <span>Export PDF</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading & Error States -->
+  <div class="state-card loading" *ngIf="loading">
+    <span class="material-symbols-outlined state-spinner">sync</span>
+    <span>Aggregating downtime telemetry and computing SLA metrics&hellip;</span>
+  </div>
+
+  <div class="state-card error" *ngIf="loadError">
+    <span class="material-symbols-outlined">error</span>
+    <span>Unable to load report data. Please verify network connectivity to telemetry services.</span>
+  </div>
+
+  <ng-container *ngIf="!loading && !loadError">
+    <!-- Category SLA Overview Section -->
+    <div class="section-container">
+      <div class="section-header-wrap">
+        <span class="material-symbols-outlined section-icon">analytics</span>
+        <h2 class="section-title">Availability SLA by Category</h2>
+        <span class="section-count-pill">{{ slaSummary.length }} categories</span>
+      </div>
+
+      <div class="sla-cards-grid">
+        <div class="sla-card" *ngFor="let s of slaSummary">
+          <div class="sla-card-top">
+            <span class="category-name">{{ s.category }}</span>
+            <span class="device-count-badge">{{ s.deviceCount }} devices</span>
+          </div>
+
+          <div class="sla-metric-wrap">
+            <div class="sla-percent" [class.warn]="s.uptimePercent < 99">
+              {{ s.uptimePercent.toFixed(2) }}%
+            </div>
+            <span class="sla-status-tag" [class.compliant]="s.uptimePercent >= 99">
+              {{ s.uptimePercent >= 99 ? 'Meets SLA' : 'SLA Degraded' }}
+            </span>
+          </div>
+
+          <!-- Visual Progress Track -->
+          <div class="progress-track" title="Uptime: {{ s.uptimePercent.toFixed(2) }}%">
+            <div
+              class="progress-fill"
+              [class.warn]="s.uptimePercent < 99"
+              [style.width.%]="s.uptimePercent"
+            ></div>
+          </div>
+
+          <div class="sla-card-footer">
+            <div class="footer-stat">
+              <span class="stat-label">Currently down:</span>
+              <strong [class.text-down]="s.currentlyDownCount > 0">{{ s.currentlyDownCount }}</strong>
+            </div>
+            <div class="footer-stat">
+              <span class="stat-label">Total downtime:</span>
+              <span class="mono">{{ formatDuration(s.totalDownSeconds) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="empty-category-card" *ngIf="slaSummary.length === 0">
+          <span class="material-symbols-outlined">filter_alt_off</span>
+          <span>No device categories match the active filter criteria.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Downtime Incidents Table Card -->
+    <div class="incidents-table-card">
+      <div class="incidents-table-header">
+        <div class="incidents-title-group">
+          <span class="material-symbols-outlined">history_toggle_off</span>
+          <h2 class="incidents-heading">Downtime Incident Log</h2>
+        </div>
+        <span class="incident-badge">{{ incidents.length }} incidents</span>
+      </div>
+
+      <div class="table-scroll-container">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Entity</th>
+              <th>Target Label</th>
+              <th>Category</th>
+              <th>Incident Start</th>
+              <th>Restored At</th>
+              <th>Duration</th>
+              <th>Detection</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              *ngFor="let i of incidents"
+              [routerLink]="i.entityType === 'DEVICE' ? ['/network-monitor/devices', i.entityId] : null"
+              [class.clickable-row]="i.entityType === 'DEVICE'"
+            >
+              <td>
+                <div class="entity-cell">
+                  <span class="material-symbols-outlined entity-icon">
+                    {{ i.entityType === 'DEVICE' ? 'router' : 'cable' }}
+                  </span>
+                  <span>{{ i.entityType === 'DEVICE' ? 'Device' : 'Fibre Link' }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="mono target-label">{{ i.entityLabel }}</span>
+              </td>
+              <td>
+                <span class="category-pill">{{ i.category ?? '—' }}</span>
+              </td>
+              <td class="mono timestamp">{{ i.downAt | date:'medium' }}</td>
+              <td class="mono timestamp">
+                <span *ngIf="i.upAt">{{ i.upAt | date:'medium' }}</span>
+                <span *ngIf="!i.upAt" class="still-down-chip">
+                  <span class="sdnet-dot sdnet-dot-down"></span>
+                  Active Outage
+                </span>
+              </td>
+              <td class="mono">
+                <span class="duration-badge" [class.active-outage]="!i.upAt">
+                  {{ formatDuration(i.durationSeconds) }}{{ !i.upAt ? ' (so far)' : '' }}
+                </span>
+              </td>
+              <td>
+                <span class="source-tag">{{ i.source }}</span>
+              </td>
+            </tr>
+            <tr *ngIf="incidents.length === 0">
+              <td colspan="7" class="empty-incidents-cell">
+                <div class="empty-incidents-wrap">
+                  <span class="material-symbols-outlined empty-check">verified</span>
+                  <h3>Zero Downtime Incidents</h3>
+                  <p>All monitored infrastructure remained 100% operational within this date range.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+</div>
+

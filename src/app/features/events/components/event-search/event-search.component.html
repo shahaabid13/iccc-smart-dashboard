@@ -3,7 +3,7 @@
     <mat-card-title>Search Events</mat-card-title>
 
     <mat-card-content>
-      <form [formGroup]="searchForm" class="search-form">
+      <form [formGroup]="searchForm" class="search-form" (ngSubmit)="onSearch()">
         <!-- Date Range -->
         <mat-form-field appearance="fill">
           <mat-label>Start Date *</mat-label>
@@ -34,8 +34,7 @@
           <button
             mat-raised-button
             color="primary"
-            type="button"
-            (click)="onSearch()"
+            type="submit"
             [disabled]="loading()"
           >
             <span *ngIf="!loading()">Search Events</span>

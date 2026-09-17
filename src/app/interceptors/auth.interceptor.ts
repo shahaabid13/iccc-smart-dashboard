@@ -37,6 +37,7 @@ const PROTECTED_ROUTES = [
    '/api/servers',
    '/api/channels',
    '/api/events',
+  '/api/sdnet-monitor',
 ];
 
 function isLoginRoute(url: string): boolean {

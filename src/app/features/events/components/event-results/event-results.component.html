@@ -12,18 +12,50 @@
         <mat-icon>arrow_back</mat-icon>
         Back to Search
       </button>
+
+      <mat-form-field appearance="fill" class="event-type-filter">
+        <mat-label>Filter by event type</mat-label>
+        <mat-select
+          [value]="selectedEventType()"
+          (selectionChange)="onEventTypeChange($event.value)"
+        >
+          <mat-option value="">All event types</mat-option>
+          <mat-option *ngFor="let eventType of eventTypes" [value]="eventType">
+            {{ eventType }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
     </div>
 
     <div *ngIf="warning()" class="results-warning" role="status">
       <mat-icon>warning</mat-icon>
       <span>{{ warning() }}</span>
+      <button
+        *ngIf="!loading() && filteredEvents().length === 0 && hasSearchRequest"
+        mat-stroked-button
+        color="primary"
+        type="button"
+        class="retry-button"
+        (click)="retrySearch()"
+      >
+        Retry
+      </button>
     </div>
 
-    <div *ngIf="events().length === 0" class="no-data">
-      <p>No events found. Try adjusting your search filters, or your results may have been lost on refresh — please search again.</p>
+    <div *ngIf="errorMessage()" class="results-error" role="alert">
+      <mat-icon>error</mat-icon>
+      <p>{{ errorMessage() }}</p>
     </div>
 
-    <table mat-table [dataSource]="events()" *ngIf="events().length > 0">
+    <div *ngIf="loading()" class="no-data" role="status">
+      <p>Loading events...</p>
+    </div>
+
+    <div *ngIf="!loading() && !warning() && !errorMessage() && filteredEvents().length === 0" class="no-data">
+      <p>No events found for the selected search.</p>
+    </div>
+
+    <table mat-table [dataSource]="filteredEvents()" *ngIf="filteredEvents().length > 0">
       <!-- Event Time Column -->
       <ng-container matColumnDef="eventtime">
         <th mat-header-cell *matHeaderCellDef>Time</th>
@@ -56,22 +88,11 @@
         <td mat-cell *matCellDef="let element">{{ element.message || '—' }}</td>
       </ng-container>
 
-      <!-- Evidence Column -->
-      <ng-container matColumnDef="evidence">
-        <th mat-header-cell *matHeaderCellDef>Evidence</th>
+      <!-- Vehicle Number / Number Plate Column -->
+      <ng-container matColumnDef="vehicleNumber">
+        <th mat-header-cell *matHeaderCellDef>Vehicle Number</th>
         <td mat-cell *matCellDef="let element">
-          <a
-            *ngIf="element.clipurl"
-            [href]="element.clipurl"
-            target="_blank"
-            rel="noopener noreferrer"
-            mat-icon-button
-            color="primary"
-            matTooltip="View evidence clip"
-          >
-            <mat-icon>videocam</mat-icon>
-          </a>
-          <span *ngIf="!element.clipurl">—</span>
+          {{ element.numberplate || element.vehicleNumber || element.lpnumber || '—' }}
         </td>
       </ng-container>
 

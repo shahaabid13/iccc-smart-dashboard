@@ -35,7 +35,7 @@ import { environment } from '../../../../../environments/environment';
 export class EventSearchComponent {
   loading = signal(false);
 
-  searchForm!: any;
+  searchForm!: ReturnType<FormBuilder['group']>;
 
   maxDaysRange = environment.trafficDashboard.features.eventSearchMaxDays;
 
@@ -70,12 +70,12 @@ export class EventSearchComponent {
 
     this.loading.set(true);
 
-    const request = {
+    const request: EventSearchRequest = {
+      serverId: 100,
       startTimestamp: this.eventService.dateToEpochMs(startDate as Date),
       endTimestamp: this.eventService.dateToEpochMs(endDate as Date),
       page: 1,
-      limit: environment.trafficDashboard.features.defaultPageSize,
-      persist: false
+      limit: 20
     };
 
     this.eventService.searchEvents(request).subscribe({
@@ -94,6 +94,18 @@ export class EventSearchComponent {
   }
 
   private getApiErrorMessage(error: any, fallback: string): string {
+    if (error?.status === 401 || error?.status === 403) {
+      return 'Authentication failed. Please sign in again.';
+    }
+    if (error?.status === 400) {
+      return 'Invalid event search. Check the dates and filters.';
+    }
+    if (error?.status === 502) {
+      return 'The VMS server could not provide event data.';
+    }
+    if (error?.status === 0) {
+      return 'Could not reach the Events API. Check the network or CORS configuration.';
+    }
     const message = error?.error?.message || error?.error?.error || error?.message;
     return message ? `${fallback}: ${message}` : fallback;
   }

@@ -1,0 +1,131 @@
+:host {
+  display: block;
+  --bg-card: var(--sdnet-bg-card);
+  --border: var(--sdnet-border);
+  --text: var(--sdnet-text);
+  --text-muted: var(--sdnet-text-muted);
+  --text-dim: var(--sdnet-text-dim);
+  --mono: var(--sdnet-mono);
+}
+
+.summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summary-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.metric-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: #cbd5e1;
+  }
+}
+
+.metric-icon {
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metric-value {
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--text);
+
+  &.text-up { color: var(--sdnet-up); }
+  &.text-down { color: var(--sdnet-down); }
+  &.text-unknown { color: var(--sdnet-unknown); }
+}
+
+.metric-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+.health-pill {
+  &.up {
+    background: var(--sdnet-up-bg);
+    border-color: var(--sdnet-up-border);
+  }
+  &.down.has-down {
+    background: var(--sdnet-down-bg);
+    border-color: var(--sdnet-down-border);
+  }
+  &.unknown {
+    background: var(--sdnet-unknown-bg);
+    border-color: var(--sdnet-unknown-border);
+  }
+}
+
+.sync-pill {
+  background: #f8fafc;
+}
+
+.sync-icon {
+  font-size: 15px;
+  color: var(--sdnet-accent);
+
+  &.spinning {
+    animation: spin 1.2s linear infinite;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+
+  &.pending {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+}
+
+.error {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.loading {
+  color: var(--text-muted);
+}
+

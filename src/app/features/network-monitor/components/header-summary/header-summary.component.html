@@ -1,0 +1,14 @@
+<div class="summary-bar" *ngIf="summary as s">
+</div>
+
+<div class="summary-bar" *ngIf="!summary">
+  <div class="metric-pill error" *ngIf="lastError">
+    <span class="material-symbols-outlined metric-icon">error</span>
+    <span>{{ lastError }}</span>
+  </div>
+  <div class="metric-pill loading" *ngIf="!lastError">
+    <span class="material-symbols-outlined sync-icon spinning">sync</span>
+    <span>Connecting to network telemetry&hellip;</span>
+  </div>
+</div>
+

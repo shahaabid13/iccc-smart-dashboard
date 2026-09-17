@@ -1,0 +1,235 @@
+<div class="device-inventory-page">
+  <!-- Top KPI Metric Cards (Interactive) -->
+  <div class="kpi-grid" *ngIf="!loading && !loadError">
+    <div
+      class="kpi-card"
+      [class.active-kpi]="statusFilter === 'ALL'"
+      (click)="setStatusFilter('ALL')"
+      title="Click to view all devices"
+    >
+      <div class="kpi-icon-wrap total">
+        <span class="material-symbols-outlined">dns</span>
+      </div>
+      <div class="kpi-details">
+        <span class="kpi-label">Total Devices</span>
+        <span class="kpi-number">{{ allDevices.length }}</span>
+      </div>
+    </div>
+
+    <div
+      class="kpi-card"
+      [class.active-kpi]="statusFilter === 'UP'"
+      (click)="setStatusFilter('UP')"
+      title="Click to filter online devices"
+    >
+      <div class="kpi-icon-wrap up">
+        <span class="material-symbols-outlined">check_circle</span>
+      </div>
+      <div class="kpi-details">
+        <span class="kpi-label">Online / Active</span>
+        <span class="kpi-number text-up">{{ statusCounts().up }}</span>
+      </div>
+    </div>
+
+    <div
+      class="kpi-card"
+      [class.active-kpi]="statusFilter === 'DOWN'"
+      (click)="setStatusFilter('DOWN')"
+      [class.alert-state]="statusCounts().down > 0"
+      title="Click to filter offline devices"
+    >
+      <div class="kpi-icon-wrap down">
+        <span class="material-symbols-outlined">error</span>
+      </div>
+      <div class="kpi-details">
+        <span class="kpi-label">Critical / Down</span>
+        <span class="kpi-number text-down">{{ statusCounts().down }}</span>
+      </div>
+    </div>
+
+    <div
+      class="kpi-card"
+      [class.active-kpi]="statusFilter === 'UNKNOWN'"
+      (click)="setStatusFilter('UNKNOWN')"
+      title="Click to filter unmonitored devices"
+    >
+      <div class="kpi-icon-wrap unknown">
+        <span class="material-symbols-outlined">help</span>
+      </div>
+      <div class="kpi-details">
+        <span class="kpi-label">Unmonitored / Stby</span>
+        <span class="kpi-number text-unknown">{{ statusCounts().unknown }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter & Action Toolbar -->
+  <div class="inventory-toolbar-card">
+    <div class="search-box">
+      <span class="material-symbols-outlined search-icon">search</span>
+      <input
+        class="search-input"
+        type="text"
+        placeholder="Filter by label, IP address, junction, or category&hellip;"
+        [(ngModel)]="searchTerm"
+        (ngModelChange)="applyFilters()"
+      >
+      <button
+        type="button"
+        class="clear-search-btn"
+        *ngIf="searchTerm"
+        (click)="searchTerm = ''; applyFilters()"
+        title="Clear search"
+      >
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div class="category-select-wrap">
+      <span class="material-symbols-outlined select-icon">category</span>
+      <select class="category-select" [(ngModel)]="categoryFilter" (ngModelChange)="applyFilters()">
+        <option value="ALL">All Categories</option>
+        <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+      </select>
+    </div>
+
+    <!-- Segmented Status Filter Buttons -->
+    <div class="status-segmented-group" *ngIf="!loading">
+      <button
+        type="button"
+        class="segment-btn"
+        [class.active]="statusFilter === 'ALL'"
+        (click)="setStatusFilter('ALL')"
+      >
+        All <span class="badge-count">{{ allDevices.length }}</span>
+      </button>
+      <button
+        type="button"
+        class="segment-btn up"
+        [class.active]="statusFilter === 'UP'"
+        (click)="setStatusFilter('UP')"
+      >
+        <span class="sdnet-dot sdnet-dot-up"></span>
+        Up <span class="badge-count">{{ statusCounts().up }}</span>
+      </button>
+      <button
+        type="button"
+        class="segment-btn down"
+        [class.active]="statusFilter === 'DOWN'"
+        (click)="setStatusFilter('DOWN')"
+      >
+        <span class="sdnet-dot sdnet-dot-down"></span>
+        Down <span class="badge-count">{{ statusCounts().down }}</span>
+      </button>
+      <button
+        type="button"
+        class="segment-btn unknown"
+        [class.active]="statusFilter === 'UNKNOWN'"
+        (click)="setStatusFilter('UNKNOWN')"
+      >
+        <span class="sdnet-dot sdnet-dot-unknown"></span>
+        Unknown <span class="badge-count">{{ statusCounts().unknown }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading & Error States -->
+  <div class="state-card loading-state" *ngIf="loading">
+    <span class="material-symbols-outlined state-spinner">sync</span>
+    <span>Polling device fleet status from telemetry stream&hellip;</span>
+  </div>
+
+  <div class="state-card error-state" *ngIf="loadError">
+    <span class="material-symbols-outlined">cloud_off</span>
+    <div>
+      <strong>Unable to load device fleet:</strong> Telemetry service unavailable. Ensure backend server is reachable.
+    </div>
+  </div>
+
+  <!-- Data Table Card Container -->
+  <div class="table-container-card" *ngIf="!loading && !loadError">
+    <div class="table-scroll-wrap">
+      <table class="devices-table">
+        <thead>
+          <tr>
+            <th class="col-status">Status</th>
+            <th class="col-device">Device Label</th>
+            <th class="col-category">Category</th>
+            <th class="col-junction">Junction Location</th>
+            <th class="col-ip">IP Address</th>
+            <th class="col-checked">Last Telemetry</th>
+            <th class="col-action">Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let d of filtered"
+            class="clickable-row"
+            [routerLink]="['/network-monitor/devices', d.id]"
+          >
+            <td class="col-status">
+              <span class="sdnet-badge sdnet-badge-{{ d.currentStatus.toLowerCase() }}">
+                <span class="sdnet-dot sdnet-dot-{{ d.currentStatus.toLowerCase() }}"></span>
+                {{ d.currentStatus }}
+              </span>
+            </td>
+            <td class="col-device">
+              <div class="device-cell">
+                <span class="material-symbols-outlined device-type-icon">
+                  {{ d.networkSwitch ? 'alt_route' : 'router' }}
+                </span>
+                <span class="device-label-text">{{ d.deviceLabel }}</span>
+              </div>
+            </td>
+            <td class="col-category">
+              <span class="category-tag">{{ d.category }}</span>
+            </td>
+            <td class="col-junction">
+              <div class="junction-cell">
+                <span class="material-symbols-outlined pin-icon" *ngIf="d.junctionName">pin_drop</span>
+                <span>{{ d.junctionName ?? '—' }}</span>
+              </div>
+            </td>
+            <td class="col-ip">
+              <code class="ip-chip">{{ d.ipAddress }}</code>
+            </td>
+            <td class="col-checked">
+              <span class="timestamp-text">
+                {{ d.lastCheckedAt ? (d.lastCheckedAt | date:'medium') : 'Never polled' }}
+              </span>
+            </td>
+            <td class="col-action">
+              <span class="material-symbols-outlined arrow-icon">chevron_right</span>
+            </td>
+          </tr>
+
+          <!-- Empty State Row -->
+          <tr *ngIf="filtered.length === 0">
+            <td colspan="7" class="empty-cell">
+              <div class="empty-state-wrap">
+                <span class="material-symbols-outlined empty-icon">search_off</span>
+                <h3 class="empty-title">No matching devices found</h3>
+                <p class="empty-sub">No network devices match the active search or category filters.</p>
+                <button type="button" class="reset-btn" (click)="resetFilters()">
+                  <span class="material-symbols-outlined">filter_alt_off</span>
+                  Reset Filters
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Table Footer Bar -->
+    <div class="table-footer-bar">
+      <div class="footer-info">
+        Showing <strong>{{ filtered.length }}</strong> of <strong>{{ allDevices.length }}</strong> devices
+      </div>
+      <div class="footer-meta" *ngIf="allDevices.length > 0">
+        Active Health: <strong>{{ ((statusCounts().up / allDevices.length) * 100).toFixed(1) }}%</strong> online
+      </div>
+    </div>
+  </div>
+</div>
+

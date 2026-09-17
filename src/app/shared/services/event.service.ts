@@ -28,28 +28,33 @@ export class EventService {
    * Backend DTOs (EventCountFilterRequest / EventSearchFilterRequest) use:
    * serverId, channelid, starttimestamp, endtimestamp, lpnumber, applicationid
    */
-  private toBackendPayload(request: EventSearchRequest): any {
-    const payload: any = {
+  private toBackendPayload(request: EventSearchRequest): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
       starttimestamp: request.startTimestamp,
-      endtimestamp: request.endTimestamp,
-      lpnumber: request.lpNumber ?? '',
-      applicationid: request.applicationId ?? ''
+      endtimestamp: request.endTimestamp
     };
 
-    if (request.serverId !== undefined) {
-      payload.serverId = request.serverId;
+    if (request.serverId !== undefined && request.serverId !== null) {
+      payload['serverId'] = request.serverId;
     }
-    if (request.channelId) {
-      payload.channelid = request.channelId;
+
+    if (request.lpNumber?.trim()) {
+      payload['lpnumber'] = request.lpNumber.trim();
     }
-    if ('page' in request && (request as EventSearchRequest).page !== undefined) {
-      payload.page = (request as EventSearchRequest).page;
+    if (request.channelId?.trim()) {
+      payload['channelid'] = request.channelId.trim();
     }
-    if ('limit' in request && (request as EventSearchRequest).limit !== undefined) {
-      payload.limit = (request as EventSearchRequest).limit;
+    if (request.applicationId?.trim()) {
+      payload['applicationid'] = request.applicationId.trim();
     }
-    if ('persist' in request) {
-      payload.persist = (request as EventSearchRequest).persist ?? false;
+    if (request.page !== undefined) {
+      payload['page'] = request.page;
+    }
+    if (request.limit !== undefined) {
+      payload['limit'] = request.limit;
+    }
+    if (request.persist !== undefined) {
+      payload['persist'] = request.persist;
     }
 
     return payload;

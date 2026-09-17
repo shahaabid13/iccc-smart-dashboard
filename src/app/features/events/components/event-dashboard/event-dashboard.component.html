@@ -1,0 +1,100 @@
+<section class="event-dashboard">
+  <section class="dashboard-header-panel">
+    <div class="dashboard-header">
+      <div class="dashboard-title-wrap">
+        <span class="breadcrumb">ITMS / DASHBOARD</span>
+        <h1>{{ title }}</h1>
+      </div>
+      <div class="header-meta">
+        <span class="material-symbols-outlined">schedule</span>
+        <span>{{ lastUpdated }}</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="summary-grid">
+    <mat-card class="summary-card total-card">
+      <mat-card-content>
+        <div class="summary-card-label">Total Events</div>
+        <div class="summary-card-value">{{ summary.totalEvents }}</div>
+        <div class="summary-card-foot">Last 24 hours</div>
+        <span class="summary-icon">🎫</span>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card peak-card">
+      <mat-card-content>
+        <div class="summary-card-label">Peak Hour</div>
+        <div class="summary-card-value">{{ summary.peakHour }}</div>
+        <div class="summary-card-foot">Highest alert volume</div>
+        <span class="summary-icon">⏱</span>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card alert-card">
+      <mat-card-content>
+        <div class="summary-card-label">Top Alert Type</div>
+        <div class="summary-card-value top-alert">{{ summary.highestAlert }}</div>
+        <div class="summary-card-foot">By event count</div>
+        <span class="summary-icon">⚠</span>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card avg-card">
+      <mat-card-content>
+        <div class="summary-card-label">Average / Hour</div>
+        <div class="summary-card-value">{{ summary.avgPerHour }}</div>
+        <div class="summary-card-foot">Events / hour</div>
+        <span class="summary-icon">↔</span>
+      </mat-card-content>
+    </mat-card>
+  </section>
+
+  <section class="content-grid">
+    <mat-card class="chart-card wide-card">
+      <div class="chart-card-title">
+        <span>Alert Types per Hour</span>
+        <span class="chart-card-meta">24 hour trend</span>
+      </div>
+
+      <div class="bar-chart">
+        <canvas
+          baseChart
+          [type]="'bar'"
+          [data]="hourlyChartData"
+          [options]="hourlyChartOptions">
+        </canvas>
+      </div>
+    </mat-card>
+
+    <mat-card class="chart-card">
+      <div class="chart-card-title">
+        <span>Alert Mix</span>
+      </div>
+
+      <div class="donut-area">
+        <canvas
+          baseChart
+          [type]="'doughnut'"
+          [data]="alertMixChartData"
+          [options]="alertMixChartOptions">
+        </canvas>
+      </div>
+
+      <div class="type-list">
+        <div class="type-item" *ngFor="let type of alertTypes">
+          <div class="type-top">
+            <span class="type-label">
+              <span class="type-swatch" [style.background-color]="alertColors[type]"></span>
+              {{ type }}
+            </span>
+            <span class="type-count">{{ getAlertTotal(type) }}</span>
+          </div>
+          <div class="type-track">
+            <div class="type-bar" [style.width.%]="getTypePercentage(type)" [style.background-color]="alertColors[type]"></div>
+          </div>
+        </div>
+      </div>
+    </mat-card>
+  </section>
+</section>

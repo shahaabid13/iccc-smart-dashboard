@@ -1,0 +1,402 @@
+:host {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  --bg-panel: var(--sdnet-bg-panel);
+  --border: var(--sdnet-border);
+  --text: var(--sdnet-text);
+  --text-muted: var(--sdnet-text-muted);
+  --text-dim: var(--sdnet-text-dim);
+  --accent: var(--sdnet-accent);
+  --accent-dim: var(--sdnet-accent-dim);
+  --mono: var(--sdnet-mono);
+}
+
+.map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+#sdnet-map {
+  position: absolute;
+  inset: 0;
+  background: #e5edf5;
+}
+
+// Modern Floating Toasts
+.hud-toast {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 18px;
+  font-size: 13px;
+  color: var(--text);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12);
+  transition: all 0.2s ease;
+
+  .spin-icon {
+    font-size: 18px;
+    color: var(--accent);
+    animation: spin 1.2s linear infinite;
+  }
+
+  &.error-toast {
+    border-color: #fecaca;
+    background: rgba(254, 242, 242, 0.96);
+    color: #b91c1c;
+
+    .material-symbols-outlined { color: #dc2626; font-size: 20px; }
+  }
+
+  &.warn-toast {
+    border-color: #fed7aa;
+    background: rgba(255, 251, 235, 0.96);
+    color: #b45309;
+
+    .material-symbols-outlined { color: #d97706; font-size: 20px; }
+  }
+}
+
+// Modern Topology HUD Panel
+.topology-hud-panel {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  width: 230px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.12), 0 2px 6px -1px rgba(15, 23, 42, 0.05);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.hud-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.hud-icon {
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.hud-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.live-beacon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+.beacon-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sdnet-up);
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.25);
+  animation: beacon-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes beacon-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+.hud-control-section {
+  padding: 2px 0;
+}
+
+// Custom iOS/Material Switch
+.custom-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-track-wrap {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.sr-only-toggle {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #cbd5e1;
+  border-radius: 22px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &::before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  }
+}
+
+.sr-only-toggle:checked + .toggle-slider {
+  background-color: var(--accent);
+
+  &::before {
+    transform: translateX(16px);
+  }
+}
+
+.toggle-text-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggle-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.toggle-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.2;
+}
+
+.hud-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 10px 0;
+}
+
+.hud-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-section-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.symbol-label {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.link-symbol {
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+
+  &.line-up {
+    background: var(--sdnet-up);
+  }
+  &.line-down {
+    background: repeating-linear-gradient(90deg, var(--sdnet-down) 0, var(--sdnet-down) 4px, transparent 4px, transparent 8px);
+    height: 3px;
+  }
+  &.line-unknown {
+    background: repeating-linear-gradient(90deg, var(--sdnet-unknown) 0, var(--sdnet-unknown) 3px, transparent 3px, transparent 6px);
+    height: 3px;
+  }
+}
+
+.node-marker {
+  flex-shrink: 0;
+
+  &.diamond-router {
+    width: 9px;
+    height: 9px;
+    background: #f59e0b;
+    border: 1px solid #b45309;
+    transform: rotate(45deg);
+  }
+  &.circle-dc {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+  }
+  &.circle-junction {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #0284c7;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
+  }
+  &.ring-device {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sdnet-up);
+    border: 1.5px solid #ffffff;
+    box-shadow: 0 0 0 1px var(--sdnet-up);
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+// Leaflet Control and Popup Styling
+::ng-deep {
+  .router-pin {
+    width: 12px;
+    height: 12px;
+    background: #f59e0b;
+    border: 1.5px solid #78350f;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+    transform: rotate(45deg);
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: #ffffff;
+    color: #0f172a;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.16), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
+    border: 1px solid #e2e8f0;
+    padding: 0;
+  }
+  .leaflet-popup-tip {
+    background: #ffffff;
+  }
+  .leaflet-popup-close-button {
+    color: #64748b !important;
+    top: 10px !important;
+    right: 10px !important;
+  }
+
+  .leaflet-popup-content {
+    margin: 14px 16px !important;
+    line-height: 1.4;
+  }
+
+  .pp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .pp-id {
+    font-family: var(--sdnet-mono);
+    font-weight: 700;
+    font-size: 13px;
+    color: #0f172a;
+  }
+  .pp-name {
+    font-size: 11.5px;
+    color: #64748b;
+    margin: -4px 0 8px;
+    font-weight: 500;
+  }
+  .pp-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    padding: 3px 0;
+    color: #334155;
+
+    span:first-child { color: #64748b; font-size: 11.5px; }
+    span:last-child { font-weight: 500; }
+  }
+  .pp-row i {
+    color: var(--accent);
+    font-style: normal;
+    font-size: 10px;
+  }
+
+  .pp-view-device {
+    margin-top: 10px;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    border-radius: 7px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #dbeafe;
+      color: #1d4ed8;
+      border-color: #93c5fd;
+    }
+  }
+
+  path.flow-down {
+    stroke-dasharray: 6 6;
+    animation: marchDown .55s linear infinite, lineBlink 1s step-start infinite;
+  }
+  @keyframes marchDown { to { stroke-dashoffset: -24; } }
+  @keyframes lineBlink { 50% { opacity: .35; } }
+}
+

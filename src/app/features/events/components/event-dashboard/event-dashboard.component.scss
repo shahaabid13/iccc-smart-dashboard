@@ -1,0 +1,349 @@
+.event-dashboard {
+  padding: 16px;
+  background: #eef4f8;
+  min-height: calc(100vh - 64px);
+  color: #1d3557;
+}
+
+.dashboard-header-panel {
+  background: linear-gradient(135deg, #183f62 0%, #1f5782 100%);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(27, 56, 109, 0.12);
+  border: 1px solid rgba(196, 219, 255, 0.16);
+  min-height: 84px;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+}
+
+.dashboard-title-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.breadcrumb {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #b6d8ff;
+  line-height: 1;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  font-size: clamp(23px, 1.4vw, 26px);
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.12;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255,255,255,0.1);
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 9px;
+  font-weight: 700;
+  min-height: 28px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  gap: 14px;
+  margin: 16px 0 14px;
+  align-items: stretch;
+  max-width: 100%;
+}
+
+.summary-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 128px;
+  border-radius: 12px;
+  border: 1px solid rgba(163, 185, 208, 0.34);
+  box-shadow: 0 10px 20px rgba(16, 36, 69, 0.10);
+  color: #fff;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 24px rgba(16, 36, 69, 0.14);
+}
+
+.summary-card mat-card-content {
+  padding: 16px 20px;
+  min-height: 116px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.summary-card-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.84);
+  line-height: 1.2;
+}
+
+.summary-card-value {
+  font-size: clamp(26px, 1.8vw, 30px);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.2;
+  margin-top: 2px;
+  white-space: normal;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.summary-card-foot {
+  font-size: 10px;
+  color: rgba(255,255,255,0.82);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.summary-icon {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  font-size: 22px;
+  color: rgba(255,255,255,0.88);
+  line-height: 1;
+}
+
+.total-card {
+  background: linear-gradient(135deg, #483cce 0%, #4f46e5 100%);
+}
+
+.peak-card {
+  background: linear-gradient(135deg, #006ab8 0%, #1ea5ff 100%);
+}
+
+.alert-card {
+  background: linear-gradient(135deg, #e46608 0%, #f6a019 100%);
+}
+
+.avg-card {
+  background: linear-gradient(135deg, #147b4c 0%, #1bab69 100%);
+}
+
+.top-alert {
+  color: #fff;
+  font-size: clamp(21px, 1.65vw, 25px);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(640px, 2fr) minmax(320px, 1fr);
+  gap: 16px;
+}
+
+.chart-card {
+  padding: 22px;
+  border-radius: 16px;
+  border: 1px solid #dce7f5;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(16, 36, 69, 0.08);
+}
+
+.wide-card {
+  min-width: 0;
+}
+
+.chart-card-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #102a43;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #edf2f7;
+  padding-bottom: 12px;
+}
+
+.chart-card-meta {
+  font-size: 11px;
+  color: #60758e;
+  font-weight: 700;
+  background: #eef6ff;
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+
+.bar-chart {
+  margin-top: 18px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 56px minmax(340px, 1fr) 36px;
+  gap: 14px;
+  align-items: center;
+  min-height: 30px;
+}
+
+.chart-label {
+  color: #536579;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bars {
+  min-width: 0;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 12px;
+}
+
+.bar-segment {
+  height: 10px;
+  display: inline-block;
+  border-radius: 2px;
+  min-width: 2px;
+}
+
+.lpr { background: #2f80ed; }
+.rlv { background: #f2994a; }
+.nh { background: #27ae60; }
+.slv { background: #a166ff; }
+
+.chart-total {
+  color: #183a5a;
+  font-weight: 700;
+  font-size: 11px;
+  text-align: right;
+}
+
+.donut-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 26px 0 14px;
+}
+
+.donut-chart {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  position: relative;
+  border: 4px solid #fff;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04), 0 12px 24px rgba(16,36,69,.12);
+}
+
+.donut-chart::after {
+  content: '';
+  position: absolute;
+  inset: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #dce7f5;
+}
+
+.donut-center {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-center span {
+  font-size: 24px;
+  font-weight: 800;
+  color: #102a43;
+}
+
+.donut-center small {
+  font-size: 10px;
+  font-weight: 800;
+  color: #60758e;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.type-list {
+  margin-top: 20px;
+}
+
+.type-item {
+  margin-bottom: 16px;
+}
+
+.type-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #344152;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.type-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.type-count {
+  color: #102a43;
+}
+
+.type-track {
+  height: 8px;
+  border-radius: 10px;
+  background: #eaf0f6;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.type-bar {
+  height: 100%;
+  border-radius: 10px;
+}
+
+@media (max-width: 1024px) {
+  .summary-grid,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-row {
+    grid-template-columns: 50px minmax(260px, 1fr) 30px;
+  }
+}

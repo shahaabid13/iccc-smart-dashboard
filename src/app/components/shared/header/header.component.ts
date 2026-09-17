@@ -176,10 +176,29 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
               <span>ATCS</span>
               <span class="coming-soon-badge">Coming Soon</span>
             </div>
-            <div class="dropdown-item disabled-item" title="Coming soon">
-              <span class="material-symbols-outlined item-icon">traffic</span>
-              <span>SD-Net</span>
-              <span class="coming-soon-badge">Coming Soon</span>
+            <div class="dropdown-container" [class.collapsed]="sidebarContentCollapsed">
+              <div class="dropdown-header" [class.open]="monitoringSdnetOpen" (click)="toggleMonitoringSdnet()">
+                <span class="material-symbols-outlined dropdown-icon">lan</span>
+                <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">SD-Net</span>
+                <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="monitoringSdnetOpen">
+                  expand_more
+                </span>
+              </div>
+
+              <div class="dropdown-content" *ngIf="monitoringSdnetOpen && !sidebarContentCollapsed">
+                <a routerLink="/network-monitor/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                  <span class="material-symbols-outlined item-icon">map</span>
+                  <span>Map</span>
+                </a>
+                <a routerLink="/network-monitor/devices" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                  <span class="material-symbols-outlined item-icon">devices</span>
+                  <span>Devices</span>
+                </a>
+                <a routerLink="/network-monitor/reports" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                  <span class="material-symbols-outlined item-icon">assessment</span>
+                  <span>Reports</span>
+                </a>
+              </div>
             </div>
             <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
           <div class="dropdown-header" [class.open]="monitoringItmsOpen" (click)="toggleMonitoringItms()">
@@ -191,6 +210,10 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
           </div>
 
           <div class="dropdown-content" *ngIf="monitoringItmsOpen && !sidebarContentCollapsed">
+            <a routerLink="/traffic-dashboard/dashboard/events/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="material-symbols-outlined item-icon">bar_chart</span>
+              <span>Dashboard</span>
+            </a>
             <a routerLink="/traffic-dashboard/dashboard/events/search" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
               <span class="material-symbols-outlined item-icon">event</span>
               <span>Events</span>
@@ -1089,6 +1112,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   }
   userDropdownOpen = false;
   monitoringItmsOpen = false;
+  monitoringSdnetOpen = false;
   openDropdown:
     | 'ai'
     | 'cims'
@@ -1180,6 +1204,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.mobileSidebarOpen = false;
     this.openDropdown = null;
     this.monitoringItmsOpen = false;
+    this.monitoringSdnetOpen = false;
     this.updateBodyScrollLock();
   }
 
@@ -1206,6 +1231,10 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
   toggleMonitoringItms(): void {
     this.monitoringItmsOpen = !this.monitoringItmsOpen;
+  }
+
+  toggleMonitoringSdnet(): void {
+    this.monitoringSdnetOpen = !this.monitoringSdnetOpen;
   }
 
   closeSidebarIfMobile() {

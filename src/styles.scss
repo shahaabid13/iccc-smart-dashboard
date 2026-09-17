@@ -55,3 +55,113 @@ body {
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+// SDNET feature tokens - Executive Smart City NOC Theme
+:root {
+  --sdnet-bg-deep: #f8fafc;
+  --sdnet-bg-panel: #ffffff;
+  --sdnet-bg-card: #ffffff;
+  --sdnet-bg-card-hover: #f1f5f9;
+  --sdnet-border: #e2e8f0;
+  --sdnet-border-light: #edf2f7;
+  --sdnet-text: #0f172a;
+  --sdnet-text-muted: #475569;
+  --sdnet-text-dim: #94a3b8;
+  --sdnet-accent: #2563eb;
+  --sdnet-accent-hover: #1d4ed8;
+  --sdnet-accent-dim: #1e40af;
+  --sdnet-accent-light: rgba(37, 99, 235, 0.08);
+  --sdnet-up: #059669;
+  --sdnet-up-bg: #ecfdf5;
+  --sdnet-up-border: #a7f3d0;
+  --sdnet-down: #dc2626;
+  --sdnet-down-bg: #fef2f2;
+  --sdnet-down-border: #fecaca;
+  --sdnet-unknown: #64748b;
+  --sdnet-unknown-bg: #f8fafc;
+  --sdnet-unknown-border: #cbd5e1;
+  --sdnet-shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.06);
+  --sdnet-shadow-md: 0 4px 12px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --sdnet-shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
+  --sdnet-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+.sdnet-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  transition: all 0.15s ease-in-out;
+}
+
+.sdnet-badge-up {
+  background: var(--sdnet-up-bg);
+  color: var(--sdnet-up);
+  border-color: var(--sdnet-up-border);
+}
+
+.sdnet-badge-down {
+  background: var(--sdnet-down-bg);
+  color: var(--sdnet-down);
+  border-color: var(--sdnet-down-border);
+  animation: sdnet-pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.sdnet-badge-unknown {
+  background: var(--sdnet-unknown-bg);
+  color: var(--sdnet-unknown);
+  border-color: var(--sdnet-unknown-border);
+}
+
+.sdnet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.sdnet-dot-up {
+  background: var(--sdnet-up);
+  box-shadow: 0 0 0 2.5px rgba(5, 150, 105, 0.2);
+}
+
+.sdnet-dot-down {
+  background: var(--sdnet-down);
+  box-shadow: 0 0 0 2.5px rgba(220, 38, 38, 0.25);
+  animation: sdnet-dot-pulse 1.8s infinite;
+}
+
+.sdnet-dot-unknown {
+  background: var(--sdnet-unknown);
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.15);
+}
+
+@keyframes sdnet-dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.4);
+  }
+}
+
+@keyframes sdnet-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15);
+  }
+}
+

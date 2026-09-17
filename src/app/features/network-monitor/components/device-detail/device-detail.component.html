@@ -1,0 +1,286 @@
+<div class="device-detail-page">
+  <!-- Loading & Error States -->
+  <div class="state-banner loading" *ngIf="loading">
+    <span class="material-symbols-outlined state-spinner">sync</span>
+    <span>Retrieving device diagnostics &amp; telemetry history&hellip;</span>
+  </div>
+
+  <div class="state-banner error" *ngIf="loadError">
+    <span class="material-symbols-outlined">error</span>
+    <span>Device record not found or network telemetry service unreachable.</span>
+  </div>
+
+  <ng-container *ngIf="device && !loading">
+    <!-- Breadcrumbs Navigation -->
+    <div class="detail-nav-bar">
+      <a routerLink="/network-monitor/devices" class="back-link">
+        <span class="material-symbols-outlined">arrow_back</span>
+        <span>Back to Device Inventory</span>
+      </a>
+      <span class="breadcrumb-sep">/</span>
+      <span class="breadcrumb-curr">{{ device.deviceLabel }}</span>
+    </div>
+
+    <!-- Device Hero Banner Card -->
+    <div class="device-hero-card">
+      <div class="hero-left">
+        <div class="hero-status-wrap">
+          <span class="sdnet-badge sdnet-badge-{{ device.currentStatus.toLowerCase() }} hero-badge">
+            <span class="sdnet-dot sdnet-dot-{{ device.currentStatus.toLowerCase() }}"></span>
+            {{ device.currentStatus }}
+          </span>
+        </div>
+        <div class="hero-info">
+          <h1 class="hero-title">{{ device.deviceLabel }}</h1>
+          <div class="hero-sub">
+            <span class="category-pill">{{ device.category }}</span>
+            <span class="sub-dot">&middot;</span>
+            <span class="junction-location">
+              <span class="material-symbols-outlined pin-icon">pin_drop</span>
+              {{ device.junctionName ?? 'Unassigned Junction Cabinet' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-actions">
+        <button type="button" class="action-btn pdf" (click)="downloadPdf()">
+          <span class="material-symbols-outlined">picture_as_pdf</span>
+          <span>Downtime PDF</span>
+        </button>
+        <button
+          type="button"
+          class="action-btn map"
+          *ngIf="device.junctionHasCoordinates"
+          (click)="viewOnMap()"
+        >
+          <span class="material-symbols-outlined">map</span>
+          <span>Locate on Map</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Hardware & Telemetry Grid -->
+    <div class="specs-grid">
+      <div class="spec-card">
+        <div class="spec-header">
+          <span class="material-symbols-outlined spec-icon">lan</span>
+          <span class="spec-label">IP Address</span>
+        </div>
+        <div class="spec-value mono">{{ device.ipAddress }}</div>
+      </div>
+
+      <div class="spec-card">
+        <div class="spec-header">
+          <span class="material-symbols-outlined spec-icon">category</span>
+          <span class="spec-label">Device Category</span>
+        </div>
+        <div class="spec-value">{{ device.category }}</div>
+      </div>
+
+      <div class="spec-card">
+        <div class="spec-header">
+          <span class="material-symbols-outlined spec-icon">alt_route</span>
+          <span class="spec-label">Network Switch</span>
+        </div>
+        <div class="spec-value">
+          <span class="boolean-tag" [class.yes]="device.networkSwitch">
+            {{ device.networkSwitch ? 'Active Switch' : 'Terminal Device' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="spec-card">
+        <div class="spec-header">
+          <span class="material-symbols-outlined spec-icon">settings_ethernet</span>
+          <span class="spec-label">SNMP Monitoring</span>
+        </div>
+        <div class="spec-value">
+          <span class="boolean-tag" [class.yes]="device.snmpEnabled">
+            {{ device.snmpEnabled ? 'Enabled' : 'Disabled' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="spec-card">
+        <div class="spec-header">
+          <span class="material-symbols-outlined spec-icon">schedule</span>
+          <span class="spec-label">Last Polled</span>
+        </div>
+        <div class="spec-value mono">
+          {{ device.lastCheckedAt ? (device.lastCheckedAt | date:'medium') : 'Never polled' }}
+        </div>
+      </div>
+
+      <div class="spec-card">
+        <div class="spec-header">
+          <span class="material-symbols-outlined spec-icon">swap_horiz</span>
+          <span class="spec-label">Last State Change</span>
+        </div>
+        <div class="spec-value mono">
+          {{ device.lastStatusChange ? (device.lastStatusChange | date:'medium') : '—' }}
+        </div>
+      </div>
+
+      <div class="spec-card">
+        <div class="spec-header">
+          <span class="material-symbols-outlined spec-icon">verified</span>
+          <span class="spec-label">Last Confirmed Up</span>
+        </div>
+        <div class="spec-value mono" [class.text-warn]="device.currentStatus === 'DOWN'">
+          {{ device.lastUpAt ? (device.lastUpAt | date:'medium') : 'No record' }}
+        </div>
+      </div>
+
+      <div class="spec-card">
+        <div class="spec-header">
+          <span class="material-symbols-outlined spec-icon">pin_drop</span>
+          <span class="spec-label">Junction Cabinet</span>
+        </div>
+        <div class="spec-value">{{ device.junctionName ?? 'Unassigned' }}</div>
+      </div>
+    </div>
+
+    <!-- Availability & SLA Analytics Card -->
+    <div class="sla-analytics-card">
+      <div class="sla-top-bar">
+        <div class="sla-title-wrap">
+          <span class="material-symbols-outlined sla-icon">insights</span>
+          <div>
+            <h2 class="sla-card-title">Availability &amp; SLA Performance</h2>
+            <p class="sla-card-sub">Measured device uptime and disruption telemetry</p>
+          </div>
+        </div>
+
+        <!-- Range Presets -->
+        <div class="range-selector">
+          <span class="range-label">Time Horizon:</span>
+          <div class="range-buttons">
+            <button
+              type="button"
+              class="range-btn"
+              [class.active]="rangePreset === '24h'"
+              (click)="setRange('24h')"
+            >
+              24 Hours
+            </button>
+            <button
+              type="button"
+              class="range-btn"
+              [class.active]="rangePreset === '7d'"
+              (click)="setRange('7d')"
+            >
+              7 Days
+            </button>
+            <button
+              type="button"
+              class="range-btn"
+              [class.active]="rangePreset === '30d'"
+              (click)="setRange('30d')"
+            >
+              30 Days
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sla-body" *ngIf="uptime as u">
+        <div class="sla-stat-col">
+          <div class="sla-big-percent" [class.warn]="u.uptimePercent < 99">
+            {{ u.uptimePercent.toFixed(2) }}%
+          </div>
+          <span class="sla-compliance-tag" [class.compliant]="u.uptimePercent >= 99">
+            {{ u.uptimePercent >= 99 ? 'Meets SLA Commitment' : 'SLA Degraded' }}
+          </span>
+        </div>
+
+        <div class="sla-breakdown-grid">
+          <div class="sla-breakdown-item up">
+            <div class="item-head">
+              <span class="sdnet-dot sdnet-dot-up"></span>
+              <span>Online Duration</span>
+            </div>
+            <div class="item-val mono">{{ formatDuration(u.upMillis / 1000) }}</div>
+          </div>
+
+          <div class="sla-breakdown-item down">
+            <div class="item-head">
+              <span class="sdnet-dot sdnet-dot-down"></span>
+              <span>Downtime Duration</span>
+            </div>
+            <div class="item-val mono">{{ formatDuration(u.downMillis / 1000) }}</div>
+          </div>
+
+          <div class="sla-breakdown-item unknown">
+            <div class="item-head">
+              <span class="sdnet-dot sdnet-dot-unknown"></span>
+              <span>Unknown Duration</span>
+            </div>
+            <div class="item-val mono">{{ formatDuration(u.unknownMillis / 1000) }}</div>
+          </div>
+
+          <div class="sla-breakdown-item transitions">
+            <div class="item-head">
+              <span class="material-symbols-outlined">shuffle</span>
+              <span>State Changes</span>
+            </div>
+            <div class="item-val mono">{{ u.stateChangeCount }} event{{ u.stateChangeCount === 1 ? '' : 's' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Downtime Incidents Table Card -->
+    <div class="incidents-card">
+      <div class="incidents-header">
+        <div class="incidents-title-wrap">
+          <span class="material-symbols-outlined icon-alert">history</span>
+          <h2 class="incidents-title">Downtime Incident Log</h2>
+        </div>
+        <span class="incident-count-pill">{{ incidents.length }} recorded</span>
+      </div>
+
+      <div class="table-scroll-wrap">
+        <table class="incidents-table">
+          <thead>
+            <tr>
+              <th>Disruption Started</th>
+              <th>Restored At</th>
+              <th>Incident Duration</th>
+              <th>Monitoring Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let i of incidents">
+              <td class="mono">{{ i.downAt | date:'medium' }}</td>
+              <td class="mono">
+                <span *ngIf="i.upAt">{{ i.upAt | date:'medium' }}</span>
+                <span *ngIf="!i.upAt" class="still-down-badge">
+                  <span class="sdnet-dot sdnet-dot-down"></span>
+                  Active Disruption
+                </span>
+              </td>
+              <td class="mono">
+                <span class="duration-chip" [class.critical]="!i.upAt">
+                  {{ formatDuration(i.durationSeconds) }}{{ !i.upAt ? ' (ongoing)' : '' }}
+                </span>
+              </td>
+              <td>
+                <span class="source-tag">{{ i.source }}</span>
+              </td>
+            </tr>
+            <tr *ngIf="incidents.length === 0">
+              <td colspan="4" class="empty-incidents">
+                <div class="empty-wrap">
+                  <span class="material-symbols-outlined check-icon">check_circle</span>
+                  <span>No downtime incidents recorded within this time horizon.</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+</div>
+

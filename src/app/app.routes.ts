@@ -53,6 +53,33 @@ export const routes: Routes = [
 			.then(m => m.DeviceHistoryComponent),
 	},
 	{
+		path: 'network-monitor',
+		loadComponent: () => import('./features/network-monitor/network-monitor-layout.component').then((m) => m.NetworkMonitorLayoutComponent),
+		children: [
+			{ path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+			{
+				path: 'dashboard',
+				loadComponent: () => import('./features/network-monitor/components/map-dashboard/map-dashboard.component').then((m) => m.MapDashboardComponent),
+				title: 'SDNET Fibre & Device Map',
+			},
+			{
+				path: 'devices',
+				loadComponent: () => import('./features/network-monitor/components/device-list/device-list.component').then((m) => m.DeviceListComponent),
+				title: 'SDNET Devices',
+			},
+			{
+				path: 'devices/:id',
+				loadComponent: () => import('./features/network-monitor/components/device-detail/device-detail.component').then((m) => m.DeviceDetailComponent),
+				title: 'SDNET Device Details',
+			},
+			{
+				path: 'reports',
+				loadComponent: () => import('./features/network-monitor/components/reports/reports.component').then((m) => m.ReportsComponent),
+				title: 'SDNET Downtime & SLA Reports',
+			},
+		],
+	},
+	{
 		path: 'anpr',
 		children: [
 			{

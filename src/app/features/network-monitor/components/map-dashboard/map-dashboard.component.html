@@ -1,0 +1,92 @@
+<div class="map-wrap">
+  <div id="sdnet-map"></div>
+
+  <!-- Floating Status Toasts -->
+  <div class="hud-toast loading-toast" *ngIf="loading">
+    <span class="material-symbols-outlined spin-icon">sync</span>
+    <span>Mapping Srinagar fibre topology &amp; junctions&hellip;</span>
+  </div>
+
+  <div class="hud-toast error-toast" *ngIf="loadError">
+    <span class="material-symbols-outlined">error</span>
+    <div class="toast-content">
+      <strong>Connection Failed:</strong> Could not reach the SD-NET telemetry API.
+    </div>
+  </div>
+
+  <!-- Floating Network Topology HUD & Controls Panel -->
+  <aside class="topology-hud-panel" aria-label="Map legend and layer controls">
+    <div class="hud-header">
+      <div class="hud-title-wrap">
+        <span class="material-symbols-outlined hud-icon">layers</span>
+        <span class="hud-title">Network Topology</span>
+      </div>
+      <span class="live-beacon" title="Live Topology Active">
+        <span class="beacon-dot"></span>
+      </span>
+    </div>
+
+    <!-- Interactive Layer Toggle -->
+    <div class="hud-control-section">
+      <label class="custom-toggle-label">
+        <div class="toggle-track-wrap">
+          <input
+            type="checkbox"
+            id="toggle-devices-chk"
+            [checked]="showDevices"
+            (change)="toggleDevices()"
+            class="sr-only-toggle"
+          >
+          <span class="toggle-slider"></span>
+        </div>
+        <div class="toggle-text-wrap">
+          <span class="toggle-title">Device Markers</span>
+          <span class="toggle-sub">Visible at zoom &ge; 15</span>
+        </div>
+      </label>
+    </div>
+
+    <div class="hud-divider"></div>
+
+    <!-- Fibre Link States -->
+    <div class="hud-section">
+      <div class="hud-section-header">Fibre Links</div>
+      <div class="legend-row">
+        <span class="link-symbol line-up"></span>
+        <span class="symbol-label">Operational (Up)</span>
+      </div>
+      <div class="legend-row">
+        <span class="link-symbol line-down"></span>
+        <span class="symbol-label">Disrupted (Down)</span>
+      </div>
+      <div class="legend-row">
+        <span class="link-symbol line-unknown"></span>
+        <span class="symbol-label">Unmonitored / Stby</span>
+      </div>
+    </div>
+
+    <div class="hud-divider"></div>
+
+    <!-- Node Architecture -->
+    <div class="hud-section">
+      <div class="hud-section-header">Node Architecture</div>
+      <div class="legend-row">
+        <span class="node-marker diamond-router"></span>
+        <span class="symbol-label">Core Router / PoP</span>
+      </div>
+      <div class="legend-row">
+        <span class="node-marker circle-dc"></span>
+        <span class="symbol-label">Data Center Hub</span>
+      </div>
+      <div class="legend-row">
+        <span class="node-marker circle-junction"></span>
+        <span class="symbol-label">Junction Cabinet</span>
+      </div>
+      <div class="legend-row">
+        <span class="node-marker ring-device"></span>
+        <span class="symbol-label">Terminal Device</span>
+      </div>
+    </div>
+  </aside>
+</div>
+
