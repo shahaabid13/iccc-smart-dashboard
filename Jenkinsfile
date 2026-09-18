@@ -40,12 +40,24 @@ pipeline {
 
         stage('Deploy to Staging') {
             steps {
-                echo 'Deploying frontend to staging server...'
+                echo 'Deploying frontend to staging server using Ansible...'
 
-                sh '''
-                    scp -r ../iccc-smart-dashboard/src/main/resources/static/browser/* \
-                    Administrator@172.30.0.116:"F:/nginx-1.29.3/html/"
-                '''
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'windows-staging-winrm',
+                        usernameVariable: 'WIN_USER',
+                        passwordVariable: 'WIN_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        ansible-playbook \
+                          -i ~/ansible/frontend/inventory.ini \
+                          ~/ansible/frontend/deploy.yml \
+                          -e "frontend_src=$WORKSPACE/../iccc-smart-dashboard/src/main/resources/static/browser/" \
+                          -e "ansible_user=$WIN_USER" \
+                          -e "ansible_password=$WIN_PASSWORD"
+                    '''
+                }
             }
         }
     }
@@ -60,3 +72,4 @@ pipeline {
         }
     }
 }
+
