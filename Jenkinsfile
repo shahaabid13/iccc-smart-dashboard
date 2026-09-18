@@ -1,14 +1,8 @@
+
 pipeline {
     agent any
 
     stages {
-
-        stage('Checkout') {
-            steps {
-                echo 'Checking out frontend source code...'
-                checkout scm
-            }
-        }
 
         stage('Install Dependencies') {
             steps {
@@ -51,8 +45,8 @@ pipeline {
                 ]) {
                     sh '''
                         ansible-playbook \
-                          -i ~/ansible/frontend/inventory.ini \
-                          ~/ansible/frontend/deploy.yml \
+                          -i /var/lib/jenkins/ansible/frontend/inventory.ini \
+                          /var/lib/jenkins/ansible/frontend/deploy.yml \
                           -e "frontend_src=$WORKSPACE/../iccc-smart-dashboard/src/main/resources/static/browser/" \
                           -e "ansible_user=$WIN_USER" \
                           -e "ansible_password=$WIN_PASSWORD"
@@ -72,4 +66,3 @@ pipeline {
         }
     }
 }
-
