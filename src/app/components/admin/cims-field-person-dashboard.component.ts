@@ -296,14 +296,24 @@ export class CimsFieldPersonDashboardComponent implements OnInit {
 
       this.cimsService.acknowledgeTicket(ticket.id, result.notes).subscribe({
         next: () => {
+          const reviewerName = this.reviewers.find(r => r.id === result.reviewerId)?.username
+            || this.reviewers.find(r => r.id === result.reviewerId)?.name
+            || 'reviewer';
+
+          const targetMessage = result.action === 'revalidation'
+            ? `Ticket sent back to ${ticket.raisedByUsername || 'the support engineer'} for revalidation`
+            : `Ticket resolved and sent to reviewer ${reviewerName} for review`;
+
           this.cimsService.assignReviewer(ticket.id, result.reviewerId).subscribe({
             next: () => {
-              this.snackBar.open('Ticket acknowledged and reviewer assigned', 'Close', { duration: 5000 });
+              this.snackBar.open(targetMessage, 'Close', { duration: 5000 });
               this.loadQueue();
               this.loadHistory();
             },
             error: (assignErr: any) => {
-              const errorMsg = assignErr.error?.message || 'Ticket acknowledged, but failed to assign reviewer';
+              const errorMsg = assignErr.error?.message || (result.action === 'revalidation'
+                ? `Ticket sent back to ${ticket.raisedByUsername || 'the support engineer'} for revalidation` 
+                : `Ticket resolved and sent to reviewer ${reviewerName} for review`);
               this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
               this.loadQueue();
               this.loadHistory();

@@ -69,22 +69,21 @@
         <ion-card-content>
           <form [formGroup]="ackForm" (ngSubmit)="acknowledge()" class="form-stack detail-form">
             <ion-item lines="none">
-              <ion-label position="stacked">Acknowledgement notes</ion-label>
-              <ion-textarea formControlName="notes" autoGrow="true" [disabled]="isSubmittingAck"></ion-textarea>
-            </ion-item>
-
-            <ion-item lines="none" *ngIf="reviewers.length" class="select-item">
-              <ion-label position="stacked">Assign reviewer</ion-label>
-              <ion-select formControlName="reviewerId" interface="action-sheet" placeholder="Select reviewer" [disabled]="isSubmittingAck" class="compact-select">
-                <ion-select-option *ngFor="let reviewer of reviewers" [value]="reviewer.id">
-                  {{ reviewer.name }}
-                </ion-select-option>
+              <ion-label position="stacked">Action</ion-label>
+              <ion-select formControlName="action" interface="popover" [disabled]="isSubmittingAck">
+                <ion-select-option value="resolved">Resolved</ion-select-option>
+                <ion-select-option value="revalidation">Revalidation</ion-select-option>
               </ion-select>
             </ion-item>
 
-            <ion-button expand="block" type="submit" [disabled]="ackForm.invalid || isSubmittingAck">
-              <span *ngIf="!isSubmittingAck">Acknowledge</span>
-              <span *ngIf="isSubmittingAck">Acknowledging...</span>
+            <ion-item lines="none">
+              <ion-label position="stacked">Acknowledgement notes</ion-label>
+              <ion-textarea formControlName="notes" autoGrow="true" [disabled]="isSubmittingAck" placeholder="Enter acknowledgement notes (optional)"></ion-textarea>
+            </ion-item>
+
+            <ion-button expand="block" type="submit" [disabled]="isSubmittingAck">
+              <span *ngIf="!isSubmittingAck">Take action</span>
+              <span *ngIf="isSubmittingAck">Submitting...</span>
             </ion-button>
           </form>
         </ion-card-content>

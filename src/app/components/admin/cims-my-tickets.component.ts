@@ -88,6 +88,12 @@ import { Ticket, PaginatedResponse } from '../../models/cims.models';
                 <td mat-cell *matCellDef="let element">{{ element.locationName }}</td>
               </ng-container>
 
+              <!-- Assigned To Column -->
+              <ng-container matColumnDef="assignedTo">
+                <th mat-header-cell *matHeaderCellDef>Assigned To</th>
+                <td mat-cell *matCellDef="let element">{{ formatDisplayName(element.fieldPersonName) || 'Unassigned' }}</td>
+              </ng-container>
+
               <!-- Priority Column -->
               <ng-container matColumnDef="priority">
                 <th mat-header-cell *matHeaderCellDef>Priority</th>
@@ -278,7 +284,7 @@ import { Ticket, PaginatedResponse } from '../../models/cims.models';
 })
 export class CimsMyTicketsComponent implements OnInit {
   tickets: Ticket[] = [];
-  displayedColumns: string[] = ['id', 'type', 'location', 'priority', 'status', 'createdAt', 'actions'];
+  displayedColumns: string[] = ['id', 'type', 'location', 'assignedTo', 'priority', 'status', 'createdAt', 'actions'];
   isLoading = false;
   searchTerm = '';
   pageSize = 20;
@@ -299,9 +305,14 @@ export class CimsMyTicketsComponent implements OnInit {
     // this.cimsService.getMyTickets(this.currentPage, this.pageSize, this.searchTerm)
     this.cimsService.getMyTickets(this.currentPage, this.pageSize).subscribe({
       next: (response: PaginatedResponse<Ticket>) => {
-        const allTickets = (response?.content ?? []).slice().sort((a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        const allTickets = (response?.content ?? []).slice().sort((a, b) => {
+          const aPriority = (a.status || '').toUpperCase() === 'REVALIDATION' ? 1 : 0;
+          const bPriority = (b.status || '').toUpperCase() === 'REVALIDATION' ? 1 : 0;
+          if (aPriority !== bPriority) {
+            return bPriority - aPriority;
+          }
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
         // Client-side filtering by search term if backend doesn't support it
         const filtered = this.filterTickets(allTickets, this.searchTerm);
         this.tickets = filtered;
@@ -335,5 +346,18 @@ export class CimsMyTicketsComponent implements OnInit {
   onSearch(): void {
     this.currentPage = 0;
     this.loadTickets();
+  }
+
+  formatDisplayName(value: string | null | undefined): string {
+    if (!value) return '';
+    return value
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 }

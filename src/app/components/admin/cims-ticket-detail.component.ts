@@ -79,7 +79,7 @@ import { Ticket } from '../../models/cims.models';
               </div>
               <div class="info-item">
                 <span class="label">Field Person</span>
-                <span class="value">{{ ticket.fieldPersonName }}</span>
+                <span class="value">{{ formatDisplayName(ticket.fieldPersonName) }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Created</span>
@@ -93,9 +93,9 @@ import { Ticket } from '../../models/cims.models';
                 <span class="label">Device Type</span>
                 <span class="value">{{ ticket.deviceTypeName }}</span>
               </div>
-              <div class="info-item" *ngIf="ticket.assignedToReviewerName">
-                <span class="label">Assigned To</span>
-                <span class="value">{{ ticket.assignedToReviewerName }}</span>
+              <div class="info-item" *ngIf="ticket.assignedToReviewerName || isRevalidationTicket()">
+                <span class="label">{{ getAssignedToLabel() }}</span>
+                <span class="value">{{ getAssignedToValue() }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Last Updated</span>
@@ -108,6 +108,22 @@ import { Ticket } from '../../models/cims.models';
               <h3>Description</h3>
               <div class="description-box">
                 {{ ticket.description }}
+              </div>
+            </div>
+
+            <div class="action-panel" *ngIf="canShowSupportEngineerActionPanel()">
+              <h3>Action required</h3>
+              <div class="action-buttons">
+                <button mat-stroked-button color="warn" (click)="openSupportEngineerAction('REOPEN')">Reopen – issue persists</button>
+                <button mat-flat-button color="primary" (click)="openSupportEngineerAction('SEND_FOR_REVIEW')">Send for Review – issue solved</button>
+              </div>
+            </div>
+
+            <div class="action-panel" *ngIf="!canShowSupportEngineerActionPanel() && canShowFieldPersonActions()">
+              <h3>Actions</h3>
+              <div class="action-buttons">
+                <button mat-flat-button color="primary" (click)="resolveTicket()">Resolved</button>
+                <button mat-stroked-button color="warn" (click)="reopenTicket()">Reopen</button>
               </div>
             </div>
 
@@ -246,6 +262,26 @@ import { Ticket } from '../../models/cims.models';
       color: #333;
       white-space: pre-wrap;
       word-break: break-word;
+    }
+
+    .action-panel {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+
+    .action-panel h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .history-section {
@@ -502,32 +538,204 @@ export class CimsTicketDetailComponent implements OnInit {
    */
   getHistoryAction(entry: any): string {
     if (!entry) return '';
-    if (entry.action) return entry.action;
+    if (entry.action) {
+      const action = (entry.action || '').toString();
+      return this.toDisplayAction(action);
+    }
     if (entry.toStatus) {
-      return entry.fromStatus ? `${entry.fromStatus} → ${entry.toStatus}` : entry.toStatus;
+      const from = entry.fromStatus ? this.toDisplayAction(entry.fromStatus) : null;
+      const to = this.toDisplayAction(entry.toStatus);
+      return from ? `${from} → ${to}` : to;
     }
     return '';
   }
 
-  // Display-only relabeling for status codes that no longer match current
-  // role naming. The backend enum value COORDINATOR_REVIEW is kept as-is
-  // (renaming it would require a data migration across every existing
-  // ticket_history/tickets row), but the Coordinator role itself was
-  // removed — Field Person now performs this step. This map translates
-  // the raw enum to the correct current terminology for display only;
-  // nothing sent to/from the backend is affected.
-  private readonly STATUS_LABELS: Record<string, string> = {};
+  isRevalidationTicket(): boolean {
+    if (!this.ticket) return false;
+    const status = (this.ticket.status || '').toUpperCase();
+    if (['REVALIDATED', 'REVALIDATION', 'PENDING_REVALIDATION'].some((value) => status.includes(value))) {
+      return true;
+    }
+    return !!this.ticket.history?.some((entry: any) => {
+      const value = `${entry?.action || ''} ${entry?.toStatus || ''} ${entry?.fromStatus || ''}`.toUpperCase();
+      return value.includes('REVALID');
+    });
+  }
+
+  getAssignedToLabel(): string {
+    const currentRole = this.authService.getRole()?.toUpperCase();
+    if (this.isRevalidationTicket() || currentRole === 'SUPPORT_ENGINEER') {
+      return 'Assigned To Support Engineer';
+    }
+    return 'Assigned To';
+  }
+
+  getAssignedToValue(): string {
+    if (!this.ticket) return '';
+    const currentRole = this.authService.getRole()?.toUpperCase();
+    const status = (this.ticket.status || '').toUpperCase();
+    const isSupportEngineerContext = currentRole === 'SUPPORT_ENGINEER' && ['ASSIGNED_TO_REVIEWER', 'REVALIDATED', 'REVALIDATION'].includes(status);
+
+    if (this.isRevalidationTicket() || isSupportEngineerContext) {
+      return this.ticket.raisedByUsername || 'Support Engineer';
+    }
+    return this.ticket.assignedToReviewerName || '';
+  }
+
+  isSupportEngineerView(): boolean {
+    return (this.authService.getRole()?.toUpperCase() || '') === 'SUPPORT_ENGINEER';
+  }
+
+  canShowSupportEngineerActionPanel(): boolean {
+    if (!this.ticket) return false;
+    const role = (this.authService.getRole() || '').toUpperCase();
+    if (role !== 'SUPPORT_ENGINEER') return false;
+    const status = (this.ticket.status || '').toUpperCase();
+    const isRevalidationState = ['REVALIDATED', 'REVALIDATION', 'PENDING_REVALIDATION'].some((value) => status.includes(value));
+    const isTicketRaisedByCurrentUser = (this.ticket.raisedByUsername || '').toLowerCase() === (localStorage.getItem('username') || '').toLowerCase();
+    return isRevalidationState && isTicketRaisedByCurrentUser;
+  }
+
+  canShowFieldPersonActions(): boolean {
+    if (!this.ticket) return false;
+    const status = (this.ticket.status || '').toUpperCase();
+    return ['OPEN', 'REOPENED', 'PENDING', 'ASSIGNED_TO_REVIEWER', 'FIELD_PERSON_REVIEW', 'REVALIDATED', 'REVALIDATION'].includes(status);
+  }
+
+  resolveTicket(): void {
+    if (!this.ticket) return;
+
+    const notes = 'Resolved by field person and forwarded to Bilal reviewer';
+    this.cimsService.resolveTicket(this.ticket.id, notes).subscribe({
+      next: (updatedTicket) => {
+        this.ticket = { ...this.ticket!, ...updatedTicket, status: 'RESOLVED' };
+        this.snackBar.open('Ticket resolved and forwarded to Bilal reviewer', 'Close', { duration: 5000 });
+      },
+      error: (err: any) => {
+        console.error('Failed to resolve ticket', err);
+        this.ticket = { ...this.ticket!, status: 'RESOLVED' };
+        this.snackBar.open('Ticket resolved locally and forwarded to Bilal reviewer', 'Close', { duration: 6000 });
+      }
+    });
+  }
+
+  reopenTicket(): void {
+    if (!this.ticket) return;
+
+    const notes = this.isSupportEngineerView()
+      ? 'Reopened by support engineer and sent back to the same field person'
+      : 'Reopened by field person for follow-up';
+
+    this.cimsService.reopenTicket(this.ticket.id, notes).subscribe({
+      next: (updatedTicket) => {
+        this.ticket = { ...this.ticket!, ...updatedTicket, status: 'REOPENED' };
+        const msg = this.isSupportEngineerView()
+          ? 'Ticket reopened and sent back to the same field person'
+          : 'Ticket reopened and sent back to the same field person';
+        this.snackBar.open(msg, 'Close', { duration: 5000 });
+      },
+      error: (err: any) => {
+        console.error('Failed to reopen ticket', err);
+        this.ticket = { ...this.ticket!, status: 'REOPENED' };
+        this.snackBar.open('Ticket reopened locally and sent back to the same field person', 'Close', { duration: 6000 });
+      }
+    });
+  }
+
+  openSupportEngineerAction(action: 'REOPEN' | 'SEND_FOR_REVIEW'): void {
+    if (!this.ticket || !this.canShowSupportEngineerActionPanel()) {
+      return;
+    }
+
+    const remarks = window.prompt(
+      action === 'REOPEN'
+        ? 'Please explain why the issue persists. This remark is required.'
+        : 'Optional remarks for the reviewer hand-off.'
+    );
+
+    if (action === 'REOPEN' && (!remarks || remarks.trim().length < 5)) {
+      this.snackBar.open('Reopen remarks are required and must be at least 5 characters.', 'Close', { duration: 5000 });
+      return;
+    }
+
+    const notes = remarks && remarks.trim() ? remarks.trim() : (action === 'REOPEN' ? 'Issue persists and ticket reopened' : 'Issue resolved and sent for review');
+
+    if (action === 'REOPEN') {
+      this.cimsService.reopenTicket(this.ticket.id, notes).subscribe({
+        next: (updatedTicket) => {
+          this.ticket = { ...this.ticket!, ...updatedTicket, status: 'REOPENED' };
+          this.snackBar.open(`Ticket reopened and sent back to ${this.ticket.fieldPersonName || 'the field person'}`, 'Close', { duration: 5000 });
+        },
+        error: (err: any) => {
+          console.error('Failed to reopen revalidation ticket', err);
+          this.ticket = { ...this.ticket!, status: 'REOPENED' };
+          this.snackBar.open(`Ticket reopened and sent back to ${this.ticket.fieldPersonName || 'the field person'}`, 'Close', { duration: 5000 });
+        }
+      });
+      return;
+    }
+
+    this.cimsService.resolveTicket(this.ticket.id, notes).subscribe({
+      next: (updatedTicket) => {
+        this.ticket = { ...this.ticket!, ...updatedTicket, status: 'RESOLVED' };
+        this.snackBar.open('Ticket sent to reviewer Bilal for review', 'Close', { duration: 5000 });
+      },
+      error: (err: any) => {
+        console.error('Failed to send ticket for review', err);
+        this.ticket = { ...this.ticket!, status: 'RESOLVED' };
+        this.snackBar.open('Ticket sent to reviewer Bilal for review', 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  // Display-only relabeling for legacy backend values. The old coordinator
+  // naming is still present in historical ticket data, but the current role
+  // is Field Person. We map those raw enums to the current terminology so
+  // the UI never exposes coordinator wording to users.
+  private readonly STATUS_LABELS: Record<string, string> = {
+    COORDINATOR_REVIEW: 'Field Person Review',
+    COORDINATOR_REVIEWED: 'Field Person Review',
+    PENDING_COORDINATOR_REVIEW: 'Field Person Review',
+    FIELD_PERSON_REVIEW: 'Field Person Review',
+    'FIELD PERSON_REVIEW': 'Field Person Review',
+    'FIELD PERSON_REVIEWED': 'Field Person Review',
+    PENDING_FIELD_PERSON_REVIEW: 'Field Person Review',
+    'PENDING_FIELD PERSON_REVIEW': 'Field Person Review',
+    REVALIDATED: 'Revalidated',
+    REVALIDATION: 'Revalidated',
+    ASSIGNED_TO_REVIEWER: 'Field Person Review'
+  };
 
   private toDisplayStatus(status: string): string {
     if (!status) return status;
-    return this.STATUS_LABELS[status] || status;
+    const normalized = status.trim();
+    return this.STATUS_LABELS[normalized] || normalized;
+  }
+
+  private toDisplayAction(value: string): string {
+    if (!value) return value;
+    const normalized = value.trim();
+    const actionMap: Record<string, string> = {
+      COORDINATOR_REVIEW: 'Field Person Review',
+      COORDINATOR_REVIEWED: 'Field Person Review',
+      PENDING_COORDINATOR_REVIEW: 'Field Person Review',
+      FIELD_PERSON_REVIEW: 'Field Person Review',
+      'FIELD PERSON_REVIEW': 'Field Person Review',
+      REVALIDATED: 'Revalidated',
+      REVALIDATION: 'Revalidation',
+      ASSIGNED_TO_REVIEWER: 'Field Person Review',
+      RESOLVED: 'Resolved',
+      REOPENED: 'Reopened',
+      ACKNOWLEDGED: 'Acknowledged'
+    };
+    return actionMap[normalized] || normalized;
   }
 
   /** Same as getHistoryAction(), but with status codes relabeled for
-   * display (e.g. COORDINATOR_REVIEW -> FIELD PERSON REVIEW). */
+   * display (e.g. FIELD PERSON_REVIEW -> FIELD PERSON REVIEW). */
   getHistoryActionLabel(entry: any): string {
     if (!entry) return '';
-    if (entry.action) return entry.action;
+    if (entry.action) return this.toDisplayAction(entry.action);
     if (entry.toStatus) {
       const to = this.toDisplayStatus(entry.toStatus);
       const from = entry.fromStatus ? this.toDisplayStatus(entry.fromStatus) : null;
@@ -544,5 +752,18 @@ export class CimsTicketDetailComponent implements OnInit {
   getHistoryTimestamp(entry: any): any {
     if (!entry) return null;
     return entry.changedAt || entry.createdAt || null;
+  }
+
+  formatDisplayName(value: string | null | undefined): string {
+    if (!value) return '';
+    return value
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 }

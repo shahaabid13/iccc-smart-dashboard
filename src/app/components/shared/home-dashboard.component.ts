@@ -12,6 +12,7 @@ import { CharteredBikeService } from '../../services/chartered-bike.service';
 import { TrammService } from '../../services/Tramm.service';
 import { CimsService } from '../../services/cims.service';
 import { TaskService } from '../../services/task.service';
+import { SdnetDashboardService } from '../../features/network-monitor/services/dashboard.service';
 import { Observable, catchError, forkJoin, map, of, switchMap, interval, Subscription } from 'rxjs';
 
 interface ModuleCard {
@@ -908,7 +909,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     private charteredBikeService: CharteredBikeService,
     private trammService: TrammService,
     private cimsService: CimsService,
-    private taskService: TaskService
+    private taskService: TaskService,
+    private sdnetDashboardService: SdnetDashboardService
   ) {}
 
   ngOnInit(): void {
@@ -990,6 +992,15 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         active: true,
         buttonText: 'Go to ITMS',
         accent: '#0891b2'
+      }),
+      this.makeCard({
+        icon: 'hub',
+        title: 'SD-Net Monitoring',
+        description: 'Live fibre and device telemetry for network health, junction visibility, and outage tracking.',
+        route: '/network-monitor/dashboard',
+        active: true,
+        buttonText: 'Go to SD-Net',
+        accent: '#0ea5e9'
       }),
       this.makeCard({
         icon: 'confirmation_number',
@@ -1124,7 +1135,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   private loadStats(): void {
     const statsByCard: Record<string, Observable<ModuleStats>> = {
-      CIMS: this.cimsStats()
+      CIMS: this.cimsStats(),
+      'SD-Net Monitoring': this.sdnetStats()
     };
 
     if (this.userRole !== 'FIELD_PERSON') {
@@ -1276,6 +1288,18 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         ];
       }),
       catchError(() => of(this.failedStats(['Total Tickets', 'Open Tickets', 'Pending Review', 'Closed Tickets'])))
+    );
+  }
+
+  private sdnetStats(): Observable<ModuleStats> {
+    return this.sdnetDashboardService.summary().pipe(
+      map((summary) => [
+        { label: 'Devices', value: summary.deviceCount ?? 0 },
+        { label: 'Down', value: summary.devicesDown ?? 0 },
+        { label: 'Junctions', value: summary.junctionCount ?? 0 },
+        { label: 'Links', value: summary.linkCount ?? 0 }
+      ]),
+      catchError(() => of(this.failedStats(['Devices', 'Down', 'Junctions', 'Links'])))
     );
   }
 

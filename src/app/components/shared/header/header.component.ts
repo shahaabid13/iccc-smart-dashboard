@@ -37,7 +37,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
         </div>
 
         <!-- AI (E-Bus) -->
-        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON' && !isSupportEngineer" [class.collapsed]="sidebarContentCollapsed">
           <div class="dropdown-header" [class.open]="openDropdown === 'ai'" (click)="toggleDropdown('ai')">
             <span class="material-symbols-outlined dropdown-icon">directions_bus</span>
             <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">AI (E-Bus)</span>
@@ -145,15 +145,15 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
               <span class="material-symbols-outlined item-icon">list_alt</span>
               <span>Inventory</span>
             </a>
-            <a routerLink="/admin/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin">
+            <a routerLink="/admin/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin && !isSupportEngineer">
               <span class="material-symbols-outlined item-icon">admin_panel_settings</span>
               <span>Admin Details</span>
             </a>
-            <a routerLink="/admin/all-requests" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin || isAgency">
+            <a routerLink="/admin/all-requests" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="(isAdmin || isAgency) && !isSupportEngineer">
               <span class="material-symbols-outlined item-icon">description</span>
               <span>All Requests</span>
             </a>
-            <a routerLink="/maintenance/request" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="isAdmin || isAgency">
+            <a routerLink="/maintenance/request" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()" *ngIf="(isAdmin || isAgency) && !isSupportEngineer">
               <span class="material-symbols-outlined item-icon">construction</span>
               <span>Maintenance Request</span>
             </a>
@@ -171,12 +171,12 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
           </div>
 
           <div class="dropdown-content" *ngIf="openDropdown === 'monitoring' && !sidebarContentCollapsed">
-            <div class="dropdown-item disabled-item" title="Coming soon">
+            <div class="dropdown-item disabled-item" title="Coming soon" *ngIf="!isSupportEngineer">
               <span class="material-symbols-outlined item-icon">traffic</span>
               <span>ATCS</span>
               <span class="coming-soon-badge">Coming Soon</span>
             </div>
-            <div class="dropdown-container" [class.collapsed]="sidebarContentCollapsed">
+            <div class="dropdown-container" *ngIf="!isSupportEngineer" [class.collapsed]="sidebarContentCollapsed">
               <div class="dropdown-header" [class.open]="monitoringSdnetOpen" (click)="toggleMonitoringSdnet()">
                 <span class="material-symbols-outlined dropdown-icon">lan</span>
                 <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">SD-Net</span>
@@ -201,30 +201,30 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
               </div>
             </div>
             <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
-          <div class="dropdown-header" [class.open]="monitoringItmsOpen" (click)="toggleMonitoringItms()">
-            <span class="material-symbols-outlined dropdown-icon">traffic</span>
-            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">ITMS</span>
-            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="monitoringItmsOpen">
-              expand_more
-            </span>
-          </div>
+              <div class="dropdown-header" [class.open]="monitoringItmsOpen" (click)="toggleMonitoringItms()">
+                <span class="material-symbols-outlined dropdown-icon">traffic</span>
+                <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">ITMS</span>
+                <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="monitoringItmsOpen">
+                  expand_more
+                </span>
+              </div>
 
-          <div class="dropdown-content" *ngIf="monitoringItmsOpen && !sidebarContentCollapsed">
-            <a routerLink="/traffic-dashboard/dashboard/events/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="material-symbols-outlined item-icon">bar_chart</span>
-              <span>Dashboard</span>
-            </a>
-            <a routerLink="/traffic-dashboard/dashboard/events/search" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
-              <span class="material-symbols-outlined item-icon">event</span>
-              <span>Events</span>
-            </a>
-          </div>
-        </div>
+              <div class="dropdown-content" *ngIf="monitoringItmsOpen && !sidebarContentCollapsed">
+                <a routerLink="/traffic-dashboard/dashboard/events/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                  <span class="material-symbols-outlined item-icon">bar_chart</span>
+                  <span>Dashboard</span>
+                </a>
+                <a routerLink="/traffic-dashboard/dashboard/events/search" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                  <span class="material-symbols-outlined item-icon">event</span>
+                  <span>Events</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- PBS -->
-        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON' && !isSupportEngineer" [class.collapsed]="sidebarContentCollapsed">
           <div class="dropdown-header" [class.open]="openDropdown === 'pbs'" (click)="toggleDropdown('pbs')">
             <span class="material-symbols-outlined dropdown-icon">pedal_bike</span>
             <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">PBS</span>
@@ -246,7 +246,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
         </div>
 
         <!-- SWM -->
-        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON' && !isSupportEngineer" [class.collapsed]="sidebarContentCollapsed">
           <div class="dropdown-header" [class.open]="openDropdown === 'swm'" (click)="toggleDropdown('swm')">
             <span class="material-symbols-outlined dropdown-icon">recycling</span>
             <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">SWM</span>
@@ -268,7 +268,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
         </div>
 
         <!-- Task Management -->
-        <div class="dropdown-container" *ngIf="(isAdmin || isReviewer || isSupportEngineer)" [class.collapsed]="sidebarContentCollapsed">
+        <div class="dropdown-container" *ngIf="(isAdmin || isReviewer) && !isSupportEngineer" [class.collapsed]="sidebarContentCollapsed">
           <div class="dropdown-header" [class.open]="openDropdown === 'tasks'" (click)="toggleDropdown('tasks')">
             <span class="material-symbols-outlined dropdown-icon">assignment</span>
             <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">Task Management</span>
@@ -290,7 +290,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
         </div>
 
         <!-- TraMM -->
-        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON'" [class.collapsed]="sidebarContentCollapsed">
+        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON' && !isSupportEngineer" [class.collapsed]="sidebarContentCollapsed">
           <div class="dropdown-header" [class.open]="openDropdown === 'tram'" (click)="toggleDropdown('tram')">
             <span class="material-symbols-outlined dropdown-icon">tram</span>
             <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">TraMM</span>
@@ -353,7 +353,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
 
       </nav>
 
-      <div class="nav-section pinned-section" *ngIf="user && !sidebarContentCollapsed">
+      <div class="nav-section pinned-section" *ngIf="user && !sidebarContentCollapsed && (userRole !== 'FIELD_PERSON' || isSupportEngineer)">
         <a routerLink="/tasks/my" routerLinkActive="active" class="dropdown-item pinned-item" (click)="closeSidebarIfMobile()">
           <span class="material-symbols-outlined item-icon">task_alt</span>
           <span>My Tasks</span>
@@ -381,7 +381,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
         </button>
 
         <div class="d-flex align-items-center col-auto">
-          <a class="navbar-brand d-flex align-items-center" routerLink="/login">
+          <a class="navbar-brand d-flex align-items-center" routerLink="/home">
             <img src="/logo.jfif" alt="Logo" class="logo-img  -fluid" />
             <div class="logo-text ms-2 d-none d-lg-block">ICCC SMART DASHBOARD</div>
           </a>

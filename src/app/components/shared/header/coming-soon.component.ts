@@ -355,7 +355,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
         </button>
 
         <div class="d-flex align-items-center col-auto">
-          <a class="navbar-brand d-flex align-items-center" routerLink="/login">
+          <a class="navbar-brand d-flex align-items-center" routerLink="/home">
             <img src="/logo.jfif" alt="Logo" class="logo-img  -fluid" />
             <div class="logo-text ms-2 d-none d-lg-block">ICCC SMART DASHBOARD</div>
           </a>

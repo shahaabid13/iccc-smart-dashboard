@@ -488,9 +488,14 @@ export class CimsSupportEngineerDashboardComponent implements OnInit {
     this.cimsService.getMyTickets(this.currentPage, this.pageSize).subscribe({
       next: (response: Ticket[] | PaginatedResponse<Ticket>) => {
         const tickets = Array.isArray(response) ? response : response?.content ?? [];
-        this.tickets = tickets.slice().sort((a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        this.tickets = tickets.slice().sort((a, b) => {
+          const aPriority = (a.status || '').toUpperCase() === 'REVALIDATION' ? 1 : 0;
+          const bPriority = (b.status || '').toUpperCase() === 'REVALIDATION' ? 1 : 0;
+          if (aPriority !== bPriority) {
+            return bPriority - aPriority;
+          }
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
         this.calculateStats();
         this.applyStatusFilter();
         this.updateCharts();

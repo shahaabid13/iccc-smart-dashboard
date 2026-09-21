@@ -150,7 +150,7 @@ interface PriorityOption {
                 <mat-icon matSuffix class="dropdown-arrow" (click)="toggleAutocomplete(fieldPersonTrigger)">arrow_drop_down</mat-icon>
                 <mat-autocomplete #autoFieldPerson="matAutocomplete" [displayWith]="displayFieldPerson" (optionSelected)="onFieldPersonSelected($event)">
                   <mat-option *ngFor="let person of filterFieldPersons(fieldPersonCtrl.value)" [value]="person">
-                    {{ person.name }} - {{ person.role }}
+                    {{ formatDisplayName(person.name) }} - {{ formatDisplayName(person.role) }}
                   </mat-option>
                 </mat-autocomplete>
                 <mat-error *ngIf="getControl('fieldPersonId')?.hasError('required')">
@@ -192,7 +192,7 @@ interface PriorityOption {
             <!-- Form Actions -->
             <div class="form-actions">
               <button mat-raised-button color="primary" type="submit" [disabled]="isLoading">
-                <span *ngIf="!isLoading">Submit Ticket</span>
+                <span *ngIf="!isLoading">Raise Ticket</span>
                 <span *ngIf="isLoading">
                   <mat-spinner diameter="20"></mat-spinner> Submitting...
                 </span>
@@ -506,7 +506,7 @@ export class CimsCreateTicketComponent implements OnInit {
 
   filterFieldPersons(term: string | FieldPerson | null): FieldPerson[] {
     const value = this.normalizeSearchTerm(term);
-    return this.fieldPersons.filter(p => `${p.name} ${p.role}`.toLowerCase().includes(value));
+    return this.fieldPersons.filter(p => `${this.formatDisplayName(p.name)} ${this.formatDisplayName(p.role)}`.toLowerCase().includes(value));
   }
 
   filterPriorities(term: string | PriorityOption | null): PriorityOption[] {
@@ -527,8 +527,26 @@ export class CimsCreateTicketComponent implements OnInit {
   displayApproachRoad = (road: ApproachRoad): string => road?.name || '';
   displayDeviceType = (device: DeviceType): string => device?.name || '';
   displayIncidentType = (type: IncidentType): string => type?.name || '';
-  displayFieldPerson = (person: FieldPerson): string => (person ? `${person.name} - ${person.role}` : '');
+  displayFieldPerson = (person: FieldPerson): string => (person ? `${this.formatDisplayName(person.name)} - ${this.formatDisplayName(person.role)}` : '');
   displayPriority = (option: PriorityOption): string => option?.label || '';
+
+  formatDisplayName(value: string | null | undefined): string {
+    if (!value) return '';
+
+    const normalized = value
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!normalized) return '';
+
+    return normalized
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
 
   // ---------- Autocomplete: selection ----------
 

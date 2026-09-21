@@ -164,14 +164,10 @@ const FETCH_ALL_PAGE_SIZE = 5000;
                 <td mat-cell *matCellDef="let element">{{ element.locationName }}</td>
               </ng-container>
 
-              <!-- Priority Column (display only — filter removed) -->
-              <ng-container matColumnDef="priority">
-                <th mat-header-cell *matHeaderCellDef>Priority</th>
-                <td mat-cell *matCellDef="let element">
-                  <span [class]="'badge priority-' + element.priority.toLowerCase()">
-                    {{ element.priority }}
-                  </span>
-                </td>
+              <!-- Assigned To Column -->
+              <ng-container matColumnDef="assignedTo">
+                <th mat-header-cell *matHeaderCellDef>Assigned To</th>
+                <td mat-cell *matCellDef="let element">{{ formatDisplayName(element.fieldPersonName) || 'Unassigned' }}</td>
               </ng-container>
 
               <!-- Status Column -->
@@ -417,7 +413,7 @@ export class CimsAllTicketsComponent implements OnInit {
   // The current page slice of filteredTickets — what the table actually renders.
   tickets: Ticket[] = [];
 
-  displayedColumns: string[] = ['id', 'type', 'location', 'priority', 'status', 'raisedBy', 'createdAt', 'closedAt', 'actions'];
+  displayedColumns: string[] = ['id', 'type', 'location', 'assignedTo', 'status', 'raisedBy', 'createdAt', 'closedAt', 'actions'];
   isLoading = false;
   pageSize = 10;
   currentPage = 0;
@@ -584,7 +580,7 @@ export class CimsAllTicketsComponent implements OnInit {
         'ID': t.id,
         'Type': this.toTitleCase(t.incidentTypeName || ''),
         'Location': this.toTitleCase(t.locationName || ''),
-        'Priority': this.toTitleCase(t.priority || ''),
+        'Assigned To': this.formatDisplayName(t.fieldPersonName) || 'Unassigned',
         'Status': this.toTitleCase(this.isClosedStatus(t.status) ? 'CLOSED' : (t.status || '')),
         'Raised By': this.toTitleCase(t.raisedByUsername || ''),
         'Ticket Created': (t as any).createdAt ? new Date((t as any).createdAt).toLocaleString() : '',
@@ -609,12 +605,13 @@ export class CimsAllTicketsComponent implements OnInit {
       // readable font size — they were silently getting clipped off the
       // right edge. Landscape A4 gives ~297mm to work with instead.
       const doc = new jsPDF({ orientation: 'landscape' });
-      const headers = ['ID', 'Type', 'Location', 'Status', 'Raised By', 'Ticket Created', 'Ticket Closed'];
+      const headers = ['ID', 'Type', 'Location', 'Assigned To', 'Status', 'Raised By', 'Ticket Created', 'Ticket Closed'];
 
       const data = this.filteredTickets.map(t => [
         t.id,
         this.toTitleCase(t.incidentTypeName || ''),
         this.toTitleCase(t.locationName || ''),
+        this.formatDisplayName(t.fieldPersonName) || 'Unassigned',
         this.toTitleCase(this.isClosedStatus(t.status) ? 'CLOSED' : (t.status || '')),
         this.toTitleCase(t.raisedByUsername || ''),
         (t as any).createdAt ? new Date((t as any).createdAt).toLocaleString() : '',
@@ -639,12 +636,13 @@ export class CimsAllTicketsComponent implements OnInit {
         styles: { fontSize: 9, cellPadding: 6 },
         columnStyles: {
           0: { cellWidth: 18 },
-          1: { cellWidth: 45 },
-          2: { cellWidth: 45 },
-          3: { cellWidth: 28 },
-          4: { cellWidth: 37 },
-          5: { cellWidth: 50 },
-          6: { cellWidth: 50 }
+          1: { cellWidth: 42 },
+          2: { cellWidth: 33 },
+          3: { cellWidth: 32 },
+          4: { cellWidth: 28 },
+          5: { cellWidth: 35 },
+          6: { cellWidth: 50 },
+          7: { cellWidth: 50 }
         },
         didDrawPage: (dataArg) => {
           // footer with page number
@@ -661,9 +659,26 @@ export class CimsAllTicketsComponent implements OnInit {
     }
   }
 
+  formatDisplayName(input: string | null | undefined): string {
+    return this.toTitleCase(input || '');
+  }
+
   private toTitleCase(input: string): string {
     if (!input) return '';
-    return input.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+    const normalized = input
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!normalized) return '';
+
+    return normalized
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   }
 
   private getReportDateRangeLabel(): string {

@@ -1,9 +1,10 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormsModule, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Subject } from 'rxjs';
+import { FormsModule, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { Subject, firstValueFrom } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { Preferences } from '@capacitor/preferences';
 import {
   IonContent,
   IonCard,
@@ -58,12 +59,13 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
 export class TicketDetailPage implements OnInit, OnDestroy {
   ticket?: Ticket;
   reviewers: Array<{ id: number; name: string }> = [];
+  bilalReviewerId: number | null = null;
   loading = true;
   loadingError: string | null = null;
   isSubmittingAck = false;
   ackForm = new FormGroup({
-    notes: new FormControl('', Validators.required),
-    reviewerId: new FormControl<number | null>(null)
+    notes: new FormControl(''),
+    action: new FormControl<'resolved' | 'revalidation'>('resolved')
   });
   isOnline$ = this.offlineService.isOnline$;
   
@@ -111,6 +113,12 @@ export class TicketDetailPage implements OnInit, OnDestroy {
         }
       });
 
+    Preferences.get({ key: 'cims_default_reviewer_id' }).then(({ value }) => {
+      if (value && !this.bilalReviewerId) {
+        this.bilalReviewerId = Number(value);
+      }
+    });
+
     this.ticketService.getReviewers()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -119,6 +127,19 @@ export class TicketDetailPage implements OnInit, OnDestroy {
             id: reviewer.id,
             name: reviewer.name || reviewer.username || reviewer.fullName || `Reviewer ${reviewer.id}`
           }));
+
+          const bilal = this.reviewers.find(r => {
+            const lower = (r.name || '').toLowerCase();
+            return lower.includes('bilal');
+          }) || (this.reviewers.length === 1 ? this.reviewers[0] : null);
+
+          if (bilal) {
+            this.bilalReviewerId = bilal.id;
+            void Preferences.set({ key: 'cims_default_reviewer_id', value: String(bilal.id) });
+          } else if (this.reviewers.length > 0 && !this.bilalReviewerId) {
+            this.bilalReviewerId = this.reviewers[0].id;
+            void Preferences.set({ key: 'cims_default_reviewer_id', value: String(this.reviewers[0].id) });
+          }
         },
         error: () => this.reviewers = []
       });
@@ -134,9 +155,17 @@ export class TicketDetailPage implements OnInit, OnDestroy {
       case 'COORDINATOR_REVIEW':
       case 'COORDINATOR_REVIEWED':
       case 'PENDING_COORDINATOR_REVIEW':
+      case 'FIELD_PERSON_REVIEW':
+      case 'FIELD PERSON_REVIEW':
+      case 'FIELD PERSON_REVIEWED':
+      case 'PENDING_FIELD_PERSON_REVIEW':
+      case 'PENDING_FIELD PERSON_REVIEW':
       case 'REVIEWER_REVIEW':
       case 'ASSIGNED_TO_REVIEWER':
-        return 'Awaiting reviewer';
+        return 'Field Person Review';
+      case 'REVALIDATED':
+      case 'REVALIDATION':
+        return 'Revalidated';
       case 'REOPENED':
         return 'Reopened';
       default:
@@ -150,7 +179,11 @@ export class TicketDetailPage implements OnInit, OnDestroy {
         return 'primary';
       case 'ASSIGNED_TO_REVIEWER':
       case 'COORDINATOR_REVIEW':
+      case 'FIELD_PERSON_REVIEW':
+      case 'FIELD PERSON_REVIEW':
       case 'REVIEWER_REVIEW':
+      case 'REVALIDATED':
+      case 'REVALIDATION':
         return 'warning';
       case 'RESOLVED':
         return 'success';
@@ -180,24 +213,69 @@ export class TicketDetailPage implements OnInit, OnDestroy {
     await actionSheet.present();
   }
 
+  private async resolveActionTargetId(): Promise<number | null> {
+    const action = this.ackForm.value.action ?? 'resolved';
+
+    if (action === 'resolved') {
+      let reviewerId = this.bilalReviewerId;
+      if (!reviewerId && this.reviewers.length > 0) {
+        const bilal = this.reviewers.find(r => (r.name || '').toLowerCase().includes('bilal')) ||
+          (this.reviewers.length === 1 ? this.reviewers[0] : null);
+        reviewerId = bilal?.id ?? null;
+      }
+      if (!reviewerId) {
+        const cached = await Preferences.get({ key: 'cims_default_reviewer_id' });
+        if (cached.value) {
+          reviewerId = Number(cached.value);
+        }
+      }
+      if (!reviewerId) {
+        try {
+          const list = await firstValueFrom(this.ticketService.getReviewers());
+          const found = (list || []).find((r: any) => {
+            const str = `${r.name || ''} ${r.username || ''} ${r.fullName || ''}`.toLowerCase();
+            return str.includes('bilal');
+          }) || (list && list.length > 0 ? list[0] : null);
+          if (found) {
+            reviewerId = found.id;
+            this.bilalReviewerId = found.id;
+            void Preferences.set({ key: 'cims_default_reviewer_id', value: String(found.id) });
+          }
+        } catch (e) {
+          console.warn('[TicketDetailPage] Could not fetch Bilal reviewer for action routing:', e);
+        }
+      }
+      return reviewerId;
+    }
+
+    const creatorId = this.ticket?.raisedByUserId;
+    if (creatorId) {
+      return Number(creatorId);
+    }
+
+    return this.bilalReviewerId;
+  }
+
   async acknowledge() {
-    if (this.ackForm.invalid || !this.ticket) {
-      console.warn('[TicketDetailPage] Acknowledge form invalid or no ticket');
+    if (this.isSubmittingAck || !this.ticket) {
+      console.warn('[TicketDetailPage] Acknowledge skipped: already submitting or no ticket');
       return;
     }
 
     this.isSubmittingAck = true;
-    const notes = this.ackForm.value.notes || '';
-    const reviewerId = this.ackForm.value.reviewerId ?? null;
+    const notes = this.ackForm.value.notes?.trim() || 'Acknowledged by field engineer';
     const ticketId = this.ticket.id;
-    console.log('[TicketDetailPage] Acknowledging ticket:', { ticketId, notes, reviewerId });
+    const selectedAction = this.ackForm.value.action ?? 'resolved';
+    const targetReviewerId = await this.resolveActionTargetId();
+
+    console.log('[TicketDetailPage] Processing ticket action:', { ticketId, selectedAction, notes, targetReviewerId });
 
     const isOnline = await this.offlineService.isOnline();
     if (!isOnline) {
       console.log('[TicketDetailPage] App is offline. Queuing acknowledgement.');
       void this.actionQueue.addAckTicket(ticketId, notes);
-      if (reviewerId) {
-        void this.actionQueue.addAssignReviewer(ticketId, reviewerId);
+      if (targetReviewerId) {
+        void this.actionQueue.addAssignReviewer(ticketId, targetReviewerId);
       }
       this.isSubmittingAck = false;
       void this.router.navigate(['/tickets']);
@@ -208,17 +286,25 @@ export class TicketDetailPage implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          if (reviewerId) {
-            this.ticketService.assignReviewer(ticketId, reviewerId)
+          if (targetReviewerId) {
+            this.ticketService.assignReviewer(ticketId, targetReviewerId)
               .pipe(takeUntil(this.destroy$))
               .subscribe({
                 next: () => {
-                  console.log('[TicketDetailPage] Reviewer assigned successfully.');
+                  if (selectedAction === 'revalidation') {
+                    this.ticket = {
+                      ...this.ticket!,
+                      status: 'REVALIDATED',
+                      reviewerId: targetReviewerId
+                    };
+                  }
+                  console.log('[TicketDetailPage] Ticket forwarded successfully for action:', selectedAction);
                   this.isSubmittingAck = false;
                   void this.router.navigate(['/tickets']);
                 },
                 error: (error) => {
-                  console.error('[TicketDetailPage] Failed to assign reviewer after acknowledgement:', error);
+                  console.error('[TicketDetailPage] Failed to forward ticket after acknowledgement:', error);
+                  void this.actionQueue.addAssignReviewer(ticketId, targetReviewerId);
                   this.isSubmittingAck = false;
                   void this.router.navigate(['/tickets']);
                 }
@@ -231,10 +317,10 @@ export class TicketDetailPage implements OnInit, OnDestroy {
           void this.router.navigate(['/tickets']);
         },
         error: (error) => {
-          console.error('[TicketDetailPage] Failed to acknowledge ticket online. Queuing action.');
+          console.error('[TicketDetailPage] Failed to acknowledge ticket online. Queuing action.', error);
           void this.actionQueue.addAckTicket(ticketId, notes);
-          if (reviewerId) {
-            void this.actionQueue.addAssignReviewer(ticketId, reviewerId);
+          if (targetReviewerId) {
+            void this.actionQueue.addAssignReviewer(ticketId, targetReviewerId);
           }
           this.isSubmittingAck = false;
           void this.router.navigate(['/tickets']);
