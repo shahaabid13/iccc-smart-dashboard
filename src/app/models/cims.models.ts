@@ -32,7 +32,7 @@ export interface Ticket {
   fieldPersonName: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
   description: string;
-  status: 'OPEN' | 'ACKNOWLEDGED' | 'ASSIGNED' | 'IN_REVIEW' | 'RESOLVED' | 'REOPENED' | 'PENDING' | 'REJECTED';
+  status: 'OPEN' | 'ACKNOWLEDGED' | 'ASSIGNED' | 'IN_REVIEW' | 'RESOLVED' | 'REOPENED' | 'PENDING' | 'REJECTED' | 'REVALIDATION';
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -40,6 +40,10 @@ export interface Ticket {
   raisedByUsername: string;
   assignedToReviewerId?: number;
   assignedToReviewerName?: string;
+  scheduledDate?: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  revalidationReason?: string;
   history: TicketHistory[];
 }
 

@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Location } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
@@ -10,9 +10,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { FormsModule } from '@angular/forms';
 import { CimsService } from '../../services/cims.service';
 import { AuthService } from '../../services/auth.service';
-import { Ticket } from '../../models/cims.models';
+import { FieldPerson, Ticket } from '../../models/cims.models';
 
 @Component({
   selector: 'app-cims-ticket-detail',
@@ -26,7 +32,13 @@ import { Ticket } from '../../models/cims.models';
     MatIconModule,
     MatTooltipModule,
     MatSnackBarModule,
-    MatChipsModule
+    MatChipsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    FormsModule
   ],
   template: `
     <div class="cims-container">
@@ -119,11 +131,48 @@ import { Ticket } from '../../models/cims.models';
               </div>
             </div>
 
-            <div class="action-panel" *ngIf="!canShowSupportEngineerActionPanel() && canShowFieldPersonActions()">
-              <h3>Actions</h3>
+            <div class="action-panel" *ngIf="canShowFieldPersonActions()">
+              <h3>Field Person Actions</h3>
               <div class="action-buttons">
                 <button mat-flat-button color="primary" (click)="resolveTicket()">Resolved</button>
-                <button mat-stroked-button color="warn" (click)="reopenTicket()">Reopen</button>
+                <button mat-stroked-button color="warn" (click)="revalidateTicket()">Revalidation</button>
+              </div>
+            </div>
+
+            <div class="action-panel" *ngIf="canShowSupportEngineerAssignmentPanel()">
+              <h3>Ticket Assignment</h3>
+              <div class="assignment-grid">
+                <div class="assign-keyline">
+                  <span class="assign-label">Status:</span>
+                  <strong>{{ ticket.status || 'OPEN' }}</strong>
+                </div>
+
+                <mat-form-field appearance="outline" class="assign-field">
+                  <mat-label>Schedule Date</mat-label>
+                  <input
+                    matInput
+                    [matDatepicker]="assignmentPicker"
+                    [(ngModel)]="scheduledDate"
+                    [min]="minFutureAssignmentDate"
+                    [attr.placeholder]="'Select future date'"
+                  />
+                  <mat-datepicker-toggle matSuffix [for]="assignmentPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #assignmentPicker></mat-datepicker>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="assign-field">
+                  <mat-label>Assign To</mat-label>
+                  <mat-select [(ngModel)]="selectedFieldPersonId">
+                    <mat-option value="">Select Field Person</mat-option>
+                    <mat-option *ngFor="let person of eligibleFieldPersons" [value]="person.id">
+                      {{ person.name }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <button mat-flat-button color="primary" (click)="assignToFieldPerson()">
+                  Assign
+                </button>
               </div>
             </div>
 
@@ -284,6 +333,32 @@ import { Ticket } from '../../models/cims.models';
       flex-wrap: wrap;
     }
 
+    .assignment-grid {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .assign-keyline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .assign-label {
+      color: #666;
+      font-weight: 600;
+    }
+
+    .assign-field {
+      min-width: 220px;
+      flex: 1;
+    }
+
     .history-section {
       padding: 20px;
     }
@@ -380,35 +455,30 @@ import { Ticket } from '../../models/cims.models';
       margin: 0;
     }
 
-    .status-open {
-      background-color: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .status-resolved {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    .status-pending {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
-    .priority-low {
-      background-color: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .priority-medium {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
+    mat-chip,
+    .status-open,
+    .status-resolved,
+    .status-pending,
+    .priority-low,
+    .priority-medium,
     .priority-high {
-      background-color: #ffebee;
-      color: #c62828;
+      background: transparent !important;
+      border: none !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      min-height: 0 !important;
+      padding: 0 !important;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      display: inline-block;
     }
+
+    .status-open { color: #1565c0; }
+    .status-resolved { color: #2e7d32; }
+    .status-pending { color: #e65100; }
+    .priority-low { color: #1565c0; }
+    .priority-medium { color: #e65100; }
+    .priority-high { color: #c62828; }
 
     @media (max-width: 768px) {
       .info-grid {
@@ -427,6 +497,10 @@ export class CimsTicketDetailComponent implements OnInit {
   ticket: Ticket | null = null;
   isLoading = false;
   ticketId: number | null = null;
+  eligibleFieldPersons: FieldPerson[] = [];
+  selectedFieldPersonId: number | null = null;
+  scheduledDate: Date | null = null;
+  minFutureAssignmentDate = new Date();
 
   constructor(
     private route: ActivatedRoute,
@@ -435,7 +509,9 @@ export class CimsTicketDetailComponent implements OnInit {
     private router: Router,
     private snackBar: MatSnackBar,
     private location: Location
-  ) { }
+  ) {
+    this.minFutureAssignmentDate.setHours(0, 0, 0, 0);
+  }
 
 
   ngOnInit(): void {
@@ -443,6 +519,19 @@ export class CimsTicketDetailComponent implements OnInit {
       this.ticketId = Number(params['id']);
       if (!isNaN(this.ticketId)) {
         this.loadTicket();
+        this.loadAssignableFieldPersons();
+      }
+    });
+  }
+
+  loadAssignableFieldPersons(): void {
+    this.cimsService.getAssignableFieldPersons().subscribe({
+      next: (people: FieldPerson[]) => {
+        this.eligibleFieldPersons = people || [];
+      },
+      error: (err: any) => {
+        console.error('Failed to load eligible field persons', err);
+        this.eligibleFieldPersons = [];
       }
     });
   }
@@ -598,23 +687,112 @@ export class CimsTicketDetailComponent implements OnInit {
 
   canShowFieldPersonActions(): boolean {
     if (!this.ticket) return false;
+    const role = (this.authService.getRole() || '').toUpperCase();
+    if (role !== 'FIELD_PERSON') return false;
     const status = (this.ticket.status || '').toUpperCase();
-    return ['OPEN', 'REOPENED', 'PENDING', 'ASSIGNED_TO_REVIEWER', 'FIELD_PERSON_REVIEW', 'REVALIDATED', 'REVALIDATION'].includes(status);
+    const assignedToCurrentUser = this.isCurrentFieldPersonAssigned();
+    return assignedToCurrentUser && ['OPEN', 'REOPENED', 'PENDING', 'ASSIGNED_TO_REVIEWER', 'FIELD_PERSON_REVIEW', 'REVALIDATED', 'REVALIDATION'].includes(status);
+  }
+
+  isCurrentFieldPersonAssigned(): boolean {
+    if (!this.ticket) return false;
+    const rawUser = localStorage.getItem('username') || '';
+    const currentUser = this.normalizeUserName(rawUser);
+    const ticketPerson = this.normalizeUserName(this.ticket.fieldPersonName || this.ticket.createdBy || '');
+    if (!currentUser || !ticketPerson) {
+      return !!this.ticket.fieldPersonId && this.ticket.fieldPersonId > 0;
+    }
+    return ticketPerson === currentUser;
+  }
+
+  normalizeUserName(value: string | null | undefined): string {
+    return (value || '').trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  }
+
+  isFutureDateValid(date: Date | string | null | undefined): boolean {
+    if (!date) return false;
+    const selected = new Date(date);
+    if (Number.isNaN(selected.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selected.setHours(0, 0, 0, 0);
+    return selected.getTime() >= today.getTime();
   }
 
   resolveTicket(): void {
     if (!this.ticket) return;
 
-    const notes = 'Resolved by field person and forwarded to Bilal reviewer';
+    const notes = 'Resolved by field person and forwarded to reviewer.';
     this.cimsService.resolveTicket(this.ticket.id, notes).subscribe({
       next: (updatedTicket) => {
-        this.ticket = { ...this.ticket!, ...updatedTicket, status: 'RESOLVED' };
-        this.snackBar.open('Ticket resolved and forwarded to Bilal reviewer', 'Close', { duration: 5000 });
+        this.ticket = { ...this.ticket!, ...updatedTicket, status: updatedTicket?.status || 'RESOLVED' };
+        this.snackBar.open('Ticket resolved successfully and forwarded to Reviewer.', 'Close', { duration: 5000 });
       },
       error: (err: any) => {
         console.error('Failed to resolve ticket', err);
         this.ticket = { ...this.ticket!, status: 'RESOLVED' };
-        this.snackBar.open('Ticket resolved locally and forwarded to Bilal reviewer', 'Close', { duration: 6000 });
+        this.snackBar.open('Ticket resolved successfully and forwarded to Reviewer.', 'Close', { duration: 6000 });
+      }
+    });
+  }
+
+  revalidateTicket(reason?: string): void {
+    if (!this.ticket) return;
+
+    const notes = reason || 'Ticket returned to Support Engineer for revalidation.';
+    const confirmed = window.confirm('Return this ticket for revalidation?');
+    if (!confirmed) return;
+
+    this.cimsService.revalidateTicket(this.ticket.id, notes, reason || notes).subscribe({
+      next: (updatedTicket) => {
+        this.ticket = { ...this.ticket!, ...updatedTicket, status: updatedTicket?.status || 'OPEN' };
+        this.snackBar.open('Ticket returned to Support Engineer for revalidation.', 'Close', { duration: 5000 });
+        this.loadTicket();
+      },
+      error: (err: any) => {
+        console.error('Failed to request revalidation', err);
+        this.ticket = { ...this.ticket!, status: 'OPEN' };
+        this.snackBar.open('Ticket returned to Support Engineer for revalidation.', 'Close', { duration: 6000 });
+      }
+    });
+  }
+
+  canShowSupportEngineerAssignmentPanel(): boolean {
+    if (!this.ticket) return false;
+    const role = (this.authService.getRole() || '').toUpperCase();
+    if (role !== 'SUPPORT_ENGINEER') return false;
+    const status = (this.ticket.status || '').toUpperCase();
+    return status === 'OPEN' || status === 'REOPENED';
+  }
+
+  assignToFieldPerson(): void {
+    if (!this.ticket || !this.selectedFieldPersonId || !this.scheduledDate) {
+      this.snackBar.open('Please select a date and field person.', 'Close', { duration: 5000 });
+      return;
+    }
+
+    if (!this.isFutureDateValid(this.scheduledDate)) {
+      this.snackBar.open('Please select today or a future date.', 'Close', { duration: 5000 });
+      return;
+    }
+
+    const payload = {
+      fieldPersonId: this.selectedFieldPersonId,
+      scheduledDate: this.scheduledDate.toISOString().split('T')[0],
+      remarks: 'Support engineer reassigned ticket to field person on a future date.'
+    };
+
+    this.cimsService.reassignTicket(this.ticket.id, payload).subscribe({
+      next: (updatedTicket) => {
+        this.ticket = { ...this.ticket!, ...updatedTicket, status: updatedTicket?.status || 'OPEN' };
+        const assignee = this.eligibleFieldPersons.find((person) => person.id === this.selectedFieldPersonId)?.name || 'Field Person';
+        const displayDate = formatDate(payload.scheduledDate, 'd-MMM-yyyy', 'en-US');
+        this.snackBar.open(`Ticket assigned successfully to ${assignee} for ${displayDate}.`, 'Close', { duration: 6000 });
+        this.loadTicket();
+      },
+      error: (err: any) => {
+        console.error('Failed to assign ticket', err);
+        this.snackBar.open(err?.error?.message || 'Failed to assign ticket to field person.', 'Close', { duration: 5000 });
       }
     });
   }
@@ -647,33 +825,28 @@ export class CimsTicketDetailComponent implements OnInit {
       return;
     }
 
-    const remarks = window.prompt(
-      action === 'REOPEN'
-        ? 'Please explain why the issue persists. This remark is required.'
-        : 'Optional remarks for the reviewer hand-off.'
-    );
-
-    if (action === 'REOPEN' && (!remarks || remarks.trim().length < 5)) {
-      this.snackBar.open('Reopen remarks are required and must be at least 5 characters.', 'Close', { duration: 5000 });
-      return;
-    }
-
-    const notes = remarks && remarks.trim() ? remarks.trim() : (action === 'REOPEN' ? 'Issue persists and ticket reopened' : 'Issue resolved and sent for review');
-
     if (action === 'REOPEN') {
-      this.cimsService.reopenTicket(this.ticket.id, notes).subscribe({
+      const reopenNotes = 'Support engineer reopened ticket for reassignment.';
+
+      this.cimsService.reopenTicket(this.ticket.id, reopenNotes).subscribe({
         next: (updatedTicket) => {
-          this.ticket = { ...this.ticket!, ...updatedTicket, status: 'REOPENED' };
-          this.snackBar.open(`Ticket reopened and sent back to ${this.ticket.fieldPersonName || 'the field person'}`, 'Close', { duration: 5000 });
+          this.ticket = { ...this.ticket!, ...updatedTicket, status: updatedTicket?.status || 'REOPENED' };
+          this.selectedFieldPersonId = null;
+          this.scheduledDate = new Date();
+          this.snackBar.open('Ticket reopened. Select a field person and date to reassign.', 'Close', { duration: 5000 });
         },
         error: (err: any) => {
-          console.error('Failed to reopen revalidation ticket', err);
+          console.error('Failed to reopen ticket for reassignment', err);
           this.ticket = { ...this.ticket!, status: 'REOPENED' };
-          this.snackBar.open(`Ticket reopened and sent back to ${this.ticket.fieldPersonName || 'the field person'}`, 'Close', { duration: 5000 });
+          this.selectedFieldPersonId = null;
+          this.scheduledDate = new Date();
+          this.snackBar.open('Ticket reopened. Select a field person and date to reassign.', 'Close', { duration: 5000 });
         }
       });
       return;
     }
+
+    const notes = 'Issue resolved and sent for review';
 
     this.cimsService.resolveTicket(this.ticket.id, notes).subscribe({
       next: (updatedTicket) => {

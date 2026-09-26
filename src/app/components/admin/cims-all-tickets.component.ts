@@ -318,62 +318,26 @@ const FETCH_ALL_PAGE_SIZE = 5000;
 
     .badge {
       display: inline-block;
-      padding: 4px 12px;
-      border-radius: 16px;
+      padding: 0;
+      border-radius: 0;
       font-size: 12px;
       font-weight: 600;
       white-space: nowrap;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
     }
 
-    .priority-low {
-      background-color: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .priority-medium {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
-    .priority-high {
-      background-color: #ffebee;
-      color: #c62828;
-    }
-
-    .status-open {
-      background-color: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .status-acknowledged {
-      background-color: #f3e5f5;
-      color: #6a1b9a;
-    }
-
-    .status-in_review {
-      background-color: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .status-resolved {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    .status-reopened {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
-    .status-pending {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
-    .status-rejected {
-      background-color: #ffebee;
-      color: #c62828;
-    }
+    .priority-low { color: #1565c0; }
+    .priority-medium { color: #e65100; }
+    .priority-high { color: #c62828; }
+    .status-open { color: #1565c0; }
+    .status-acknowledged { color: #6a1b9a; }
+    .status-in_review { color: #1565c0; }
+    .status-resolved { color: #2e7d32; }
+    .status-reopened { color: #e65100; }
+    .status-pending { color: #e65100; }
+    .status-rejected { color: #c62828; }
 
     .empty-state {
       display: flex;

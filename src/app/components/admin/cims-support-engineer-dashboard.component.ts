@@ -11,7 +11,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { CimsService } from '../../services/cims.service';
 import { Ticket, PaginatedResponse } from '../../models/cims.models';
 import { ChartConfiguration } from 'chart.js';
@@ -37,32 +39,43 @@ import autoTable from 'jspdf-autotable';
     MatSnackBarModule,
     MatChipsModule,
     MatMenuModule,
+    MatTooltipModule,
     NgChartsModule
   ],
   template: `
     <div class="dashboard-container">
-      <mat-card class="dashboard-header header-card">
+      <!-- Header -->
+      <div class="dashboard-header">
         <div class="header-content">
-          <div>
-            <h1>My Tickets Dashboard</h1>
-            <p class="subtitle">Manage and track all tickets you have raised</p>
+          <div class="header-title-block">
+            <div class="title-icon">📊</div>
+            <div>
+              <h1>My Tickets Dashboard</h1>
+              <p class="subtitle">Manage and track all tickets you have raised</p>
+            </div>
           </div>
           <div class="header-actions">
-            <button mat-raised-button color="primary" (click)="loadDashboardData()" [disabled]="isLoading">
+            <button mat-stroked-button class="action-btn" (click)="loadDashboardData()" [disabled]="isLoading">
               <mat-icon>refresh</mat-icon>
               Refresh
             </button>
-            <button mat-stroked-button color="primary" (click)="exportToExcel()" [disabled]="filteredTickets.length===0">
+            <button mat-flat-button class="action-btn export-btn" [matMenuTriggerFor]="exportMenu" [disabled]="filteredTickets.length===0">
               <mat-icon>download</mat-icon>
-              Export Excel
+              Export
             </button>
-            <button mat-stroked-button color="accent" (click)="exportToPDF()" [disabled]="filteredTickets.length===0">
-              <mat-icon>picture_as_pdf</mat-icon>
-              Export PDF
-            </button>
+            <mat-menu #exportMenu="matMenu">
+              <button mat-menu-item (click)="exportToExcel()">
+                <mat-icon>description</mat-icon>
+                Export to Excel
+              </button>
+              <button mat-menu-item (click)="exportToPDF()">
+                <mat-icon>picture_as_pdf</mat-icon>
+                Export to PDF
+              </button>
+            </mat-menu>
           </div>
         </div>
-      </mat-card>
+      </div>
 
       <!-- Loading State -->
       <div *ngIf="isLoading" class="loading-container">
@@ -72,44 +85,45 @@ import autoTable from 'jspdf-autotable';
 
       <!-- Stats Grid -->
       <div *ngIf="!isLoading" class="stats-grid">
-        <mat-card class="stat-card total">
-          <mat-card-content>
-            <div class="stat-value">{{ stats.totalRaised || 0 }}</div>
+        <div class="stat-card total">
+          <div class="stat-icon-wrap"><span class="stat-icon">📝</span></div>
+          <div class="stat-text">
+            <div class="stat-value">{{ stats.totalRaised }}</div>
             <div class="stat-label">Total Raised</div>
-            <div class="stat-icon">📝</div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </div>
 
-        <mat-card class="stat-card open">
-          <mat-card-content>
-            <div class="stat-value">{{ stats.open || 0 }}</div>
+        <div class="stat-card open">
+          <div class="stat-icon-wrap"><span class="stat-icon">📂</span></div>
+          <div class="stat-text">
+            <div class="stat-value">{{ stats.open }}</div>
             <div class="stat-label">Open</div>
-            <div class="stat-icon">📂</div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </div>
 
-        <mat-card class="stat-card inProgress">
-          <mat-card-content>
-            <div class="stat-value">{{ stats.inProgress || 0 }}</div>
+        <div class="stat-card inProgress">
+          <div class="stat-icon-wrap"><span class="stat-icon">⚙️</span></div>
+          <div class="stat-text">
+            <div class="stat-value">{{ stats.inProgress }}</div>
             <div class="stat-label">In Progress</div>
-            <div class="stat-icon">⚙️</div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </div>
 
-        <mat-card class="stat-card resolved">
-          <mat-card-content>
-            <div class="stat-value">{{ stats.resolved || 0 }}</div>
+        <div class="stat-card resolved">
+          <div class="stat-icon-wrap"><span class="stat-icon">✅</span></div>
+          <div class="stat-text">
+            <div class="stat-value">{{ stats.resolved }}</div>
             <div class="stat-label">Resolved</div>
-            <div class="stat-icon">✅</div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </div>
       </div>
+      <p class="stats-note" *ngIf="!isLoading">Open + In Progress + Resolved = {{ stats.open + stats.inProgress + stats.resolved }} of {{ stats.totalRaised }} total</p>
 
       <!-- Chart Section -->
       <div *ngIf="!isLoading" class="charts-grid">
         <mat-card class="chart-card">
           <mat-card-header>
-            <mat-card-title>My Raised Tickets by Status</mat-card-title>
+            <mat-card-title>Tickets by Status</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <div class="chart-container">
@@ -127,49 +141,30 @@ import autoTable from 'jspdf-autotable';
 
       <!-- Tickets Table with Filters -->
       <mat-card class="tickets-table-card" *ngIf="!isLoading">
-        <mat-card-header>
-          <mat-card-title>My Tickets</mat-card-title>
-          <div class="export-menu">
-            <button mat-raised-button color="accent" [matMenuTriggerFor]="exportMenu">
-              <mat-icon>download</mat-icon>
-              Export
-            </button>
-            <mat-menu #exportMenu="matMenu">
-              <button mat-menu-item (click)="exportToExcel()">
-                <mat-icon>description</mat-icon>
-                Export to Excel
-              </button>
-              <button mat-menu-item (click)="exportToPDF()">
-                <mat-icon>picture_as_pdf</mat-icon>
-                Export to PDF
-              </button>
-            </mat-menu>
-          </div>
-        </mat-card-header>
+        <div class="table-card-header">
+          <h2>My Tickets</h2>
+        </div>
 
         <mat-card-content>
           <!-- Status Filter Tabs -->
-          <mat-tab-group (selectedIndexChange)="onStatusFilterChange($event)">
-            <mat-tab label="All">
-              <ng-template mat-tab-label>All ({{ filteredTickets.length }})</ng-template>
+          <mat-tab-group class="status-tabs" (selectedIndexChange)="onStatusFilterChange($event)" mat-stretch-tabs="false">
+            <mat-tab>
+              <ng-template mat-tab-label>All <span class="tab-count">{{ stats.totalRaised }}</span></ng-template>
             </mat-tab>
-            <mat-tab label="Open">
-              <ng-template mat-tab-label>Open ({{ getCountByStatus('OPEN') }})</ng-template>
+            <mat-tab>
+              <ng-template mat-tab-label>Open <span class="tab-count">{{ stats.open }}</span></ng-template>
             </mat-tab>
-            <mat-tab label="In Progress">
-              <ng-template mat-tab-label>In Progress ({{ getCountInProgress() }})</ng-template>
+            <mat-tab>
+              <ng-template mat-tab-label>In Progress <span class="tab-count">{{ stats.inProgress }}</span></ng-template>
             </mat-tab>
-            <mat-tab label="Resolved">
-              <ng-template mat-tab-label>Resolved ({{ getCountByStatus('RESOLVED') }})</ng-template>
-            </mat-tab>
-            <mat-tab label="Reopened">
-              <ng-template mat-tab-label>Reopened ({{ getCountByStatus('REOPENED') }})</ng-template>
+            <mat-tab>
+              <ng-template mat-tab-label>Resolved <span class="tab-count">{{ stats.resolved }}</span></ng-template>
             </mat-tab>
           </mat-tab-group>
 
           <!-- Table -->
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="filteredTickets" class="tickets-table">
+          <div class="table-wrapper" *ngIf="pagedTickets.length > 0">
+            <table mat-table [dataSource]="pagedTickets" class="tickets-table">
               <ng-container matColumnDef="id">
                 <th mat-header-cell *matHeaderCellDef>ID</th>
                 <td mat-cell *matCellDef="let element" class="ticket-id">#{{ element.id }}</td>
@@ -182,45 +177,52 @@ import autoTable from 'jspdf-autotable';
 
               <ng-container matColumnDef="location">
                 <th mat-header-cell *matHeaderCellDef>Location</th>
-                <td mat-cell *matCellDef="let element">{{ element.locationName }}</td>
+                <td mat-cell *matCellDef="let element">
+                  <span class="location-cell">
+                    <mat-icon class="loc-icon">place</mat-icon>
+                    {{ element.locationName }}
+                  </span>
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="priority">
                 <th mat-header-cell *matHeaderCellDef>Priority</th>
                 <td mat-cell *matCellDef="let element">
-                  <mat-chip [class]="'priority-' + element.priority.toLowerCase()">
+                  <span class="badge priority-badge" [ngClass]="'priority-' + element.priority.toLowerCase()">
                     {{ element.priority }}
-                  </mat-chip>
+                  </span>
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Status</th>
                 <td mat-cell *matCellDef="let element">
-                  <mat-chip [class]="'status-' + element.status.toLowerCase()">
+                  <span class="badge status-badge" [ngClass]="'status-' + element.status.toLowerCase()">
+                    <span class="status-dot"></span>
                     {{ element.status }}
-                  </mat-chip>
+                  </span>
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="createdAt">
                 <th mat-header-cell *matHeaderCellDef>Raised Date</th>
-                <td mat-cell *matCellDef="let element">
-                  {{ element.createdAt | date: 'short' }}
+                <td mat-cell *matCellDef="let element" class="date-cell">
+                  {{ element.createdAt | date: 'MMM d, y, h:mm a' }}
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Actions</th>
                 <td mat-cell *matCellDef="let element">
-                  <button mat-icon-button [routerLink]="['/cims/support-engineer/tickets', element.id]" matTooltip="View Details">
+                  <button mat-icon-button class="view-icon-btn" [routerLink]="['/cims/support-engineer/tickets', element.id]" matTooltip="View Details">
                     <mat-icon>visibility</mat-icon>
                   </button>
                 </td>
               </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+                  [class.row-revalidation]="row.status?.toUpperCase() === 'REVALIDATION'"></tr>
             </table>
           </div>
 
@@ -232,10 +234,12 @@ import autoTable from 'jspdf-autotable';
 
           <!-- Paginator -->
           <mat-paginator
-            *ngIf="tickets.length > 0"
-            [length]="tickets.length"
+            *ngIf="filteredTickets.length > 0"
+            class="ticket-paginator"
+            [length]="filteredTickets.length"
+            [pageIndex]="currentPage"
             [pageSize]="pageSize"
-            [pageSizeOptions]="[5, 10, 20]"
+            [pageSizeOptions]="[5, 10, 20, 50]"
             (page)="onPageChange($event)">
           </mat-paginator>
         </mat-card-content>
@@ -247,31 +251,74 @@ import autoTable from 'jspdf-autotable';
       padding: 24px;
       max-width: 1400px;
       margin: 0 auto;
+      background: #f4f6f9;
     }
 
+    /* ---------- Header ---------- */
     .dashboard-header {
-      margin-bottom: 32px;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1976d2 100%);
+      border-radius: 16px;
+      padding: 26px 28px;
+      margin-bottom: 28px;
+      box-shadow: 0 4px 20px rgba(20, 30, 60, 0.12);
     }
 
-    .header-title {
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .header-title-block {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 28px;
-      font-weight: 600;
-      color: #1a1a1a;
-      margin-bottom: 8px;
+      gap: 16px;
+      color: #fff;
     }
 
-    .icon {
-      font-size: 32px;
+    .title-icon {
+      font-size: 30px;
+      width: 54px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+    }
+
+    .header-title-block h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
     }
 
     .subtitle {
-      color: #666;
-      font-size: 14px;
+      margin: 2px 0 0;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.8);
     }
 
+    .header-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-btn {
+      border-radius: 10px;
+      font-weight: 600;
+      color: #fff !important;
+      border-color: rgba(255, 255, 255, 0.4) !important;
+    }
+
+    .export-btn {
+      background: #fff !important;
+      color: #1565c0 !important;
+    }
+
+    /* ---------- Loading ---------- */
     .loading-container {
       display: flex;
       flex-direction: column;
@@ -279,156 +326,240 @@ import autoTable from 'jspdf-autotable';
       justify-content: center;
       padding: 80px 20px;
       gap: 16px;
+      color: #607d8b;
     }
 
+    /* ---------- Stat cards ---------- */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      margin-bottom: 32px;
+      gap: 18px;
+      margin-bottom: 6px;
     }
 
     .stat-card {
-      position: relative;
-      overflow: hidden;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .stat-card.total {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .stat-card.open {
-      background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-      color: white;
-    }
-
-    .stat-card.inProgress {
-      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-      color: white;
-    }
-
-    .stat-card.resolved {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-    }
-
-    mat-card-content {
-      position: relative;
-      padding: 24px;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
       align-items: center;
-      gap: 12px;
-      text-align: center;
+      gap: 16px;
+      border-radius: 14px;
+      padding: 20px 22px;
+      box-shadow: 0 3px 12px rgba(20, 30, 60, 0.08);
+      color: #fff;
     }
 
-    .stat-value {
-      font-size: 40px;
-      font-weight: 700;
-    }
+    .stat-card.total { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .stat-card.open { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); }
+    .stat-card.inProgress { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+    .stat-card.resolved { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
 
-    .stat-label {
-      font-size: 14px;
-      font-weight: 500;
-      opacity: 0.95;
+    .stat-icon-wrap {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
     .stat-icon {
-      font-size: 32px;
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      opacity: 0.3;
+      font-size: 24px;
     }
 
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.95;
+      margin-top: 2px;
+    }
+
+    .stats-note {
+      text-align: right;
+      font-size: 12px;
+      color: #90a4ae;
+      margin: 8px 4px 24px;
+    }
+
+    /* ---------- Charts ---------- */
     .charts-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
       gap: 20px;
-      margin-bottom: 32px;
+      margin-bottom: 28px;
     }
 
     .chart-card {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border-radius: 14px;
+      box-shadow: 0 3px 12px rgba(20, 30, 60, 0.08);
     }
 
     .chart-container {
       position: relative;
       height: 300px;
-      margin: 20px 0;
+      margin: 12px 0;
     }
 
+    /* ---------- Table card ---------- */
     .tickets-table-card {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border-radius: 14px;
+      box-shadow: 0 3px 12px rgba(20, 30, 60, 0.08);
+      padding-bottom: 8px;
     }
 
-    mat-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
+    .table-card-header {
+      padding: 20px 24px 0;
     }
 
-    .export-menu {
-      display: flex;
-      gap: 8px;
+    .table-card-header h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: #263238;
+    }
+
+    .status-tabs {
+      margin-top: 14px;
+    }
+
+    ::ng-deep .status-tabs .mat-mdc-tab-label-container {
+      border-bottom: 1px solid #eceff1;
+    }
+
+    .tab-count {
+      background: #eceff1;
+      color: #546e7a;
+      border-radius: 999px;
+      padding: 1px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-left: 6px;
     }
 
     .table-wrapper {
       overflow-x: auto;
-      margin-top: 20px;
+      border-radius: 12px;
+      border: 1px solid #eef1f5;
+      margin: 18px 0 4px;
     }
 
     .tickets-table {
       width: 100%;
     }
 
+    ::ng-deep .tickets-table .mat-mdc-header-row {
+      background: #f8fafc;
+    }
+
+    ::ng-deep .tickets-table .mat-mdc-header-cell {
+      color: #607d8b;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 2px solid #eceff1;
+    }
+
+    ::ng-deep .tickets-table .mat-mdc-row:nth-child(even) {
+      background-color: #fafbfc;
+    }
+
+    ::ng-deep .tickets-table .mat-mdc-row:hover {
+      background-color: #eef5fd !important;
+    }
+
+    ::ng-deep .tickets-table .row-revalidation {
+      background-color: #fff8e6 !important;
+      border-left: 3px solid #ffa726;
+    }
+
+    ::ng-deep .tickets-table .row-revalidation:hover {
+      background-color: #fff2d6 !important;
+    }
+
+    ::ng-deep .tickets-table .mat-mdc-cell {
+      border-bottom: 1px solid #f1f3f5;
+      font-size: 13.5px;
+      color: #37474f;
+    }
+
     .ticket-id {
-      font-weight: 600;
+      font-weight: 700;
+      color: #1565c0;
+      font-size: 14px;
+    }
+
+    .date-cell {
+      color: #78909c;
+      white-space: nowrap;
+    }
+
+    .location-cell {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .loc-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: #90a4ae;
+    }
+
+    /* ---------- Badges ---------- */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .priority-low { background: #e3f2fd; color: #1565c0; }
+    .priority-medium { background: #fff3e0; color: #e65100; }
+    .priority-high { background: #ffebee; color: #c62828; }
+
+    .status-badge .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status-open { background: #e3f2fd; color: #1565c0; }
+    .status-resolved { background: #e8f5e9; color: #2e7d32; }
+    .status-acknowledged,
+    .status-in_review,
+    .status-pending,
+    .status-coordinator_review,
+    .status-assigned_to_reviewer { background: #fff3e0; color: #ef6c00; }
+    .status-reopened { background: #fce4ec; color: #c2185b; }
+    .status-revalidation { background: #fff3e0; color: #ef6c00; }
+    .status-rejected { background: #ffebee; color: #c62828; }
+    .status-ticket_created { background: #ede7f6; color: #5e35b1; }
+    .status-sent_for_review { background: #e0f2f1; color: #00695c; }
+
+    .view-icon-btn {
       color: #1976d2;
     }
 
-    .priority-low {
-      background-color: #e3f2fd;
-      color: #1565c0;
+    .ticket-paginator {
+      background: transparent;
     }
 
-    .priority-medium {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
-    .priority-high {
-      background-color: #ffebee;
-      color: #c62828;
-    }
-
-    .status-open {
-      background-color: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .status-resolved {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    .status-acknowledged,
-    .status-in_review,
-    .status-pending {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
-    .status-reopened {
-      background-color: #fce4ec;
-      color: #c2185b;
-    }
-
+    /* ---------- Empty state ---------- */
     .empty-state {
       display: flex;
       flex-direction: column;
@@ -436,14 +567,32 @@ import autoTable from 'jspdf-autotable';
       justify-content: center;
       padding: 60px 20px;
       gap: 12px;
-      color: #999;
+      color: #90a4ae;
     }
 
     .empty-icon {
       font-size: 64px;
+      opacity: 0.6;
     }
 
     @media (max-width: 768px) {
+      .dashboard-container {
+        padding: 12px;
+      }
+
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .header-actions {
+        width: 100%;
+      }
+
+      .action-btn {
+        flex: 1;
+      }
+
       .stats-grid {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -451,10 +600,15 @@ import autoTable from 'jspdf-autotable';
   `]
 })
 export class CimsSupportEngineerDashboardComponent implements OnInit {
+  /** Full set of tickets raised by this engineer — every page merged, not just one. */
   tickets: Ticket[] = [];
+  /** tickets after the active status-tab filter, still the full matching set (not paginated). */
   filteredTickets: Ticket[] = [];
+  /** Just the slice of filteredTickets shown on the current page. */
+  pagedTickets: Ticket[] = [];
+
   displayedColumns: string[] = ['id', 'type', 'location', 'priority', 'status', 'createdAt', 'actions'];
-  
+
   stats = {
     totalRaised: 0,
     open: 0,
@@ -463,13 +617,17 @@ export class CimsSupportEngineerDashboardComponent implements OnInit {
   };
 
   isLoading = false;
-  currentStatusFilter: string = 'ALL';
+  currentStatusFilter: 'ALL' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' = 'ALL';
   pageSize = 10;
   currentPage = 0;
 
   statusChartData: any;
   statusChartOptions: ChartConfiguration['options'];
   statusChartPlugins: any[] = [];
+
+  // Batch size used when pulling pages from the backend to assemble the
+  // full ticket set, since the backend endpoint is paginated.
+  private readonly FETCH_BATCH_SIZE = 200;
 
   constructor(
     private cimsService: CimsService,
@@ -484,22 +642,39 @@ export class CimsSupportEngineerDashboardComponent implements OnInit {
 
   loadDashboardData(): void {
     this.isLoading = true;
-    // Use existing endpoint that returns all tickets raised by this engineer
-    this.cimsService.getMyTickets(this.currentPage, this.pageSize).subscribe({
+
+    this.cimsService.getMyTickets(0, this.FETCH_BATCH_SIZE).subscribe({
       next: (response: Ticket[] | PaginatedResponse<Ticket>) => {
-        const tickets = Array.isArray(response) ? response : response?.content ?? [];
-        this.tickets = tickets.slice().sort((a, b) => {
-          const aPriority = (a.status || '').toUpperCase() === 'REVALIDATION' ? 1 : 0;
-          const bPriority = (b.status || '').toUpperCase() === 'REVALIDATION' ? 1 : 0;
-          if (aPriority !== bPriority) {
-            return bPriority - aPriority;
+        // Some environments may return a plain array with no pagination envelope.
+        if (Array.isArray(response)) {
+          this.finishLoading(response);
+          return;
+        }
+
+        const total = response?.totalElements ?? 0;
+        const firstBatch = response?.content ?? [];
+        const totalBatches = Math.ceil(total / this.FETCH_BATCH_SIZE);
+
+        if (totalBatches <= 1) {
+          this.finishLoading(firstBatch);
+          return;
+        }
+
+        const remainingRequests = [];
+        for (let page = 1; page < totalBatches; page++) {
+          remainingRequests.push(this.cimsService.getMyTickets(page, this.FETCH_BATCH_SIZE));
+        }
+
+        forkJoin(remainingRequests).subscribe({
+          next: (responses: (Ticket[] | PaginatedResponse<Ticket>)[]) => {
+            const rest = responses.flatMap(r => Array.isArray(r) ? r : (r?.content ?? []));
+            this.finishLoading([...firstBatch, ...rest]);
+          },
+          error: (err: any) => {
+            console.error('Failed to load remaining ticket pages', err);
+            this.finishLoading(firstBatch);
           }
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
-        this.calculateStats();
-        this.applyStatusFilter();
-        this.updateCharts();
-        this.isLoading = false;
       },
       error: (err: any) => {
         console.error('Failed to load my tickets', err);
@@ -509,53 +684,76 @@ export class CimsSupportEngineerDashboardComponent implements OnInit {
     });
   }
 
+  private finishLoading(allTickets: Ticket[]): void {
+    this.tickets = allTickets.slice().sort((a, b) => {
+      const aPriority = (a.status || '').toUpperCase() === 'REVALIDATION' ? 1 : 0;
+      const bPriority = (b.status || '').toUpperCase() === 'REVALIDATION' ? 1 : 0;
+      if (aPriority !== bPriority) {
+        return bPriority - aPriority;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    this.calculateStats();
+    this.currentPage = 0;
+    this.applyStatusFilter();
+    this.updateCharts();
+    this.isLoading = false;
+  }
+
+  /**
+   * Open + In Progress + Resolved always sum to exactly totalRaised, because
+   * "In Progress" is a catch-all for every status that isn't OPEN or RESOLVED
+   * (REVALIDATION, ASSIGNED_TO_REVIEWER, COORDINATOR_REVIEW, TICKET_CREATED,
+   * SENT_FOR_REVIEW, etc.) rather than a hardcoded list that could silently
+   * miss a status your workflow actually uses.
+   */
   calculateStats(): void {
     this.stats.totalRaised = this.tickets.length;
-    this.stats.open = this.tickets.filter(t => t.status === 'OPEN').length;
-    this.stats.inProgress = this.tickets.filter(t => 
-      t.status === 'ACKNOWLEDGED' || 
-      t.status === 'IN_REVIEW' || 
-      t.status === 'PENDING'
-    ).length;
-    this.stats.resolved = this.tickets.filter(t => t.status === 'RESOLVED').length;
+    this.stats.open = this.tickets.filter(t => (t.status || '').toUpperCase() === 'OPEN').length;
+    this.stats.resolved = this.tickets.filter(t => (t.status || '').toUpperCase() === 'RESOLVED').length;
+    this.stats.inProgress = this.stats.totalRaised - this.stats.open - this.stats.resolved;
   }
 
   onStatusFilterChange(index: number): void {
-    const statuses = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'REOPENED'];
+    const statuses: ('ALL' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED')[] = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED'];
     this.currentStatusFilter = statuses[index];
+    this.currentPage = 0;
     this.applyStatusFilter();
   }
 
   applyStatusFilter(): void {
     if (this.currentStatusFilter === 'ALL') {
       this.filteredTickets = this.tickets;
-    } else if (this.currentStatusFilter === 'IN_PROGRESS') {
-      this.filteredTickets = this.tickets.filter(t => 
-        t.status === 'ACKNOWLEDGED' || 
-        t.status === 'IN_REVIEW' || 
-        t.status === 'PENDING'
-      );
+    } else if (this.currentStatusFilter === 'OPEN') {
+      this.filteredTickets = this.tickets.filter(t => (t.status || '').toUpperCase() === 'OPEN');
+    } else if (this.currentStatusFilter === 'RESOLVED') {
+      this.filteredTickets = this.tickets.filter(t => (t.status || '').toUpperCase() === 'RESOLVED');
     } else {
-      this.filteredTickets = this.tickets.filter(t => t.status === this.currentStatusFilter);
+      // IN_PROGRESS: same catch-all definition used in calculateStats()
+      this.filteredTickets = this.tickets.filter(t => {
+        const s = (t.status || '').toUpperCase();
+        return s !== 'OPEN' && s !== 'RESOLVED';
+      });
     }
+    this.updatePagedTickets();
   }
 
-  getCountByStatus(status: string): number {
-    return this.tickets.filter(t => t.status === status).length;
-  }
-
-  getCountInProgress(): number {
-    return this.tickets.filter(t => 
-      t.status === 'ACKNOWLEDGED' || 
-      t.status === 'IN_REVIEW' || 
-      t.status === 'PENDING'
-    ).length;
+  private updatePagedTickets(): void {
+    const start = this.currentPage * this.pageSize;
+    this.pagedTickets = this.filteredTickets.slice(start, start + this.pageSize);
   }
 
   onPageChange(event: PageEvent): void {
-    this.currentPage = event.pageIndex;
+    const previousPageSize = this.pageSize;
     this.pageSize = event.pageSize;
-    this.loadDashboardData();
+    this.currentPage = event.pageIndex;
+
+    if (event.pageSize !== previousPageSize) {
+      this.currentPage = 0;
+    }
+
+    this.updatePagedTickets();
   }
 
   initializeCharts(): void {
@@ -571,7 +769,7 @@ export class CimsSupportEngineerDashboardComponent implements OnInit {
   updateCharts(): void {
     const statusCounts: Record<string, number> = {};
     this.tickets.forEach(ticket => {
-      const status = ticket.status;
+      const status = ticket.status || 'UNKNOWN';
       statusCounts[status] = (statusCounts[status] || 0) + 1;
     });
 
@@ -581,11 +779,8 @@ export class CimsSupportEngineerDashboardComponent implements OnInit {
         label: 'Tickets by Status',
         data: Object.values(statusCounts),
         backgroundColor: [
-          '#3b82f6',
-          '#10b981',
-          '#f59e0b',
-          '#ef4444',
-          '#8b5cf6'
+          '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+          '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'
         ]
       }]
     };
@@ -593,6 +788,7 @@ export class CimsSupportEngineerDashboardComponent implements OnInit {
 
   exportToExcel(): void {
     try {
+      // Exports every ticket matching the active tab filter, not just the current page.
       const data = this.filteredTickets.map(t => ({
         'ID': t.id,
         'Type': t.incidentTypeName,

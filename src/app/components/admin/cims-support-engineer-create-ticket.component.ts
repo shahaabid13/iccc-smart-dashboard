@@ -13,6 +13,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDividerModule } from '@angular/material/divider';
 import { CimsService } from '../../services/cims.service';
 import { CimsNotificationService } from '../../services/cims-notification.service';
 import { DevicesService } from '../../services/devices.service';
@@ -37,25 +38,31 @@ interface PriorityOption {
     MatCardModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
-    MatIconModule
+    MatIconModule,
+    MatDividerModule
   ],
   template: `
     <div class="cims-container">
-      <mat-card class="ticket-form-card">
-        <mat-card-header>
-          <mat-card-title>
-            <div class="header-title">
-              <span class="icon">📹</span>
-              <span>Raise New Incident Ticket</span>
-            </div>
-          </mat-card-title>
-          <mat-card-subtitle>Submit a new camera incident for investigation</mat-card-subtitle>
-        </mat-card-header>
+      <div class="page-header">
+        <div class="header-title-block">
+          <div class="title-icon">📹</div>
+          <div>
+            <h1>Raise New Incident Ticket</h1>
+            <p class="subtitle">Submit a new camera incident for investigation</p>
+          </div>
+        </div>
+      </div>
 
+      <mat-card class="ticket-form-card">
         <mat-card-content>
           <form [formGroup]="ticketForm" (ngSubmit)="submitForm()">
-            <div class="form-grid">
 
+            <div class="section-label">
+              <mat-icon>location_on</mat-icon>
+              <span>Location Details</span>
+            </div>
+
+            <div class="form-grid">
               <!-- Location -->
               <mat-form-field appearance="outline" class="form-field">
                 <mat-label>Location *</mat-label>
@@ -115,7 +122,16 @@ interface PriorityOption {
                   </mat-option>
                 </mat-autocomplete>
               </mat-form-field>
+            </div>
 
+            <mat-divider class="section-divider"></mat-divider>
+
+            <div class="section-label">
+              <mat-icon>report_problem</mat-icon>
+              <span>Incident Details</span>
+            </div>
+
+            <div class="form-grid">
               <!-- Incident Type -->
               <mat-form-field appearance="outline" class="form-field">
                 <mat-label>Incident Type *</mat-label>
@@ -134,6 +150,29 @@ interface PriorityOption {
                 </mat-autocomplete>
                 <mat-error *ngIf="getControl('incidentTypeId')?.hasError('required')">
                   Incident Type is required
+                </mat-error>
+              </mat-form-field>
+
+              <!-- Priority -->
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Priority *</mat-label>
+                <input
+                  matInput
+                  type="text"
+                  placeholder="Type to search priority..."
+                  [formControl]="priorityCtrl"
+                  [matAutocomplete]="autoPriority"
+                  #priorityTrigger="matAutocompleteTrigger">
+                <mat-icon matSuffix class="dropdown-arrow" (click)="toggleAutocomplete(priorityTrigger)">arrow_drop_down</mat-icon>
+                <mat-autocomplete #autoPriority="matAutocomplete" [displayWith]="displayPriority" (optionSelected)="onPrioritySelected($event)">
+                  <mat-option *ngFor="let option of filterPriorities(priorityCtrl.value)" [value]="option">
+                    <span class="priority-option" [ngClass]="'priority-opt-' + option.value.toLowerCase()">
+                      <span class="priority-dot"></span>{{ option.label }}
+                    </span>
+                  </mat-option>
+                </mat-autocomplete>
+                <mat-error *ngIf="getControl('priority')?.hasError('required')">
+                  Priority is required
                 </mat-error>
               </mat-form-field>
 
@@ -158,27 +197,6 @@ interface PriorityOption {
                 </mat-error>
               </mat-form-field>
 
-              <!-- Priority -->
-              <mat-form-field appearance="outline" class="form-field">
-                <mat-label>Priority *</mat-label>
-                <input
-                  matInput
-                  type="text"
-                  placeholder="Type to search priority..."
-                  [formControl]="priorityCtrl"
-                  [matAutocomplete]="autoPriority"
-                  #priorityTrigger="matAutocompleteTrigger">
-                <mat-icon matSuffix class="dropdown-arrow" (click)="toggleAutocomplete(priorityTrigger)">arrow_drop_down</mat-icon>
-                <mat-autocomplete #autoPriority="matAutocomplete" [displayWith]="displayPriority" (optionSelected)="onPrioritySelected($event)">
-                  <mat-option *ngFor="let option of filterPriorities(priorityCtrl.value)" [value]="option">
-                    {{ option.label }}
-                  </mat-option>
-                </mat-autocomplete>
-                <mat-error *ngIf="getControl('priority')?.hasError('required')">
-                  Priority is required
-                </mat-error>
-              </mat-form-field>
-
               <!-- Description (Full Width, optional) -->
               <mat-form-field appearance="outline" class="form-field full-width">
                 <mat-label>Description</mat-label>
@@ -191,17 +209,17 @@ interface PriorityOption {
 
             <!-- Form Actions -->
             <div class="form-actions">
-              <button mat-raised-button color="primary" type="submit" [disabled]="isLoading">
-                <span *ngIf="!isLoading">Raise Ticket</span>
-                <span *ngIf="isLoading">
-                  <mat-spinner diameter="20"></mat-spinner> Submitting...
+              <button mat-raised-button color="primary" type="submit" class="submit-btn" [disabled]="isLoading">
+                <span *ngIf="!isLoading" class="btn-inner"><mat-icon>send</mat-icon> Raise Ticket</span>
+                <span *ngIf="isLoading" class="btn-inner">
+                  <mat-spinner diameter="18"></mat-spinner> Submitting...
                 </span>
               </button>
               <button mat-stroked-button type="button" (click)="resetForm()" [disabled]="isLoading">
-                Reset
+                <mat-icon>restart_alt</mat-icon> Reset
               </button>
-              <button mat-stroked-button type="button" (click)="goBack()">
-                Back to My Tickets
+              <button mat-button type="button" class="back-btn" (click)="goBack()">
+                <mat-icon>arrow_back</mat-icon> Back to My Tickets
               </button>
             </div>
           </form>
@@ -214,29 +232,82 @@ interface PriorityOption {
       padding: 24px;
       max-width: 900px;
       margin: 0 auto;
+      background: #f4f6f9;
     }
 
-    .ticket-form-card {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    /* ---------- Page header ---------- */
+    .page-header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1976d2 100%);
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-bottom: 22px;
+      box-shadow: 0 4px 20px rgba(20, 30, 60, 0.12);
     }
 
-    .header-title {
+    .header-title-block {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 24px;
-      font-weight: 500;
+      gap: 16px;
+      color: #fff;
     }
 
-    .icon {
+    .title-icon {
       font-size: 28px;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      flex-shrink: 0;
+    }
+
+    .header-title-block h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    /* ---------- Card ---------- */
+    .ticket-form-card {
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(20, 30, 60, 0.08);
+      padding: 8px;
+    }
+
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #1976d2;
+      margin: 18px 0 14px;
+    }
+
+    .section-label mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .section-divider {
+      margin: 12px 0 6px;
     }
 
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-top: 20px;
+      gap: 18px 20px;
     }
 
     .form-field {
@@ -247,43 +318,106 @@ interface PriorityOption {
       grid-column: 1 / -1;
     }
 
+    ::ng-deep .form-field .mat-mdc-text-field-wrapper {
+      border-radius: 10px;
+    }
+
     .dropdown-arrow {
       cursor: pointer;
-      color: rgba(0, 0, 0, 0.54);
+      color: rgba(0, 0, 0, 0.4);
       user-select: none;
     }
 
     .dropdown-arrow.disabled {
       cursor: not-allowed;
-      color: rgba(0, 0, 0, 0.26);
+      color: rgba(0, 0, 0, 0.2);
       pointer-events: none;
     }
 
+    .priority-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .priority-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .priority-opt-low .priority-dot { background: #1565c0; }
+    .priority-opt-medium .priority-dot { background: #e65100; }
+    .priority-opt-high .priority-dot { background: #c62828; }
+
+    /* ---------- Actions ---------- */
     .form-actions {
       display: flex;
+      align-items: center;
       gap: 12px;
-      margin-top: 30px;
+      margin-top: 28px;
       padding-top: 20px;
-      border-top: 1px solid #e0e0e0;
+      border-top: 1px solid #eceff1;
+    }
+
+    .submit-btn {
+      border-radius: 10px;
+      padding: 0 22px;
+      min-width: 160px;
+      font-weight: 600;
+    }
+
+    .btn-inner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .btn-inner mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    button[mat-stroked-button] {
+      border-radius: 10px;
+    }
+
+    .back-btn {
+      margin-left: auto;
+      color: #607d8b;
     }
 
     button {
-      padding: 10px 20px;
       min-width: 120px;
     }
 
     mat-spinner {
       display: inline-block;
-      margin-right: 10px;
     }
 
     @media (max-width: 768px) {
+      .cims-container {
+        padding: 12px;
+      }
+
+      .page-header {
+        padding: 18px 20px;
+      }
+
       .form-grid {
         grid-template-columns: 1fr;
       }
 
       .form-actions {
         flex-direction: column;
+        align-items: stretch;
+      }
+
+      .back-btn {
+        margin-left: 0;
       }
 
       button {

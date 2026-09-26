@@ -186,18 +186,18 @@ import autoTable from 'jspdf-autotable';
               <ng-container matColumnDef="priority">
                 <th mat-header-cell *matHeaderCellDef>Priority</th>
                 <td mat-cell *matCellDef="let element">
-                  <mat-chip [class]="'priority-' + element.priority.toLowerCase()">
+                  <span [class]="'priority-' + element.priority.toLowerCase()">
                     {{ element.priority }}
-                  </mat-chip>
+                  </span>
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Status</th>
                 <td mat-cell *matCellDef="let element">
-                  <mat-chip [class]="'status-' + element.status.toLowerCase()">
+                  <span [class]="'status-' + element.status.toLowerCase()">
                     {{ element.status }}
-                  </mat-chip>
+                  </span>
                 </td>
               </ng-container>
 
@@ -228,6 +228,7 @@ import autoTable from 'jspdf-autotable';
           <mat-paginator
             *ngIf="tickets.length > 0"
             [length]="tickets.length"
+            [pageIndex]="currentPage"
             [pageSize]="pageSize"
             [pageSizeOptions]="[5, 10, 20]"
             (page)="onPageChange($event)">
@@ -386,45 +387,34 @@ import autoTable from 'jspdf-autotable';
       color: #1976d2;
     }
 
-    .priority-low {
-      background-color: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .priority-medium {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
-    .priority-high {
-      background-color: #ffebee;
-      color: #c62828;
-    }
-
-    .status-resolved {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    .status-pending {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
-    .status-reopened {
-      background-color: #fce4ec;
-      color: #c2185b;
-    }
-
-    .status-rejected {
-      background-color: #ffebee;
-      color: #c62828;
-    }
-
+    mat-chip,
+    .priority-low,
+    .priority-medium,
+    .priority-high,
+    .status-resolved,
+    .status-pending,
+    .status-reopened,
+    .status-rejected,
     .status-assigned_to_reviewer {
-      background-color: #e3f2fd;
-      color: #1565c0;
+      background: transparent !important;
+      border: none !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      min-height: 0 !important;
+      padding: 0 !important;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      display: inline-block;
     }
+
+    .priority-low { color: #1565c0; }
+    .priority-medium { color: #e65100; }
+    .priority-high { color: #c62828; }
+    .status-resolved { color: #2e7d32; }
+    .status-pending { color: #e65100; }
+    .status-reopened { color: #c2185b; }
+    .status-rejected { color: #c62828; }
+    .status-assigned_to_reviewer { color: #1565c0; }
 
     .empty-state {
       display: flex;

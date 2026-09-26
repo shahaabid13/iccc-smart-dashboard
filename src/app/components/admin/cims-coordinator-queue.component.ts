@@ -86,9 +86,9 @@ import { AcknowledgeAssignDialogComponent, AcknowledgeAssignResult } from './ack
               <ng-container matColumnDef="priority">
                 <th mat-header-cell *matHeaderCellDef>Priority</th>
                 <td mat-cell *matCellDef="let element">
-                  <mat-chip [class]="'priority-' + element.priority.toLowerCase()">
+                  <span [class]="'priority-' + element.priority.toLowerCase()">
                     {{ element.priority }}
-                  </mat-chip>
+                  </span>
                 </td>
               </ng-container>
 
@@ -110,9 +110,9 @@ import { AcknowledgeAssignDialogComponent, AcknowledgeAssignResult } from './ack
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Status</th>
                 <td mat-cell *matCellDef="let element">
-                  <mat-chip [class]="'status-' + (element.status || '').toLowerCase()">
+                  <span [class]="'status-' + (element.status || '').toLowerCase()">
                     {{ element.status }}
-                  </mat-chip>
+                  </span>
                 </td>
               </ng-container>
 
@@ -152,6 +152,7 @@ import { AcknowledgeAssignDialogComponent, AcknowledgeAssignResult } from './ack
           <mat-paginator
             *ngIf="!isLoading && tickets.length > 0"
             [length]="totalElements"
+            [pageIndex]="currentPage"
             [pageSize]="pageSize"
             [pageSizeOptions]="[5, 10, 20]"
             (page)="onPageChange($event)">
@@ -213,20 +214,24 @@ import { AcknowledgeAssignDialogComponent, AcknowledgeAssignResult } from './ack
       color: #1976d2;
     }
 
-    .priority-low {
-      background-color: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .priority-medium {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-
+    mat-chip,
+    .priority-low,
+    .priority-medium,
     .priority-high {
-      background-color: #ffebee;
-      color: #c62828;
+      background: transparent !important;
+      border: none !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      min-height: 0 !important;
+      padding: 0 !important;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      display: inline-block;
     }
+
+    .priority-low { color: #1565c0; }
+    .priority-medium { color: #e65100; }
+    .priority-high { color: #c62828; }
 
     .action-buttons {
       display: flex;
@@ -342,7 +347,7 @@ export class CimsCoordinatorQueueComponent implements OnInit {
         return; // dialog was cancelled
       }
 
-      this.cimsService.acknowledgeTicket(ticket.id, result.notes).subscribe({
+      this.cimsService.acknowledgeTicket(ticket.id, result.action, result.notes).subscribe({
         next: () => {
           this.cimsService.assignReviewer(ticket.id, result.reviewerId).subscribe({
             next: () => {

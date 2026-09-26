@@ -94,8 +94,8 @@ export class CimsService {
     return this.getFieldPersonQueue(page, size);
   }
 
-  acknowledgeTicket(id: number, notes: string): Observable<Ticket> {
-    return this.http.put<Ticket>(`${this.apiUrl}/tickets/${id}/acknowledge`, { notes });
+  acknowledgeTicket(id: number, action: 'resolved' | 'revalidation', notes: string = ''): Observable<Ticket> {
+    return this.http.put<Ticket>(`${this.apiUrl}/tickets/${id}/acknowledge`, { action, notes });
   }
 
   assignReviewer(id: number, reviewerId: number): Observable<Ticket> {
@@ -135,6 +135,21 @@ export class CimsService {
 
   resolveTicket(id: number, notes: string): Observable<Ticket> {
     return this.http.put<Ticket>(`${this.apiUrl}/tickets/${id}/resolve`, { notes });
+  }
+
+  revalidateTicket(id: number, notes: string = 'Revalidation requested', reason?: string): Observable<Ticket> {
+    return this.http.put<Ticket>(`${this.apiUrl}/tickets/${id}/revalidation`, {
+      notes,
+      reason: reason ?? notes
+    });
+  }
+
+  reassignTicket(id: number, payload: { fieldPersonId: number; scheduledDate: string; remarks?: string }): Observable<Ticket> {
+    return this.http.put<Ticket>(`${this.apiUrl}/tickets/${id}/reassign`, payload);
+  }
+
+  assignFieldPerson(id: number, payload: { fieldPersonId: number; scheduledDate: string; remarks?: string }): Observable<Ticket> {
+    return this.reassignTicket(id, payload);
   }
 
   holdTicket(id: number, notes: string): Observable<Ticket> {
@@ -184,6 +199,16 @@ export class CimsService {
 
   getHomeDashboardStats(): Observable<DashboardStats> {
     const role = (localStorage.getItem('role') || '').toUpperCase();
+    const normalizeNumber = (value: unknown, fallback = 0): number => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+      }
+      return fallback;
+    };
 
     if (role === 'FIELD_PERSON' || role === 'COORDINATOR') {
       return forkJoin({
@@ -204,7 +229,7 @@ export class CimsService {
             closedTickets: historyList.length,
             byStatus: {},
             byPriority: {}
-          };
+          } satisfies DashboardStats;
         })
       );
     }
@@ -220,15 +245,22 @@ export class CimsService {
           const closedStatuses = ['RESOLVED', 'REJECTED'];
 
           return {
-            totalTickets,
+            totalTickets: normalizeNumber(totalTickets),
             openTickets: ticketList.filter((t) => openStatuses.includes((t.status || '').toUpperCase())).length,
             pendingReview: ticketList.filter((t) => pendingStatuses.includes((t.status || '').toUpperCase())).length,
             closedTickets: ticketList.filter((t) => closedStatuses.includes((t.status || '').toUpperCase())).length,
             byStatus: {},
             byPriority: {}
-          };
+          } satisfies DashboardStats;
         }),
-        catchError(() => of({ totalTickets: 0, openTickets: 0, pendingReview: 0, closedTickets: 0, byStatus: {}, byPriority: {} }))
+        catchError(() => of({
+          totalTickets: 0,
+          openTickets: 0,
+          pendingReview: 0,
+          closedTickets: 0,
+          byStatus: {},
+          byPriority: {}
+        } satisfies DashboardStats))
       );
     }
 
@@ -249,7 +281,7 @@ export class CimsService {
             closedTickets: historyList.length,
             byStatus: {},
             byPriority: {}
-          };
+          } satisfies DashboardStats;
         })
       );
     }
@@ -260,27 +292,39 @@ export class CimsService {
     }).pipe(
       map(({ summary, tickets }: { summary: DashboardStats; tickets: PaginatedResponse<Ticket> | null }) => {
         const ticketList = Array.isArray(tickets) ? tickets : tickets?.content || [];
-        const totalTickets = tickets?.totalElements ?? summary?.totalTickets ?? ticketList.length;
+        const totalTickets = tickets?.totalElements ?? normalizeNumber(summary?.totalTickets ?? ticketList.length);
+        const fallbackSummary: DashboardStats = {
+          totalTickets,
+          openTickets: 0,
+          pendingReview: 0,
+          closedTickets: 0,
+          byStatus: {},
+          byPriority: {}
+        };
+
+        const normalizedSummary: DashboardStats = {
+          ...fallbackSummary,
+          ...summary,
+          totalTickets,
+          openTickets: normalizeNumber(summary?.openTickets ?? summary?.['open_tickets' as keyof DashboardStats] ?? fallbackSummary.openTickets),
+          pendingReview: normalizeNumber(summary?.pendingReview ?? summary?.['pending_review' as keyof DashboardStats] ?? fallbackSummary.pendingReview),
+          closedTickets: normalizeNumber(summary?.closedTickets ?? summary?.['closed' as keyof DashboardStats] ?? fallbackSummary.closedTickets)
+        };
+
         if (!ticketList.length) {
-          return {
-            ...summary,
-            totalTickets,
-            openTickets: summary?.openTickets ?? summary?.['open_tickets' as keyof DashboardStats] ?? 0,
-            pendingReview: summary?.pendingReview ?? summary?.['pending_review' as keyof DashboardStats] ?? 0,
-            closedTickets: summary?.closedTickets ?? summary?.['closed' as keyof DashboardStats] ?? 0
-          };
+          return normalizedSummary;
         }
 
         const openStatuses = ['OPEN', 'REOPENED'];
         const pendingStatuses = ['PENDING', 'IN_REVIEW', 'ACKNOWLEDGED', 'ASSIGNED_TO_REVIEWER', 'ASSIGNED'];
         const closedStatuses = ['RESOLVED', 'REJECTED'];
         return {
-          ...summary,
+          ...normalizedSummary,
           totalTickets,
           openTickets: ticketList.filter((ticket) => openStatuses.includes((ticket.status || '').toUpperCase())).length,
           pendingReview: ticketList.filter((ticket) => pendingStatuses.includes((ticket.status || '').toUpperCase())).length,
           closedTickets: ticketList.filter((ticket) => closedStatuses.includes((ticket.status || '').toUpperCase())).length
-        };
+        } satisfies DashboardStats;
       })
     );
   }

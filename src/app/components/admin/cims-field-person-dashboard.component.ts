@@ -294,7 +294,7 @@ export class CimsFieldPersonDashboardComponent implements OnInit {
         return;
       }
 
-      this.cimsService.acknowledgeTicket(ticket.id, result.notes).subscribe({
+      this.cimsService.acknowledgeTicket(ticket.id, result.action, result.notes).subscribe({
         next: () => {
           const reviewerName = this.reviewers.find(r => r.id === result.reviewerId)?.username
             || this.reviewers.find(r => r.id === result.reviewerId)?.name
