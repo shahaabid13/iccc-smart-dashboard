@@ -877,7 +877,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   ];
   currentSlide = 0;
   private autoScrollTimer?: Subscription;
-  private readonly autoScrollIntervalMs = 3500;
+  private readonly autoScrollIntervalMs = 2000;
 
   private touchStartX = 0;
   private touchEndX = 0;
@@ -985,15 +985,6 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         accent: '#7c3aed'
       }),
       this.makeCard({
-        icon: 'traffic',
-        title: 'ITMS',
-        description: 'Traffic Management System for real-time traffic monitoring and control.',
-        route: '/traffic-dashboard/dashboard/events/results',
-        active: true,
-        buttonText: 'Go to ITMS',
-        accent: '#0891b2'
-      }),
-      this.makeCard({
         icon: 'hub',
         title: 'SD-Net Monitoring',
         description: 'Live fibre and device telemetry for network health, junction visibility, and outage tracking.',
@@ -1010,6 +1001,15 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         active: this.canAccessCims(),
         buttonText: this.canAccessCims() ? 'Go to CIMS' : 'Access Restricted',
         accent: '#e11d48'
+      }),
+      this.makeCard({
+        icon: 'traffic',
+        title: 'ITMS',
+        description: 'Traffic Management System for real-time traffic monitoring and control.',
+        route: '/traffic-dashboard/dashboard/events/results',
+        active: true,
+        buttonText: 'Go to ITMS',
+        accent: '#0891b2'
       })
     ];
 
