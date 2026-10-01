@@ -78,6 +78,30 @@ describe('CimsTicketDetailComponent workflow', () => {
     expect(component.isFutureDateValid(today)).toBeFalse();
   });
 
+  it('should reveal reassignment once and hide it after a successful assignment', () => {
+    authService.getRole = () => 'SUPPORT_ENGINEER';
+    localStorage.setItem('username', 'support');
+    component.ticket = { ...component.ticket!, status: 'REVALIDATION', raisedByUsername: 'support' };
+    cimsService.reassignTicket = jasmine.createSpy('reassignTicket').and.returnValue(of({
+      id: 42,
+      status: 'OPEN',
+      scheduledDate: '2026-10-02'
+    }));
+    component.eligibleFieldPersons = [{ id: 8, name: 'Field Person', role: 'FIELD_PERSON', phone: '' }];
+    component.selectedFieldPersonId = 8;
+    component.scheduledDate = new Date('2026-10-02T12:00:00');
+
+    expect(component.canShowSupportEngineerActionPanel()).toBeTrue();
+    component.showReassignmentForm();
+    expect(component.canShowSupportEngineerAssignmentPanel()).toBeTrue();
+
+    component.assignToFieldPerson();
+
+    expect(component.assignmentSubmitted).toBeTrue();
+    expect(component.canShowSupportEngineerAssignmentPanel()).toBeFalse();
+    expect(component.canShowSupportEngineerActionPanel()).toBeFalse();
+  });
+
   it('should call the resolved API when the field person resolves the ticket', () => {
     component.resolveTicket();
     expect(cimsService.resolveTicket).toHaveBeenCalledWith(42, jasmine.any(String));

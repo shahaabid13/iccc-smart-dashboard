@@ -27,4 +27,12 @@ export class SdnetFibreLinkService {
       .set('to', to.toISOString());
     return this.http.get<UptimeSummary>(`${this.baseUrl}/${id}/uptime`, { params });
   }
+
+  updateFieldStatus(id: string, status: 'UP' | 'DOWN', notes: string): Observable<FibreLink> {
+    return this.http.patch<FibreLink>(`${this.baseUrl}/${id}/field-status`, { status, notes });
+  }
+
+  clearFieldStatus(id: string): Observable<FibreLink> {
+    return this.http.delete<FibreLink>(`${this.baseUrl}/${id}/field-status`);
+  }
 }

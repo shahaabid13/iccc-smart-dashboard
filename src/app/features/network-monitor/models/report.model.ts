@@ -18,3 +18,8 @@ export interface CategorySla {
   uptimePercent: number;
   currentlyDownCount: number;
 }
+
+export interface DowntimeReportDto {
+  incidents: DowntimeIncident[];
+  totalCount: number;
+}

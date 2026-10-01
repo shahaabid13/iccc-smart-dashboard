@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { DowntimeIncident, CategorySla } from '../models/report.model';
+import { DowntimeReportDto, CategorySla } from '../models/report.model';
 
 export interface ReportFilter {
   category?: string | null;
@@ -22,8 +22,9 @@ export class SdnetReportService {
     return params;
   }
 
-  downtime(from: Date, to: Date, filter?: ReportFilter): Observable<DowntimeIncident[]> {
-    return this.http.get<DowntimeIncident[]>(`${this.baseUrl}/downtime`, { params: this.buildParams(from, to, filter) });
+  downtime(from: Date, to: Date, filter?: ReportFilter, limit = 200): Observable<DowntimeReportDto> {
+    const params = this.buildParams(from, to, filter).set('limit', limit);
+    return this.http.get<DowntimeReportDto>(`${this.baseUrl}/downtime`, { params });
   }
 
   slaSummary(from: Date, to: Date, filter?: ReportFilter): Observable<CategorySla[]> {

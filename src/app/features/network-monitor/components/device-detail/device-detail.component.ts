@@ -70,7 +70,7 @@ export class DeviceDetailComponent implements OnInit {
     const to = new Date();
 
     this.deviceService.uptime(this.device.id, from, to).subscribe((summary) => (this.uptime = summary));
-    this.reportService.downtime(from, to, { deviceId: this.device.id }).subscribe((incidents) => (this.incidents = incidents));
+    this.reportService.downtime(from, to, { deviceId: this.device.id }).subscribe((report) => (this.incidents = report.incidents));
   }
 
   downloadPdf(): void {

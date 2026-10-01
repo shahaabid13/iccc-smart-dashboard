@@ -26,6 +26,33 @@
   background: var(--sdnet-bg-deep);
 }
 
+.incidents-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-load-more {
+  padding: 8px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:disabled { cursor: wait; opacity: 0.65; }
+}
+
+.load-more-error {
+  color: #b91c1c;
+  font-size: 12px;
+}
+
 // Page Header
 .reports-header-card {
   background: #ffffff;

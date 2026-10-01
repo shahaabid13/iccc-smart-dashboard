@@ -14,6 +14,11 @@
     </div>
   </div>
 
+  <div class="hud-toast warn-toast" *ngIf="!loading && !loadError && unresolvedCount > 0">
+    <span class="material-symbols-outlined">location_off</span>
+    <span>{{ unresolvedCount }} junction(s) have no coordinates and are not shown.</span>
+  </div>
+
   <!-- Floating Network Topology HUD & Controls Panel -->
   <aside class="topology-hud-panel" aria-label="Map legend and layer controls">
     <div class="hud-header">
@@ -41,7 +46,7 @@
         </div>
         <div class="toggle-text-wrap">
           <span class="toggle-title">Device Markers</span>
-          <span class="toggle-sub">Visible at zoom &ge; 15</span>
+          <span class="toggle-sub">Visible at zoom &ge; 13</span>
         </div>
       </label>
     </div>

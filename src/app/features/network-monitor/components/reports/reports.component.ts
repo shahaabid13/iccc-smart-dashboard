@@ -17,12 +17,17 @@ import { DowntimeIncident, CategorySla } from '../../models/report.model';
 export class ReportsComponent implements OnInit {
   categories: string[] = [];
   categoryFilter = '';
-  fromDate = this.isoDate(new Date(Date.now() - 30 * 24 * 3600 * 1000));
+  fromDate = this.isoDate(this.startOfMonth(new Date()));
   toDate = this.isoDate(new Date());
   slaSummary: CategorySla[] = [];
   incidents: DowntimeIncident[] = [];
   loading = true;
   loadError = false;
+  totalIncidentCount = 0;
+  loadingMore = false;
+  loadMoreError = false;
+  private currentLimit = 200;
+  private reportRequestId = 0;
 
   constructor(
     private deviceService: SdnetDeviceService,
@@ -39,27 +44,61 @@ export class ReportsComponent implements OnInit {
   }
 
   runReport(): void {
+    const requestId = ++this.reportRequestId;
     this.loading = true;
     this.loadError = false;
+    this.loadingMore = false;
+    this.loadMoreError = false;
+    this.currentLimit = 200;
     const from = new Date(this.fromDate + 'T00:00:00');
     const to = new Date(this.toDate + 'T23:59:59');
     const filter = { category: this.categoryFilter || null };
     forkJoin({
       sla: this.reportService.slaSummary(from, to, filter),
-      incidents: this.reportService.downtime(from, to, filter),
+      downtime: this.reportService.downtime(from, to, filter, this.currentLimit),
     }).subscribe({
-      next: ({ sla, incidents }) => {
+      next: ({ sla, downtime }) => {
+        if (requestId !== this.reportRequestId) return;
         this.slaSummary = sla;
-        this.incidents = incidents;
+        this.incidents = downtime.incidents;
+        this.totalIncidentCount = downtime.totalCount;
         this.loading = false;
         this.cdr.markForCheck();
       },
       error: () => {
+        if (requestId !== this.reportRequestId) return;
         this.loading = false;
         this.loadError = true;
         this.cdr.markForCheck();
       },
     });
+  }
+
+  showMore(): void {
+    if (this.loadingMore || this.incidents.length >= this.totalIncidentCount) return;
+    const requestId = this.reportRequestId;
+    const nextLimit = this.currentLimit + 200;
+    const from = new Date(this.fromDate + 'T00:00:00');
+    const to = new Date(this.toDate + 'T23:59:59');
+    this.loadingMore = true;
+    this.loadMoreError = false;
+    this.reportService.downtime(from, to, { category: this.categoryFilter || null }, nextLimit)
+      .subscribe({
+        next: (downtime) => {
+          if (requestId !== this.reportRequestId) return;
+          this.incidents = downtime.incidents;
+          this.totalIncidentCount = downtime.totalCount;
+          this.currentLimit = nextLimit;
+          this.loadingMore = false;
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          if (requestId !== this.reportRequestId) return;
+          this.loadingMore = false;
+          this.loadMoreError = true;
+          this.cdr.markForCheck();
+        }
+      });
   }
 
   downloadPdf(): void {
@@ -80,6 +119,10 @@ export class ReportsComponent implements OnInit {
     const m = Math.floor((totalSeconds % 3600) / 60);
     if (h > 0) return `${h}h ${m}m`;
     return `${m}m`;
+  }
+
+  private startOfMonth(d: Date): Date {
+    return new Date(d.getFullYear(), d.getMonth(), 1);
   }
 
   private isoDate(d: Date): string {

@@ -11,8 +11,14 @@ export interface FibreLink {
   toConfident: boolean;
   lengthMeters: number | null;
   confirmed: boolean;
+  tier?: 'MAIN_TRUNK' | 'BRANCH' | null;
   diagramConfirmed: boolean;
   currentStatus: DeviceStatus;
+  fieldVerifiedStatus?: DeviceStatus | null;
+  fieldVerifiedNotes?: string | null;
+  fieldVerifiedAt?: string | null;
+  effectiveStatus?: DeviceStatus;
   lastStatusChange: string | null;
+  topologyRole?: string | null;
   path: number[][];
 }

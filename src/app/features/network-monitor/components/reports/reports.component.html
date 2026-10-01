@@ -111,7 +111,7 @@
           <span class="material-symbols-outlined">history_toggle_off</span>
           <h2 class="incidents-heading">Downtime Incident Log</h2>
         </div>
-        <span class="incident-badge">{{ incidents.length }} incidents</span>
+        <span class="incident-badge">{{ incidents.length }} of {{ totalIncidentCount }} incidents</span>
       </div>
 
       <div class="table-scroll-container">
@@ -175,6 +175,12 @@
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="incidents-footer" *ngIf="incidents.length < totalIncidentCount">
+        <span class="load-more-error" *ngIf="loadMoreError">Could not load more incidents. Try again.</span>
+        <button type="button" class="btn-load-more" (click)="showMore()" [disabled]="loadingMore">
+          {{ loadingMore ? 'Loading...' : 'Load more incidents' }}
+        </button>
       </div>
     </div>
   </ng-container>
