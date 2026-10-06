@@ -15,6 +15,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { CimsService } from '../../services/cims.service';
+import { AttachmentService } from '../../services/attachment.service';
 import { Ticket, PaginatedResponse, Reviewer } from '../../models/cims.models';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AcknowledgeAssignDialogComponent, AcknowledgeAssignResult } from './acknowledge-assign-dialog.component';
@@ -284,7 +285,8 @@ export class CimsCoordinatorQueueComponent implements OnInit {
   constructor(
     private cimsService: CimsService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private attachmentService: AttachmentService
   ) { }
 
   ngOnInit(): void {
@@ -348,7 +350,14 @@ export class CimsCoordinatorQueueComponent implements OnInit {
       }
 
       this.cimsService.acknowledgeTicket(ticket.id, result.action, result.notes).subscribe({
-        next: () => {
+        next: (response) => {
+          this.uploadActionAttachments(result.attachmentFiles, response.ticketHistoryId);
+          if (result.action === 'revalidation') {
+            this.snackBar.open(`Ticket sent back to ${ticket.raisedByUsername || 'the support engineer'} for revalidation`, 'Close', { duration: 5000 });
+            this.loadQueue();
+            return;
+          }
+
           this.cimsService.assignReviewer(ticket.id, result.reviewerId).subscribe({
             next: () => {
               this.snackBar.open('Ticket acknowledged and reviewer assigned', 'Close', { duration: 5000 });
@@ -366,6 +375,17 @@ export class CimsCoordinatorQueueComponent implements OnInit {
           this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
         }
       });
+    });
+  }
+
+  private uploadActionAttachments(files: Blob[], historyId?: number): void {
+    if (!files.length) return;
+    if (!historyId) {
+      this.snackBar.open(`Ticket action succeeded, but ${files.length} screenshots could not be uploaded because the history ID was not returned`, 'Close', { duration: 8000 });
+      return;
+    }
+    this.attachmentService.uploadAttachments(files, 'TICKET_ACTION', historyId).subscribe((result) => {
+      if (result.failed) this.snackBar.open(`Ticket action succeeded, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
     });
   }
 }

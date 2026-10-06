@@ -44,6 +44,7 @@ export interface Ticket {
   resolvedBy?: string;
   resolvedAt?: string;
   revalidationReason?: string;
+  ticketHistoryId?: number;
   history: TicketHistory[];
 }
 
@@ -79,9 +80,16 @@ export interface Task {
   status: 'OPEN' | 'HOLD' | 'RESOLVED' | 'REJECTED' | 'CLOSED';
   actionSummary?: string;
   actionTakenAt?: string;
+  taskHistoryId?: number;
   createdAt: string;
   updatedAt?: string;
   history?: TaskHistoryItem[];
+}
+
+export interface TaskActionResponse extends Task {
+  taskHistoryId?: number;
+  historyId?: number;
+  taskHistory?: TaskHistoryItem;
 }
 
 export interface IncidentType {

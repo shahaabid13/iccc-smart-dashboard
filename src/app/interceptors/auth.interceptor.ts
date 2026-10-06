@@ -2,6 +2,7 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
 import { environment } from '../../environments/environment';
+import { catchError, throwError } from 'rxjs';
 
 // ============================================
 // LOGIN ENDPOINTS (PUBLIC - NO TOKEN INJECTION)
@@ -28,6 +29,7 @@ const PROTECTED_ROUTES = [
   '/api/smc',
   '/api/chartered-bike',
   '/api/incidents', // include incidents under protected list
+  '/api/attachments',
   '/api/tasks',
   '/api/locations',
   '/api/approach-roads',
@@ -63,19 +65,23 @@ function isProtectedRoute(url: string): boolean {
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  console.log("REQUEST URL =", req.url);
-
   const authService = inject(AuthService);
+  if (authService.isAuthenticated()) authService.recordActivity();
 
   if (isLoginRoute(req.url)) {
-    console.log("LOGIN REQUEST DETECTED");
-    return next(req);
+    return next(req).pipe(
+      catchError((error) => {
+        if (error?.status === 401 && authService.isAuthenticated()) authService.expireSession();
+        return throwError(() => error);
+      })
+    );
   }
 
   // ============================================
   // PROTECTED REQUESTS - attach currently authenticated user's token
   // ============================================
   if (isProtectedRoute(req.url)) {
+    authService.recordActivity();
     // Only attach token if user is authenticated
     if (!authService.isAuthenticated()) {
       console.warn('[AUTH] Request to protected route without token:', req.url);
@@ -83,23 +89,30 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     }
 
     const token = authService.getToken();
-    const role = authService.getRole();
     if (token) {
-      const label = role && role.toLowerCase() === 'admin' ? 'Admin' : 'User';
-      console.log(`[AUTH] Attaching ${label} token for:`, req.url);
-      const cloned = req.clone({
+      const authenticatedRequest = req.clone({
         headers: req.headers.set('Authorization', `Bearer ${token}`)
       });
-      return next(cloned);
+      return next(authenticatedRequest).pipe(
+        catchError((error) => {
+          if (error?.status === 401) authService.expireSession();
+          return throwError(() => error);
+        })
+      );
     }
 
-    console.warn('[AUTH] No token found for protected route:', req.url);
-    return next(req);
+    return next(req).pipe(
+      catchError((error) => {
+        if (error?.status === 401 && authService.isAuthenticated()) authService.expireSession();
+        return throwError(() => error);
+      })
+    );
   }
 
-  // ============================================
-  // PUBLIC ROUTES - NO TOKEN
-  // ============================================
-  console.log('[AUTH] Public route - no token:', req.url);
-  return next(req);
+  return next(req).pipe(
+    catchError((error) => {
+      if (error?.status === 401 && authService.isAuthenticated()) authService.expireSession();
+      return throwError(() => error);
+    })
+  );
 };

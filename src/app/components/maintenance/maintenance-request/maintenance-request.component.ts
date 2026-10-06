@@ -656,8 +656,8 @@ export class MaintenanceRequestComponent implements OnInit {
 
     // Resolve the current user's name from localStorage (adjust key as needed)
     const submittedBy =
-      localStorage.getItem('username') ||
-      localStorage.getItem('name')     ||
+      sessionStorage.getItem('username') ||
+      sessionStorage.getItem('name')     ||
       'Admin';
 
     const submittedAt = new Date().toLocaleString('en-IN', {
@@ -714,7 +714,7 @@ export class MaintenanceRequestComponent implements OnInit {
     }
 
     this.fetchingDetails = true;
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     if (!token) {
       this.snackBar.open('❌ You must log in to fetch device details', 'Close',
@@ -752,7 +752,7 @@ export class MaintenanceRequestComponent implements OnInit {
           // removed device last-seen display per UX requirements
 
           // Meta info
-          this.submittedBy = localStorage.getItem('username') || localStorage.getItem('name') || 'Admin';
+          this.submittedBy = sessionStorage.getItem('username') || sessionStorage.getItem('name') || 'Admin';
           this.submittedAt = new Date().toLocaleString();
           this.requestDate = new Date().toLocaleDateString();
 
@@ -797,7 +797,7 @@ export class MaintenanceRequestComponent implements OnInit {
       return;
     }
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (!token) {
       this.snackBar.open('❌ You must log in before submitting a request.', 'Close', { duration: 3000, panelClass: ['error-snackbar'] });
       return;

@@ -126,8 +126,8 @@ export class RegisterComponent {
   }
 
   ngOnInit() {
-    // Get current logged-in user from localStorage
-    const currentUser = localStorage.getItem('currentUser');
+    // Get current logged-in user from this tab's session.
+    const currentUser = sessionStorage.getItem('currentUser');
     if (currentUser) {
       const user = JSON.parse(currentUser);
       this.isAdmin = user.role === 'ADMIN';

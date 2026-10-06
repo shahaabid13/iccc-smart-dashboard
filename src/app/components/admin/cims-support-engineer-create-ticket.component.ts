@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
@@ -18,6 +18,8 @@ import { CimsService } from '../../services/cims.service';
 import { CimsNotificationService } from '../../services/cims-notification.service';
 import { DevicesService } from '../../services/devices.service';
 import { IncidentType, FieldPerson, Ticket, Location, ApproachRoad, DeviceType } from '../../models/cims.models';
+import { AttachmentService } from '../../services/attachment.service';
+import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
 
 interface PriorityOption {
   value: string;
@@ -39,7 +41,8 @@ interface PriorityOption {
     MatSnackBarModule,
     MatProgressSpinnerModule,
     MatIconModule,
-    MatDividerModule
+    MatDividerModule,
+    ImageAttachmentPickerComponent
   ],
   template: `
     <div class="cims-container">
@@ -205,6 +208,7 @@ interface PriorityOption {
                   Description must be at least 10 characters if provided
                 </mat-error>
               </mat-form-field>
+              <app-image-attachment-picker #imagePicker class="form-field full-width"></app-image-attachment-picker>
             </div>
 
             <!-- Form Actions -->
@@ -427,6 +431,7 @@ interface PriorityOption {
   `]
 })
 export class CimsCreateTicketComponent implements OnInit {
+  @ViewChild('imagePicker') imagePicker?: ImageAttachmentPickerComponent;
   ticketForm!: FormGroup;
   isLoading = false;
 
@@ -462,7 +467,8 @@ export class CimsCreateTicketComponent implements OnInit {
     private notificationService: CimsNotificationService,
     private devicesService: DevicesService,
     private router: Router,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private attachmentService: AttachmentService
   ) {
     this.initializeForm();
   }
@@ -766,10 +772,9 @@ export class CimsCreateTicketComponent implements OnInit {
   }
 
   private createTicketAndRedirect(payload: any): void {
+  const files = this.imagePicker?.getPendingFiles() ?? [];
   this.cimsService.createTicket(payload).subscribe({
     next: (response: Ticket) => {
-      this.isLoading = false;
-
       this.snackBar.open(`Ticket #${response.id} created successfully!`, 'Close', {
         duration: 3000,
         panelClass: ['success-snackbar']
@@ -782,7 +787,18 @@ export class CimsCreateTicketComponent implements OnInit {
         console.error('[CIMS Form] notifyTicketUpdate failed (non-blocking):', notifyErr);
       }
 
-      this.redirectToMyTickets();
+      if (!files.length) {
+        this.isLoading = false;
+        this.redirectToMyTickets();
+        return;
+      }
+      this.attachmentService.uploadAttachments(files, 'TICKET', response.id).subscribe((result) => {
+        if (result.failed) {
+          this.snackBar.open(`Ticket created, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
+        }
+        this.isLoading = false;
+        this.redirectToMyTickets();
+      });
     },
     error: (err: any) => {
       this.isLoading = false;

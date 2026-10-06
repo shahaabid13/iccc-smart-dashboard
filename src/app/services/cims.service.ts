@@ -198,7 +198,7 @@ export class CimsService {
   }
 
   getHomeDashboardStats(): Observable<DashboardStats> {
-    const role = (localStorage.getItem('role') || '').toUpperCase();
+    const role = (sessionStorage.getItem('role') || '').toUpperCase();
     const normalizeNumber = (value: unknown, fallback = 0): number => {
       if (typeof value === 'number' && Number.isFinite(value)) {
         return value;

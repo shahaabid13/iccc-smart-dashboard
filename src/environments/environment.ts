@@ -24,7 +24,6 @@ export const environment = {
     auth: {
       tokenStorageKey: 'token',
       userStorageKey: 'currentUser',
-      useHttpOnly: false, // localStorage for development
       useRefreshToken: true
     },
     map: {

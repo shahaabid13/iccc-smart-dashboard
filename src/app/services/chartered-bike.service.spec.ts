@@ -73,12 +73,12 @@ describe('CharteredBikeService', () => {
     httpMock = TestBed.inject(HttpTestingController);
 
     // Clear localStorage before each test
-    localStorage.clear();
+    sessionStorage.clear();
   });
 
   afterEach(() => {
     httpMock.verify();
-    localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('should be created', () => {
@@ -104,9 +104,9 @@ describe('CharteredBikeService', () => {
       req.flush(mockLoginResponse);
     });
 
-    it('should store token in localStorage on successful login', (done) => {
+    it('should store token in sessionStorage on successful login', (done) => {
       service.login().subscribe(() => {
-        expect(localStorage.getItem('chartered_bike_token')).toBe(
+        expect(sessionStorage.getItem('chartered_bike_token')).toBe(
           'mock_jwt_token_xyz'
         );
         done();
@@ -163,7 +163,7 @@ describe('CharteredBikeService', () => {
   describe('getStations()', () => {
     beforeEach(() => {
       // Store token before testing getStations
-      localStorage.setItem('chartered_bike_token', 'mock_jwt_token_xyz');
+      sessionStorage.setItem('chartered_bike_token', 'mock_jwt_token_xyz');
       service['isAuthenticatedSubject'].next(true);
     });
 
@@ -204,13 +204,13 @@ describe('CharteredBikeService', () => {
       });
 
       setTimeout(() => {
-        expect(localStorage.getItem('chartered_bike_token')).toBeNull();
+        expect(sessionStorage.getItem('chartered_bike_token')).toBeNull();
         done();
       }, 100);
     });
 
     it('should return error if no token is available', (done) => {
-      localStorage.clear();
+      sessionStorage.clear();
       service['isAuthenticatedSubject'].next(false);
 
       service.getStations().subscribe(
@@ -243,20 +243,20 @@ describe('CharteredBikeService', () => {
     });
 
     it('should return null if no token exists', () => {
-      localStorage.clear();
+      sessionStorage.clear();
       expect(service.getToken()).toBeNull();
     });
 
     it('should return null if no login data exists', () => {
-      localStorage.clear();
+      sessionStorage.clear();
       expect(service.getLoginData()).toBeNull();
     });
   });
 
   describe('logout()', () => {
     beforeEach(() => {
-      localStorage.setItem('chartered_bike_token', 'mock_token');
-      localStorage.setItem(
+      sessionStorage.setItem('chartered_bike_token', 'mock_token');
+      sessionStorage.setItem(
         'chartered_bike_login',
         JSON.stringify(mockLoginResponse.data)
       );
@@ -266,8 +266,8 @@ describe('CharteredBikeService', () => {
     it('should clear token and login data from localStorage', () => {
       service.logout();
 
-      expect(localStorage.getItem('chartered_bike_token')).toBeNull();
-      expect(localStorage.getItem('chartered_bike_login')).toBeNull();
+      expect(sessionStorage.getItem('chartered_bike_token')).toBeNull();
+      expect(sessionStorage.getItem('chartered_bike_login')).toBeNull();
     });
 
     it('should update isAuthenticated$ to false', (done) => {
@@ -284,10 +284,10 @@ describe('CharteredBikeService', () => {
 
   describe('Authentication Status', () => {
     it('should return correct authentication status', () => {
-      localStorage.clear();
+      sessionStorage.clear();
       expect(service.isAuthenticated()).toBe(false);
 
-      localStorage.setItem('chartered_bike_token', 'mock_token');
+      sessionStorage.setItem('chartered_bike_token', 'mock_token');
       // Create new service instance to check token on init
       const newService = new CharteredBikeService(
         TestBed.inject(HttpClientTestingModule)

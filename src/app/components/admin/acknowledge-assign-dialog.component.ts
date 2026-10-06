@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -8,6 +8,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDividerModule } from '@angular/material/divider';
 import { Reviewer, Ticket } from '../../models/cims.models';
+import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
+import { AttachmentResponse, AttachmentService } from '../../services/attachment.service';
 
 export interface AcknowledgeAssignDialogData {
   ticket: Ticket;
@@ -18,6 +20,7 @@ export interface AcknowledgeAssignResult {
   notes: string;
   action: 'resolved' | 'revalidation';
   reviewerId: number;
+  attachmentFiles: Blob[];
 }
 
 @Component({
@@ -31,7 +34,8 @@ export interface AcknowledgeAssignResult {
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
-    MatDividerModule
+    MatDividerModule,
+    ImageAttachmentPickerComponent
   ],
   template: `
     <h2 mat-dialog-title>Acknowledge &amp; Assign — Ticket #{{ data.ticket.id }}</h2>
@@ -40,6 +44,11 @@ export interface AcknowledgeAssignResult {
       <p class="ticket-summary">
         <strong>{{ data.ticket.incidentTypeName }}</strong> — {{ data.ticket.locationName }}
       </p>
+
+      <app-image-attachment-picker
+        [attachments]="ticketAttachments"
+        [allowSelection]="false">
+      </app-image-attachment-picker>
 
       <form [formGroup]="form">
         <h3 class="section-label">Acknowledgment Summary</h3>
@@ -63,6 +72,7 @@ export interface AcknowledgeAssignResult {
             Remarks must be at least 5 characters long.
           </mat-error>
         </mat-form-field>
+        <app-image-attachment-picker #imagePicker></app-image-attachment-picker>
 
         <mat-divider class="section-divider"></mat-divider>
 
@@ -138,11 +148,14 @@ export interface AcknowledgeAssignResult {
   `]
 })
 export class AcknowledgeAssignDialogComponent {
+  @ViewChild('imagePicker') imagePicker?: ImageAttachmentPickerComponent;
   form: FormGroup;
+  ticketAttachments: AttachmentResponse[] = [];
 
   constructor(
     private fb: FormBuilder,
     private dialogRef: MatDialogRef<AcknowledgeAssignDialogComponent>,
+    private attachmentService: AttachmentService,
     @Inject(MAT_DIALOG_DATA) public data: AcknowledgeAssignDialogData
   ) {
     this.form = this.fb.group({
@@ -157,6 +170,11 @@ export class AcknowledgeAssignDialogComponent {
 
     const defaultTargetId = bilalReviewer?.id ?? this.data.ticket.raisedByUserId ?? null;
     this.form.patchValue({ reviewerId: defaultTargetId });
+
+    this.attachmentService.getAttachments('TICKET', this.data.ticket.id).subscribe({
+      next: (attachments) => this.ticketAttachments = attachments || [],
+      error: () => this.ticketAttachments = []
+    });
   }
 
   getReviewerName(): string {
@@ -199,7 +217,8 @@ export class AcknowledgeAssignDialogComponent {
     const result: AcknowledgeAssignResult = {
       notes: this.form.value.notes ?? '',
       action: this.form.value.action ?? 'resolved',
-      reviewerId: this.form.value.reviewerId
+      reviewerId: this.form.value.reviewerId,
+      attachmentFiles: this.imagePicker?.getPendingFiles() ?? []
     };
     this.dialogRef.close(result);
   }

@@ -68,11 +68,7 @@ export class AuthService {
    */
   getToken(): string | null {
     const config = environment.trafficDashboard.auth;
-    if (config.useHttpOnly) {
-      return null; // httpOnly cookies are handled by the browser automatically
-    }
-    return localStorage.getItem(config.tokenStorageKey) || 
-           sessionStorage.getItem(config.tokenStorageKey);
+    return sessionStorage.getItem(config.tokenStorageKey);
   }
 
   /**
@@ -80,9 +76,7 @@ export class AuthService {
    */
   private setToken(token: string): void {
     const config = environment.trafficDashboard.auth;
-    if (!config.useHttpOnly) {
-      localStorage.setItem(config.tokenStorageKey, token);
-    }
+    sessionStorage.setItem(config.tokenStorageKey, token);
   }
 
   /**
@@ -90,16 +84,16 @@ export class AuthService {
    */
   private setCurrentUser(user: AuthUser): void {
     const config = environment.trafficDashboard.auth;
-    localStorage.setItem(config.userStorageKey, JSON.stringify(user));
+    sessionStorage.setItem(config.userStorageKey, JSON.stringify(user));
     this.currentUserSubject.next(user);
   }
 
   /**
-   * Load stored user from localStorage
+  * Load the user stored by this browser tab.
    */
   private loadStoredUser(): void {
     const config = environment.trafficDashboard.auth;
-    const stored = localStorage.getItem(config.userStorageKey);
+    const stored = sessionStorage.getItem(config.userStorageKey);
     if (stored) {
       try {
         const user: AuthUser = JSON.parse(stored);
@@ -115,8 +109,8 @@ export class AuthService {
    */
   private clearAuth(): void {
     const config = environment.trafficDashboard.auth;
-    localStorage.removeItem(config.tokenStorageKey);
-    localStorage.removeItem(config.userStorageKey);
+    sessionStorage.removeItem(config.tokenStorageKey);
+    sessionStorage.removeItem(config.userStorageKey);
     sessionStorage.removeItem(config.tokenStorageKey);
   }
 }

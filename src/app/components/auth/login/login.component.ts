@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../../services/auth.service';
@@ -20,6 +20,9 @@ import { AuthService } from '../../../services/auth.service';
       <div class="login-box">
         <h2>Welcome Back</h2>
         <p class="subtitle">Sign in to continue to ICCC Dashboard</p>
+        <div class="session-expired" *ngIf="sessionExpired" role="status">
+          Your session expired after 30 minutes of inactivity. Please sign in again.
+        </div>
 
         <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
           <div class="form-group" [class.invalid]="isInvalid('username')">
@@ -148,6 +151,18 @@ import { AuthService } from '../../../services/auth.service';
       font-size: 13.5px;
       color: #8a94a3;
       text-align: center;
+    }
+
+    .session-expired {
+      margin: -12px 0 20px;
+      padding: 11px 13px;
+      border: 1px solid #fed7aa;
+      border-radius: 6px;
+      background: #fff7ed;
+      color: #9a3412;
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: left;
     }
 
     /* ---------- FORM FIELDS ---------- */
@@ -448,14 +463,17 @@ import { AuthService } from '../../../services/auth.service';
 })
 export class LoginComponent {
   loginForm: FormGroup;
+  sessionExpired = false;
   submitting = false;
   showPassword = false;
 
   constructor(
     private fb: FormBuilder,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
+    this.sessionExpired = this.route.snapshot.queryParamMap.get('sessionExpired') === 'true';
     this.loginForm = this.fb.group({
       username: ['', Validators.required],
       password: ['', Validators.required]

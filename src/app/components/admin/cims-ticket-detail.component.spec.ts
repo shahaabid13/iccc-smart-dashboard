@@ -10,12 +10,13 @@ describe('CimsTicketDetailComponent workflow', () => {
   let authService: any;
 
   beforeEach(() => {
-    localStorage.setItem('username', 'ali');
-    localStorage.setItem('role', 'FIELD_PERSON');
+    sessionStorage.setItem('username', 'ali');
+    sessionStorage.setItem('role', 'FIELD_PERSON');
 
     cimsService = {
       resolveTicket: jasmine.createSpy('resolveTicket').and.returnValue(of({ id: 42, status: 'RESOLVED' })),
       revalidateTicket: jasmine.createSpy('revalidateTicket').and.returnValue(of({ id: 42, status: 'OPEN' })),
+      reopenTicket: jasmine.createSpy('reopenTicket').and.returnValue(of({ id: 42, status: 'REOPENED' })),
       getTicketById: jasmine.createSpy('getTicketById').and.returnValue(of({
         id: 42,
         status: 'OPEN',
@@ -35,6 +36,10 @@ describe('CimsTicketDetailComponent workflow', () => {
     snackBar = { open: jasmine.createSpy('open') };
     router = { navigate: jasmine.createSpy('navigate') };
     location = { back: jasmine.createSpy('back') };
+    const attachmentService = {
+      getAttachments: jasmine.createSpy('getAttachments').and.returnValue(of([])),
+      uploadAttachments: jasmine.createSpy('uploadAttachments').and.returnValue(of({ uploaded: 0, failed: 0 }))
+    };
     authService = {
       getRole: () => 'FIELD_PERSON'
     };
@@ -45,7 +50,8 @@ describe('CimsTicketDetailComponent workflow', () => {
       authService,
       router,
       snackBar,
-      location
+      location,
+      attachmentService as any
     );
 
     component.ticket = {
@@ -70,6 +76,11 @@ describe('CimsTicketDetailComponent workflow', () => {
     expect(component.canShowFieldPersonActions()).toBeTrue();
   });
 
+  it('should hide field person actions after the ticket is sent for revalidation', () => {
+    component.ticket = { ...component.ticket!, status: 'REVALIDATION' };
+    expect(component.canShowFieldPersonActions()).toBeFalse();
+  });
+
   it('should reject past and today dates for reassignment validation', () => {
     const today = new Date();
     const past = new Date(today.getTime() - 86400000);
@@ -78,9 +89,9 @@ describe('CimsTicketDetailComponent workflow', () => {
     expect(component.isFutureDateValid(today)).toBeFalse();
   });
 
-  it('should reveal reassignment once and hide it after a successful assignment', () => {
+  it('should reveal reassignment without reopening and hide it after a successful assignment', () => {
     authService.getRole = () => 'SUPPORT_ENGINEER';
-    localStorage.setItem('username', 'support');
+    sessionStorage.setItem('username', 'support');
     component.ticket = { ...component.ticket!, status: 'REVALIDATION', raisedByUsername: 'support' };
     cimsService.reassignTicket = jasmine.createSpy('reassignTicket').and.returnValue(of({
       id: 42,
@@ -89,10 +100,12 @@ describe('CimsTicketDetailComponent workflow', () => {
     }));
     component.eligibleFieldPersons = [{ id: 8, name: 'Field Person', role: 'FIELD_PERSON', phone: '' }];
     component.selectedFieldPersonId = 8;
-    component.scheduledDate = new Date('2026-10-02T12:00:00');
+    component.scheduledDate = new Date();
+    component.scheduledDate.setDate(component.scheduledDate.getDate() + 2);
 
     expect(component.canShowSupportEngineerActionPanel()).toBeTrue();
     component.showReassignmentForm();
+    expect(cimsService.reopenTicket).not.toHaveBeenCalled();
     expect(component.canShowSupportEngineerAssignmentPanel()).toBeTrue();
 
     component.assignToFieldPerson();

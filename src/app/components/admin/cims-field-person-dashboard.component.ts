@@ -14,6 +14,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CimsService } from '../../services/cims.service';
+import { AttachmentService } from '../../services/attachment.service';
 import { Ticket, Reviewer, PaginatedResponse } from '../../models/cims.models';
 import { AcknowledgeAssignDialogComponent, AcknowledgeAssignResult } from './acknowledge-assign-dialog.component';
 
@@ -220,7 +221,8 @@ export class CimsFieldPersonDashboardComponent implements OnInit {
   constructor(
     private cimsService: CimsService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private attachmentService: AttachmentService
   ) {}
 
   ngOnInit(): void {
@@ -295,14 +297,20 @@ export class CimsFieldPersonDashboardComponent implements OnInit {
       }
 
       this.cimsService.acknowledgeTicket(ticket.id, result.action, result.notes).subscribe({
-        next: () => {
+        next: (response) => {
+          this.uploadActionAttachments(result.attachmentFiles, response.ticketHistoryId);
+          if (result.action === 'revalidation') {
+            this.snackBar.open(`Ticket sent back to ${ticket.raisedByUsername || 'the support engineer'} for revalidation`, 'Close', { duration: 5000 });
+            this.loadQueue();
+            this.loadHistory();
+            return;
+          }
+
           const reviewerName = this.reviewers.find(r => r.id === result.reviewerId)?.username
             || this.reviewers.find(r => r.id === result.reviewerId)?.name
             || 'reviewer';
 
-          const targetMessage = result.action === 'revalidation'
-            ? `Ticket sent back to ${ticket.raisedByUsername || 'the support engineer'} for revalidation`
-            : `Ticket resolved and sent to reviewer ${reviewerName} for review`;
+          const targetMessage = `Ticket resolved and sent to reviewer ${reviewerName} for review`;
 
           this.cimsService.assignReviewer(ticket.id, result.reviewerId).subscribe({
             next: () => {
@@ -311,9 +319,7 @@ export class CimsFieldPersonDashboardComponent implements OnInit {
               this.loadHistory();
             },
             error: (assignErr: any) => {
-              const errorMsg = assignErr.error?.message || (result.action === 'revalidation'
-                ? `Ticket sent back to ${ticket.raisedByUsername || 'the support engineer'} for revalidation` 
-                : `Ticket resolved and sent to reviewer ${reviewerName} for review`);
+              const errorMsg = assignErr.error?.message || `Ticket resolved, but failed to assign reviewer ${reviewerName}`;
               this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
               this.loadQueue();
               this.loadHistory();
@@ -325,6 +331,17 @@ export class CimsFieldPersonDashboardComponent implements OnInit {
           this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
         }
       });
+    });
+  }
+
+  private uploadActionAttachments(files: Blob[], historyId?: number): void {
+    if (!files.length) return;
+    if (!historyId) {
+      this.snackBar.open(`Ticket action succeeded, but ${files.length} screenshots could not be uploaded because the history ID was not returned`, 'Close', { duration: 8000 });
+      return;
+    }
+    this.attachmentService.uploadAttachments(files, 'TICKET_ACTION', historyId).subscribe((result) => {
+      if (result.failed) this.snackBar.open(`Ticket action succeeded, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
     });
   }
 }

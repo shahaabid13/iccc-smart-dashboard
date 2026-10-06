@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
-import { Task } from '../models/cims.models';
+import { Task, TaskActionResponse } from '../models/cims.models';
 
 export interface TaskDashboardStats {
   totalTasks: number;
@@ -57,8 +57,8 @@ export class TaskService {
     );
   }
 
-  takeAction(taskId: number, action: string, summary?: string): Observable<Task> {
-  return this.http.put<Task>(`${this.apiUrl}/${taskId}/action`, { status: action, summary });
+  takeAction(taskId: number, action: string, summary?: string): Observable<TaskActionResponse> {
+  return this.http.put<TaskActionResponse>(`${this.apiUrl}/${taskId}/action`, { status: action, summary });
 }
 
   getTaskDetail(taskId: number): Observable<Task> {

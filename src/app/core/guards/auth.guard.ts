@@ -12,8 +12,7 @@ export const authGuard: CanActivateFn = (
 ): Observable<boolean> | Promise<boolean> | boolean => {
   const router = new Router();
 
-  // Check for token in localStorage or sessionStorage
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
 
   if (token) {
     return true;
@@ -32,7 +31,7 @@ export const authGuard: CanActivateFn = (
  * Admin Guard - validates admin role
  */
 export const adminGuard: CanActivateFn = (): Observable<boolean> | Promise<boolean> | boolean => {
-  const user = localStorage.getItem('currentUser');
+  const user = sessionStorage.getItem('currentUser');
   if (user) {
     try {
       const userData = JSON.parse(user);
@@ -54,7 +53,7 @@ export class AuthGuardService {
   constructor(private router: Router) {}
 
   canActivate(): boolean {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     if (token) {
       return true;

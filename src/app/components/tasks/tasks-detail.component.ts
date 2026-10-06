@@ -1,13 +1,15 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { TaskService } from '../../services/task.service';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Task } from '../../models/cims.models';
+import { AttachmentService } from '../../services/attachment.service';
+import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
 
 @Component({
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, ImageAttachmentPickerComponent],
   selector: 'app-tasks-detail',
   template: `
     <div class="container">
@@ -52,6 +54,7 @@ import { Task } from '../../models/cims.models';
           <div>
             <strong>Description</strong>
             <div class="mt-1" [innerHTML]="task.description"></div>
+            <app-image-attachment-picker [allowSelection]="false" [attachments]="taskAttachments"></app-image-attachment-picker>
           </div>
         </div>
 
@@ -62,6 +65,7 @@ import { Task } from '../../models/cims.models';
               <div><strong>{{ h.action }}</strong> — {{ h.changedAt | date:'medium' }}</div>
               <div class="text-muted" *ngIf="h.summary">{{ h.summary }}</div>
               <div class="text-muted">by {{ h.changedBy }}</div>
+              <app-image-attachment-picker [allowSelection]="false" [attachments]="historyAttachments[h.id] || []"></app-image-attachment-picker>
             </li>
           </ul>
         </div>
@@ -83,6 +87,8 @@ import { Task } from '../../models/cims.models';
               <textarea class="form-control" rows="4" formControlName="summary"></textarea>
             </div>
 
+            <app-image-attachment-picker #imagePicker></app-image-attachment-picker>
+
             <div class="text-danger mb-2" *ngIf="errorMsg">{{ errorMsg }}</div>
 
             <div class="d-flex justify-content-end">
@@ -97,7 +103,10 @@ import { Task } from '../../models/cims.models';
   `
 })
 export class TasksDetailComponent implements OnInit {
+  @ViewChild('imagePicker') imagePicker?: ImageAttachmentPickerComponent;
   task: Task | null = null;
+  taskAttachments: import('../../services/attachment.service').AttachmentResponse[] = [];
+  historyAttachments: Record<number, import('../../services/attachment.service').AttachmentResponse[]> = {};
   form!: FormGroup;
   submitting = false;
   errorMsg = '';
@@ -108,7 +117,8 @@ export class TasksDetailComponent implements OnInit {
     private router: Router,
     private location: Location,
     private taskService: TaskService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private attachmentService: AttachmentService
   ) {
     this.form = this.fb.group({ action: ['RESOLVED', Validators.required], summary: ['', Validators.required] });
   }
@@ -119,7 +129,29 @@ export class TasksDetailComponent implements OnInit {
 
     const id = Number(this.route.snapshot.paramMap.get('id'));
     if (id) {
-      this.taskService.getTaskDetail(id).subscribe(t => this.task = t);
+      this.loadTask(id);
+    }
+  }
+
+  private loadTask(id: number): void {
+    this.taskService.getTaskDetail(id).subscribe((task) => {
+      this.task = task;
+      this.loadTaskAttachments(task);
+    });
+  }
+
+  private loadTaskAttachments(task: Task): void {
+    this.attachmentService.getAttachments('TASK', task.id).subscribe({
+      next: (attachments) => this.taskAttachments = attachments || [],
+      error: () => this.taskAttachments = []
+    });
+    this.historyAttachments = {};
+    for (const entry of task.history || []) {
+      if (!entry.id) continue;
+      this.attachmentService.getAttachments('TASK_ACTION', entry.id).subscribe({
+        next: (attachments) => this.historyAttachments[entry.id] = attachments || [],
+        error: () => this.historyAttachments[entry.id] = []
+      });
     }
   }
 
@@ -152,10 +184,21 @@ export class TasksDetailComponent implements OnInit {
     this.errorMsg = '';
     this.submitting = true;
     const val = this.form.value;
+    const files = this.imagePicker?.getPendingFiles() ?? [];
     this.taskService.takeAction(this.task.id, val.action, val.summary).subscribe({
-      next: () => {
-        this.submitting = false;
-        this.taskService.getTaskDetail(this.task!.id).subscribe(t => this.task = t);
+      next: (response) => {
+        const historyId = response.taskHistoryId || response.historyId || response.taskHistory?.id || response.history?.at(-1)?.id;
+        if (files.length && historyId) {
+          this.attachmentService.uploadAttachments(files, 'TASK_ACTION', historyId).subscribe((result) => {
+            if (result.failed) this.errorMsg = `Action saved, but ${result.failed} of ${files.length} screenshots failed to upload.`;
+            this.submitting = false;
+            this.loadTask(this.task!.id);
+          });
+        } else {
+          if (files.length) this.errorMsg = 'Action saved, but screenshots could not be uploaded because the action history ID was not returned.';
+          this.submitting = false;
+          this.loadTask(this.task!.id);
+        }
       },
       error: (err) => {
         this.submitting = false;

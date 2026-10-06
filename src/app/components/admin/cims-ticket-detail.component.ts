@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, formatDate } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Location } from '@angular/common';
@@ -19,6 +19,8 @@ import { FormsModule } from '@angular/forms';
 import { CimsService } from '../../services/cims.service';
 import { AuthService } from '../../services/auth.service';
 import { FieldPerson, Ticket } from '../../models/cims.models';
+import { AttachmentResponse, AttachmentService } from '../../services/attachment.service';
+import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
 
 @Component({
   selector: 'app-cims-ticket-detail',
@@ -38,7 +40,8 @@ import { FieldPerson, Ticket } from '../../models/cims.models';
     MatSelectModule,
     MatDatepickerModule,
     MatNativeDateModule,
-    FormsModule
+    FormsModule,
+    ImageAttachmentPickerComponent
   ],
   template: `
     <div class="cims-container">
@@ -121,6 +124,7 @@ import { FieldPerson, Ticket } from '../../models/cims.models';
               <div class="description-box">
                 {{ ticket.description }}
               </div>
+              <app-image-attachment-picker [allowSelection]="false" [attachments]="ticketAttachments"></app-image-attachment-picker>
             </div>
 
             <div class="action-panel" *ngIf="canShowSupportEngineerActionPanel() && !assignmentFormVisible">
@@ -132,6 +136,11 @@ import { FieldPerson, Ticket } from '../../models/cims.models';
 
             <div class="action-panel" *ngIf="canShowFieldPersonActions()">
               <h3>Field Person Actions</h3>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Remarks / Notes</mat-label>
+                <textarea matInput [(ngModel)]="ticketActionNotes" rows="3"></textarea>
+              </mat-form-field>
+              <app-image-attachment-picker #ticketActionPicker></app-image-attachment-picker>
               <div class="action-buttons">
                 <button mat-flat-button color="primary" (click)="resolveTicket()">Resolved</button>
                 <button mat-stroked-button color="warn" (click)="revalidateTicket()">Revalidation</button>
@@ -141,37 +150,56 @@ import { FieldPerson, Ticket } from '../../models/cims.models';
             <div class="action-panel" *ngIf="canShowSupportEngineerAssignmentPanel()">
               <h3>Ticket Assignment</h3>
               <div class="assignment-grid">
-                <div class="assign-keyline">
+                <div class="assign-keyline assignment-status">
                   <span class="assign-label">Status:</span>
                   <strong>{{ ticket.status || 'OPEN' }}</strong>
                 </div>
 
-                <mat-form-field appearance="outline" class="assign-field">
-                  <mat-label>Schedule Date</mat-label>
-                  <input
-                    matInput
-                    [matDatepicker]="assignmentPicker"
-                    [(ngModel)]="scheduledDate"
-                    [min]="minFutureAssignmentDate"
-                    [attr.placeholder]="'Select future date'"
-                  />
-                  <mat-datepicker-toggle matSuffix [for]="assignmentPicker"></mat-datepicker-toggle>
-                  <mat-datepicker #assignmentPicker></mat-datepicker>
+                <div class="assignment-fields">
+                  <mat-form-field appearance="outline" class="assign-field">
+                    <mat-label>Schedule Date</mat-label>
+                    <input
+                      matInput
+                      [matDatepicker]="assignmentDatePicker"
+                      [(ngModel)]="scheduledDate"
+                      [min]="minFutureAssignmentDate"
+                      placeholder="Select a future date"
+                    />
+                    <mat-datepicker-toggle matSuffix [for]="assignmentDatePicker"></mat-datepicker-toggle>
+                    <mat-datepicker #assignmentDatePicker></mat-datepicker>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="assign-field">
+                    <mat-label>Assign To</mat-label>
+                    <mat-select [(ngModel)]="selectedFieldPersonId">
+                      <mat-option [value]="null">Select Field Person</mat-option>
+                      <mat-option *ngFor="let person of eligibleFieldPersons" [value]="person.id">
+                        {{ person.name }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+
+                <mat-form-field appearance="outline" class="assign-field assignment-remarks">
+                  <mat-label>Remarks / Notes</mat-label>
+                  <textarea matInput [(ngModel)]="assignmentRemarks" rows="2" placeholder="Add assignment details"></textarea>
                 </mat-form-field>
 
-                <mat-form-field appearance="outline" class="assign-field">
-                  <mat-label>Assign To</mat-label>
-                  <mat-select [(ngModel)]="selectedFieldPersonId">
-                    <mat-option value="">Select Field Person</mat-option>
-                    <mat-option *ngFor="let person of eligibleFieldPersons" [value]="person.id">
-                      {{ person.name }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
+                <app-image-attachment-picker #assignmentImagePicker class="assignment-picker"></app-image-attachment-picker>
 
-                <button mat-flat-button color="primary" (click)="assignToFieldPerson()" [disabled]="isAssigning">
-                  {{ isAssigning ? 'Assigning...' : 'Assign' }}
-                </button>
+                <div class="assignment-error" *ngIf="assignmentError" role="alert">{{ assignmentError }}</div>
+
+                <div class="assignment-actions">
+                  <button type="button" mat-stroked-button class="reset-assignment-button" (click)="resetAssignmentForm()" [disabled]="isAssigning">
+                    <mat-icon>restart_alt</mat-icon>
+                    Reset
+                  </button>
+                  <button type="button" mat-flat-button color="primary" class="submit-assignment-button" (click)="assignToFieldPerson()" [disabled]="isAssigning">
+                    <mat-icon *ngIf="!isAssigning">person_add_alt_1</mat-icon>
+                    <mat-spinner *ngIf="isAssigning" diameter="18"></mat-spinner>
+                    {{ isAssigning ? 'Assigning...' : 'Assign Field Person' }}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -191,6 +219,7 @@ import { FieldPerson, Ticket } from '../../models/cims.models';
                         <div class="timeline-notes" *ngIf="entry.notes">
                           {{ entry.notes }}
                         </div>
+                        <app-image-attachment-picker [allowSelection]="false" [attachments]="historyAttachments[entry.id] || []"></app-image-attachment-picker>
                       </div>
                     </div>
                   </div>
@@ -333,10 +362,67 @@ import { FieldPerson, Ticket } from '../../models/cims.models';
     }
 
     .assignment-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 4px 18px;
+      align-items: start;
+    }
+
+    .assignment-status {
+      margin: 0 0 4px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #eef4fb;
+      color: #334155;
+    }
+
+    .assignment-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 14px;
+    }
+
+    .assignment-fields .assign-field,
+    .assignment-remarks {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .assignment-remarks {
+      margin-top: 2px;
+    }
+
+    .assignment-picker {
+      width: 100%;
+      margin: 0 0 8px;
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .assignment-actions {
       display: flex;
-      flex-wrap: wrap;
+      justify-content: flex-end;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .assignment-actions button {
+      min-height: 40px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .assignment-actions mat-icon {
+      margin-right: 4px;
+    }
+
+    .assignment-actions mat-spinner {
+      display: inline-block;
+      margin-right: 8px;
     }
 
     .assign-keyline {
@@ -356,6 +442,47 @@ import { FieldPerson, Ticket } from '../../models/cims.models';
     .assign-field {
       min-width: 220px;
       flex: 1;
+    }
+
+    .assignment-error {
+      grid-column: 1 / -1;
+      padding: 8px 10px;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      background: #fef2f2;
+      color: #b91c1c;
+      font-size: 12px;
+    }
+
+    @media (min-width: 760px) {
+      .assignment-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .assignment-status,
+      .assignment-fields,
+      .assignment-remarks,
+      .assignment-picker,
+      .assignment-error,
+      .assignment-actions {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .assignment-fields {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .assignment-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .assignment-actions button {
+        width: 100%;
+        margin: 0;
+      }
     }
 
     .history-section {
@@ -493,7 +620,11 @@ import { FieldPerson, Ticket } from '../../models/cims.models';
   `]
 })
 export class CimsTicketDetailComponent implements OnInit {
+  @ViewChild('ticketActionPicker') ticketActionPicker?: ImageAttachmentPickerComponent;
+  @ViewChild('assignmentImagePicker') assignmentPicker?: ImageAttachmentPickerComponent;
   ticket: Ticket | null = null;
+  ticketAttachments: AttachmentResponse[] = [];
+  historyAttachments: Record<number, AttachmentResponse[]> = {};
   isLoading = false;
   ticketId: number | null = null;
   eligibleFieldPersons: FieldPerson[] = [];
@@ -502,6 +633,10 @@ export class CimsTicketDetailComponent implements OnInit {
   assignmentFormVisible = false;
   assignmentSubmitted = false;
   isAssigning = false;
+  assignmentError = '';
+  fieldPersonActionSubmitted = false;
+  ticketActionNotes = '';
+  assignmentRemarks = '';
   minFutureAssignmentDate = new Date();
 
   constructor(
@@ -510,9 +645,11 @@ export class CimsTicketDetailComponent implements OnInit {
     private authService: AuthService,
     private router: Router,
     private snackBar: MatSnackBar,
-    private location: Location
+    private location: Location,
+    private attachmentService: AttachmentService
   ) {
     this.minFutureAssignmentDate.setHours(0, 0, 0, 0);
+    this.minFutureAssignmentDate.setDate(this.minFutureAssignmentDate.getDate() + 1);
   }
 
 
@@ -546,6 +683,7 @@ export class CimsTicketDetailComponent implements OnInit {
       next: (ticket: Ticket) => {
         this.ticket = ticket;
         this.assignmentSubmitted = this.assignmentSubmitted || this.hasRecordedFieldPersonAssignment(ticket);
+        this.loadTicketAttachments(ticket);
         this.isLoading = false;
       },
       error: (err: any) => {
@@ -559,6 +697,21 @@ export class CimsTicketDetailComponent implements OnInit {
         this.snackBar.open('Failed to load ticket details', 'Close', { duration: 5000 });
       }
     });
+  }
+
+  private loadTicketAttachments(ticket: Ticket): void {
+    this.attachmentService.getAttachments('TICKET', ticket.id).subscribe({
+      next: (attachments) => this.ticketAttachments = attachments || [],
+      error: () => this.ticketAttachments = []
+    });
+    this.historyAttachments = {};
+    for (const entry of ticket.history || []) {
+      if (!entry.id) continue;
+      this.attachmentService.getAttachments('TICKET_ACTION', entry.id).subscribe({
+        next: (attachments) => this.historyAttachments[entry.id] = attachments || [],
+        error: () => this.historyAttachments[entry.id] = []
+      });
+    }
   }
 
   private tryRoleBasedTicketLookup(): void {
@@ -684,22 +837,22 @@ export class CimsTicketDetailComponent implements OnInit {
     if (role !== 'SUPPORT_ENGINEER') return false;
     const status = (this.ticket.status || '').toUpperCase();
     const isRevalidationState = ['REVALIDATED', 'REVALIDATION', 'PENDING_REVALIDATION'].some((value) => status.includes(value));
-    const isTicketRaisedByCurrentUser = (this.ticket.raisedByUsername || '').toLowerCase() === (localStorage.getItem('username') || '').toLowerCase();
+    const isTicketRaisedByCurrentUser = (this.ticket.raisedByUsername || '').toLowerCase() === (sessionStorage.getItem('username') || '').toLowerCase();
     return isRevalidationState && isTicketRaisedByCurrentUser;
   }
 
   canShowFieldPersonActions(): boolean {
-    if (!this.ticket) return false;
+    if (!this.ticket || this.fieldPersonActionSubmitted) return false;
     const role = (this.authService.getRole() || '').toUpperCase();
     if (role !== 'FIELD_PERSON') return false;
     const status = (this.ticket.status || '').toUpperCase();
     const assignedToCurrentUser = this.isCurrentFieldPersonAssigned();
-    return assignedToCurrentUser && ['OPEN', 'REOPENED', 'PENDING', 'ASSIGNED_TO_REVIEWER', 'FIELD_PERSON_REVIEW', 'REVALIDATED', 'REVALIDATION'].includes(status);
+    return assignedToCurrentUser && ['OPEN', 'REOPENED', 'PENDING', 'ASSIGNED_TO_REVIEWER', 'FIELD_PERSON_REVIEW'].includes(status);
   }
 
   isCurrentFieldPersonAssigned(): boolean {
     if (!this.ticket) return false;
-    const rawUser = localStorage.getItem('username') || '';
+    const rawUser = sessionStorage.getItem('username') || '';
     const currentUser = this.normalizeUserName(rawUser);
     const ticketPerson = this.normalizeUserName(this.ticket.fieldPersonName || this.ticket.createdBy || '');
     if (!currentUser || !ticketPerson) {
@@ -719,16 +872,19 @@ export class CimsTicketDetailComponent implements OnInit {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     selected.setHours(0, 0, 0, 0);
-    return selected.getTime() >= today.getTime();
+    return selected.getTime() > today.getTime();
   }
 
   resolveTicket(): void {
     if (!this.ticket) return;
 
-    const notes = 'Resolved by field person and forwarded to reviewer.';
+    const notes = this.ticketActionNotes.trim() || 'Resolved by field person and forwarded to reviewer.';
+    const files = this.ticketActionPicker?.getPendingFiles() ?? [];
     this.cimsService.resolveTicket(this.ticket.id, notes).subscribe({
       next: (updatedTicket) => {
         this.ticket = { ...this.ticket!, ...updatedTicket, status: updatedTicket?.status || 'RESOLVED' };
+        this.fieldPersonActionSubmitted = true;
+        this.uploadTicketActionAttachments(files, updatedTicket.ticketHistoryId);
         this.snackBar.open('Ticket resolved successfully and forwarded to Reviewer.', 'Close', { duration: 5000 });
       },
       error: (err: any) => {
@@ -742,13 +898,16 @@ export class CimsTicketDetailComponent implements OnInit {
   revalidateTicket(reason?: string): void {
     if (!this.ticket) return;
 
-    const notes = reason || 'Ticket returned to Support Engineer for revalidation.';
+    const notes = reason || this.ticketActionNotes.trim() || 'Ticket returned to Support Engineer for revalidation.';
+    const files = this.ticketActionPicker?.getPendingFiles() ?? [];
     const confirmed = window.confirm('Return this ticket for revalidation?');
     if (!confirmed) return;
 
     this.cimsService.revalidateTicket(this.ticket.id, notes, reason || notes).subscribe({
       next: (updatedTicket) => {
         this.ticket = { ...this.ticket!, ...updatedTicket, status: updatedTicket?.status || 'OPEN' };
+        this.fieldPersonActionSubmitted = true;
+        this.uploadTicketActionAttachments(files, updatedTicket.ticketHistoryId);
         this.snackBar.open('Ticket returned to Support Engineer for revalidation.', 'Close', { duration: 5000 });
         this.loadTicket();
       },
@@ -769,11 +928,19 @@ export class CimsTicketDetailComponent implements OnInit {
   }
 
   showReassignmentForm(): void {
-    if (this.canShowSupportEngineerActionPanel()) {
-      this.assignmentFormVisible = true;
-      this.selectedFieldPersonId = null;
-      this.scheduledDate = null;
-    }
+    if (!this.ticket || !this.canShowSupportEngineerActionPanel()) return;
+    this.assignmentFormVisible = true;
+    this.selectedFieldPersonId = null;
+    this.scheduledDate = null;
+    this.assignmentRemarks = '';
+  }
+
+  resetAssignmentForm(): void {
+    this.scheduledDate = null;
+    this.selectedFieldPersonId = null;
+    this.assignmentRemarks = '';
+    this.assignmentError = '';
+    this.assignmentPicker?.resetPending();
   }
 
   private hasFieldPersonAssignment(): boolean {
@@ -788,26 +955,32 @@ export class CimsTicketDetailComponent implements OnInit {
   }
 
   assignToFieldPerson(): void {
-    if (this.isAssigning || !this.ticket || !this.selectedFieldPersonId || !this.scheduledDate) {
-      this.snackBar.open('Please select a date and field person.', 'Close', { duration: 5000 });
+    if (this.isAssigning) return;
+    this.assignmentError = '';
+    if (!this.ticket || this.selectedFieldPersonId == null || !this.scheduledDate) {
+      this.assignmentError = 'Please select a schedule date and field person.';
+      this.snackBar.open(this.assignmentError, 'Close', { duration: 5000 });
       return;
     }
 
     if (!this.isFutureDateValid(this.scheduledDate)) {
-      this.snackBar.open('Please select today or a future date.', 'Close', { duration: 5000 });
+      this.assignmentError = 'Please select a date after today.';
+      this.snackBar.open(this.assignmentError, 'Close', { duration: 5000 });
       return;
     }
 
     const payload = {
-      fieldPersonId: this.selectedFieldPersonId,
-      scheduledDate: this.scheduledDate.toISOString().split('T')[0],
-      remarks: 'Support engineer reassigned ticket to field person on a future date.'
+      fieldPersonId: Number(this.selectedFieldPersonId),
+      scheduledDate: this.toLocalDateString(this.scheduledDate),
+      remarks: this.assignmentRemarks.trim() || 'Support engineer reassigned ticket to field person on a future date.'
     };
+    const files = this.assignmentPicker?.getPendingFiles() ?? [];
 
     this.isAssigning = true;
     this.cimsService.reassignTicket(this.ticket.id, payload).subscribe({
       next: (updatedTicket) => {
         this.ticket = { ...this.ticket!, ...updatedTicket, status: updatedTicket?.status || 'OPEN' };
+        this.uploadTicketActionAttachments(files, updatedTicket.ticketHistoryId);
         this.assignmentSubmitted = true;
         this.assignmentFormVisible = false;
         this.isAssigning = false;
@@ -819,21 +992,43 @@ export class CimsTicketDetailComponent implements OnInit {
       error: (err: any) => {
         this.isAssigning = false;
         console.error('Failed to assign ticket', err);
-        this.snackBar.open(err?.error?.message || 'Failed to assign ticket to field person.', 'Close', { duration: 5000 });
+        this.assignmentError = err?.error?.message || err?.message || `Assignment failed (${err?.status || 'unknown error'}). Please try again.`;
+        this.snackBar.open(this.assignmentError, 'Close', { duration: 7000 });
       }
+    });
+  }
+
+  private toLocalDateString(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private uploadTicketActionAttachments(files: Blob[], historyId?: number): void {
+    if (!files.length) return;
+    if (!historyId) {
+      this.snackBar.open(`Ticket action succeeded, but ${files.length} screenshots could not be uploaded because the history ID was not returned`, 'Close', { duration: 8000 });
+      return;
+    }
+    this.attachmentService.uploadAttachments(files, 'TICKET_ACTION', historyId).subscribe((result) => {
+      if (result.failed) this.snackBar.open(`Ticket action succeeded, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
+      this.loadTicket();
     });
   }
 
   reopenTicket(): void {
     if (!this.ticket) return;
 
-    const notes = this.isSupportEngineerView()
+    const notes = this.ticketActionNotes.trim() || (this.isSupportEngineerView()
       ? 'Reopened by support engineer and sent back to the same field person'
-      : 'Reopened by field person for follow-up';
+      : 'Reopened by field person for follow-up');
+    const files = this.ticketActionPicker?.getPendingFiles() ?? [];
 
     this.cimsService.reopenTicket(this.ticket.id, notes).subscribe({
       next: (updatedTicket) => {
         this.ticket = { ...this.ticket!, ...updatedTicket, status: 'REOPENED' };
+        this.uploadTicketActionAttachments(files, updatedTicket.ticketHistoryId);
         const msg = this.isSupportEngineerView()
           ? 'Ticket reopened and sent back to the same field person'
           : 'Ticket reopened and sent back to the same field person';

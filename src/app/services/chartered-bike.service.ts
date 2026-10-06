@@ -120,22 +120,22 @@ export class CharteredBikeService {
   }
 
   /**
-   * Store JWT token in localStorage
+  * Store JWT token in this tab's sessionStorage.
    */
   private storeToken(token: string): void {
     try {
-      localStorage.setItem(this.tokenKey, token);
+      sessionStorage.setItem(this.tokenKey, token);
     } catch (error) {
       console.error('Failed to store token:', error);
     }
   }
 
   /**
-   * Retrieve JWT token from localStorage
+  * Retrieve JWT token from this tab's sessionStorage.
    */
   getToken(): string | null {
     try {
-      return localStorage.getItem(this.tokenKey);
+      return sessionStorage.getItem(this.tokenKey);
     } catch (error) {
       console.error('Failed to retrieve token:', error);
       return null;
@@ -143,22 +143,22 @@ export class CharteredBikeService {
   }
 
   /**
-   * Store login data (user info) in localStorage
+  * Store login data (user info) in this tab's sessionStorage.
    */
   private storeLoginData(data: CharteredBikeLoginData): void {
     try {
-      localStorage.setItem(this.loginDataKey, JSON.stringify(data));
+      sessionStorage.setItem(this.loginDataKey, JSON.stringify(data));
     } catch (error) {
       console.error('Failed to store login data:', error);
     }
   }
 
   /**
-   * Retrieve login data from localStorage
+  * Retrieve login data from this tab's sessionStorage.
    */
   getLoginData(): CharteredBikeLoginData | null {
     try {
-      const data = localStorage.getItem(this.loginDataKey);
+      const data = sessionStorage.getItem(this.loginDataKey);
       return data ? JSON.parse(data) : null;
     } catch (error) {
       console.error('Failed to retrieve login data:', error);
@@ -178,8 +178,8 @@ export class CharteredBikeService {
    */
   logout(): void {
     try {
-      localStorage.removeItem(this.tokenKey);
-      localStorage.removeItem(this.loginDataKey);
+      sessionStorage.removeItem(this.tokenKey);
+      sessionStorage.removeItem(this.loginDataKey);
       this.isAuthenticatedSubject.next(false);
       this.errorSubject.next(null);
     } catch (error) {

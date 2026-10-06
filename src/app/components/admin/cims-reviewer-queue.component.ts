@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CimsService } from '../../services/cims.service';
+import { AttachmentService } from '../../services/attachment.service';
 import { Ticket, PaginatedResponse } from '../../models/cims.models';
 import { TicketActionDialogComponent, TicketActionResult, ReviewAction } from './action-notes-dialog.component';
 
@@ -279,7 +280,8 @@ export class CimsReviewerQueueComponent implements OnInit {
   constructor(
     private cimsService: CimsService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private attachmentService: AttachmentService
   ) { }
 
   ngOnInit(): void {
@@ -328,9 +330,10 @@ export class CimsReviewerQueueComponent implements OnInit {
       const actionText = action.charAt(0).toUpperCase() + action.slice(1);
 
       apiCall.subscribe({
-        next: () => {
+        next: (response) => {
           this.actionedTicketIds.add(ticket.id);
           this.snackBar.open(`Ticket ${actionText} successfully`, 'Close', { duration: 5000 });
+          this.uploadActionAttachments(result.attachmentFiles, response.ticketHistoryId);
           this.loadQueue();
         },
         error: (err: any) => {
@@ -338,6 +341,17 @@ export class CimsReviewerQueueComponent implements OnInit {
           this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
         }
       });
+    });
+  }
+
+  private uploadActionAttachments(files: Blob[], historyId?: number): void {
+    if (!files.length) return;
+    if (!historyId) {
+      this.snackBar.open(`Ticket action succeeded, but ${files.length} screenshots could not be uploaded because the history ID was not returned`, 'Close', { duration: 8000 });
+      return;
+    }
+    this.attachmentService.uploadAttachments(files, 'TICKET_ACTION', historyId).subscribe((result) => {
+      if (result.failed) this.snackBar.open(`Ticket action succeeded, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
     });
   }
 

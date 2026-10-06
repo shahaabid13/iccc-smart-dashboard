@@ -50,7 +50,7 @@ export class TokenInterceptor implements HttpInterceptor {
   }
 
   private getToken(): string | null {
-    return localStorage.getItem('token') || sessionStorage.getItem('token');
+    return sessionStorage.getItem('token');
   }
 
   private handleUnauthorized(
@@ -59,8 +59,8 @@ export class TokenInterceptor implements HttpInterceptor {
   ): Observable<HttpEvent<any>> {
     // Redirect to login
     this.clearAuth();
-    this.router.navigate(['/auth/login'], {
-      queryParams: { returnUrl: this.router.url }
+    this.router.navigate(['/login'], {
+      queryParams: { sessionExpired: 'true', returnUrl: this.router.url }
     });
     return throwError(() => new Error('Unauthorized'));
   }
@@ -70,8 +70,6 @@ export class TokenInterceptor implements HttpInterceptor {
   }
 
   private clearAuth(): void {
-    localStorage.removeItem('token');
-    localStorage.removeItem('currentUser');
-    sessionStorage.removeItem('token');
+    sessionStorage.clear();
   }
 }

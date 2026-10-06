@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -7,6 +7,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { Ticket } from '../../models/cims.models';
+import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
+import { AttachmentResponse, AttachmentService } from '../../services/attachment.service';
 
 export type ReviewAction = 'resolve' | 'hold' | 'reopen' | 'reject';
 
@@ -19,6 +21,7 @@ export interface TicketActionDialogData {
 export interface TicketActionResult {
   action: ReviewAction;
   notes: string;
+  attachmentFiles: Blob[];
 }
 
 interface ActionOption {
@@ -38,7 +41,8 @@ interface ActionOption {
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
-    MatIconModule
+    MatIconModule,
+    ImageAttachmentPickerComponent
   ],
   template: `
     <h2 mat-dialog-title>Take Action — Ticket #{{ data.ticket.id }}</h2>
@@ -47,6 +51,11 @@ interface ActionOption {
       <p class="ticket-summary">
         <strong>{{ data.ticket.incidentTypeName }}</strong> — {{ data.ticket.locationName }}
       </p>
+
+      <app-image-attachment-picker
+        [attachments]="ticketAttachments"
+        [allowSelection]="false">
+      </app-image-attachment-picker>
 
       <p class="locked-message" *ngIf="data.disabled">
         <mat-icon>lock</mat-icon>
@@ -80,6 +89,7 @@ interface ActionOption {
               placeholder="Add notes for this action (optional)...">
             </textarea>
           </mat-form-field>
+          <app-image-attachment-picker #imagePicker></app-image-attachment-picker>
         </form>
       </ng-container>
     </mat-dialog-content>
@@ -153,7 +163,9 @@ interface ActionOption {
   `]
 })
 export class TicketActionDialogComponent {
+  @ViewChild('imagePicker') imagePicker?: ImageAttachmentPickerComponent;
   form: FormGroup;
+  ticketAttachments: AttachmentResponse[] = [];
   selectedAction: ReviewAction | null = null;
 
   actionOptions: ActionOption[] = [
@@ -166,10 +178,16 @@ export class TicketActionDialogComponent {
   constructor(
     private fb: FormBuilder,
     private dialogRef: MatDialogRef<TicketActionDialogComponent>,
+    private attachmentService: AttachmentService,
     @Inject(MAT_DIALOG_DATA) public data: TicketActionDialogData
   ) {
     this.form = this.fb.group({
       notes: ['']
+    });
+
+    this.attachmentService.getAttachments('TICKET', this.data.ticket.id).subscribe({
+      next: (attachments) => this.ticketAttachments = attachments || [],
+      error: () => this.ticketAttachments = []
     });
   }
 
@@ -187,7 +205,8 @@ export class TicketActionDialogComponent {
     }
     const result: TicketActionResult = {
       action: this.selectedAction,
-      notes: this.form.value.notes ?? ''
+      notes: this.form.value.notes ?? '',
+      attachmentFiles: this.imagePicker?.getPendingFiles() ?? []
     };
     this.dialogRef.close(result);
   }

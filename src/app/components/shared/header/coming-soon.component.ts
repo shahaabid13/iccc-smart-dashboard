@@ -1132,8 +1132,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
           role === 'ADMIN';
       });
 
-    // Restore user from localStorage
-    const stored = localStorage.getItem('currentUser');
+    // Restore the current tab's user session.
+    const stored = sessionStorage.getItem('currentUser');
     if (stored && !this.user) {
       const parsed = JSON.parse(stored);
       this.auth.setCurrentUser(parsed);

@@ -65,7 +65,7 @@ export class CimsNotificationService implements OnDestroy {
     this.authSubscription = combineLatest([this.authService.currentUser$, this.settings$]).subscribe(
       ([user, settings]) => {
         const newRole = (user?.role || this.authService.getRole() || '').toUpperCase();
-        const newUsername = (user?.username || localStorage.getItem('username') || '').toLowerCase();
+        const newUsername = (user?.username || sessionStorage.getItem('username') || '').toLowerCase();
         const newUserId = user?.id ? String(user.id) : newUsername;
 
         const userChanged = newUsername !== this.username || newRole !== this.role;
@@ -82,7 +82,7 @@ export class CimsNotificationService implements OnDestroy {
     );
 
     // Initial load for current session
-    this.username = (this.authService.getCurrentUser()?.username || localStorage.getItem('username') || '').toLowerCase();
+    this.username = (this.authService.getCurrentUser()?.username || sessionStorage.getItem('username') || '').toLowerCase();
     this.role = (this.authService.getRole() || '').toUpperCase();
     if (this.username) {
       this.initUserState();

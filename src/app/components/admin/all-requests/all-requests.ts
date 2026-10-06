@@ -227,8 +227,8 @@ export class AllRequestsComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.role = localStorage.getItem('role') || 'agency';
-    this.username = localStorage.getItem('username') || '';
+    this.role = sessionStorage.getItem('role') || 'agency';
+    this.username = sessionStorage.getItem('username') || '';
 
     const normalizedRole = this.role.toLowerCase();
     if (normalizedRole !== 'admin' && this.displayedColumns.includes('actions')) {
@@ -241,7 +241,7 @@ export class AllRequestsComponent implements OnInit {
   loadRequests(): void {
     this.loading = true;
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (!token) {
       this.snackBar.open('❌ You must log in to view maintenance requests', 'Close', {
         duration: 3000,
@@ -395,7 +395,7 @@ export class AllRequestsComponent implements OnInit {
   submitAction(request: MaintenanceRequest, approved: boolean): void {
     this.actionInProgress = request.id;
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (!token) {
       this.snackBar.open('❌ You must log in to perform this action', 'Close', {
         duration: 3000,

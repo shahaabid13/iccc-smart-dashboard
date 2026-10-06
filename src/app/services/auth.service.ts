@@ -3,11 +3,19 @@ import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { User } from '../models/user';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+
+export const SESSION_INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+  private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastActivityAt = 0;
+  private expiryHandled = false;
+  private readonly activityEvents = ['mousedown', 'mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+  private readonly activityHandler = () => this.recordActivity();
   isAgency(): boolean {
     throw new Error('Method not implemented.');
   }
@@ -34,11 +42,17 @@ export class AuthService {
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
 
-  constructor(private http: HttpClient) {
-    const savedUser = localStorage.getItem('currentUser');
+  constructor(private http: HttpClient, private router: Router) {
+    const savedUser = this.getSessionValue('currentUser');
     if (savedUser) {
-      this.currentUserSubject.next(JSON.parse(savedUser));
+      try {
+        this.currentUserSubject.next(JSON.parse(savedUser));
+      } catch {
+        this.removeSessionValue('currentUser');
+      }
     }
+    this.installActivityListeners();
+    if (this.isAuthenticated()) this.recordActivity();
   }
 
   /** ------------------------
@@ -47,10 +61,10 @@ export class AuthService {
   login(username: string, password: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/login`, { username, password }).pipe(
       tap((res: any) => {
-        // ✅ Save credentials
-        localStorage.setItem('token', res.token);
-        localStorage.setItem('role', res.role);
-        localStorage.setItem('username', res.username);
+        this.setSessionValue('token', res.token);
+        this.setSessionValue('role', res.role);
+        this.setSessionValue('username', res.username);
+        if (res.permissions) this.setSessionValue('permissions', JSON.stringify(res.permissions));
 
         // ✅ Save user session
         const user: User = {
@@ -60,6 +74,8 @@ export class AuthService {
           role: res.role
         };
         this.setCurrentUser(user);
+        this.expiryHandled = false;
+        this.recordActivity();
       }),
       catchError((err) => {
         console.error('Login failed:', err);
@@ -89,34 +105,67 @@ export class AuthService {
    * ------------------------- */
  // ✅ FIX - Only clear admin-specific keys
 logout(): void {
-  localStorage.removeItem('token');
-  localStorage.removeItem('role');
-  localStorage.removeItem('username');
-  localStorage.removeItem('currentUser');
+  this.clearSession();
   this.currentUserSubject.next(null);
 }
+
+  expireSession(): void {
+    if (this.expiryHandled) return;
+    this.expiryHandled = true;
+    this.clearSession();
+    this.currentUserSubject.next(null);
+    void this.router.navigate(['/login'], { queryParams: { sessionExpired: 'true' } });
+  }
+
+  private clearSession(): void {
+    if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
+    this.inactivityTimer = null;
+    this.lastActivityAt = 0;
+    if (typeof window !== 'undefined') window.sessionStorage.clear();
+  }
+
+  private installActivityListeners(): void {
+    if (typeof document === 'undefined') return;
+    for (const eventName of this.activityEvents) {
+      document.addEventListener(eventName, this.activityHandler, { passive: true });
+    }
+  }
+
+  recordActivity(): void {
+    if (!this.isAuthenticated() || typeof window === 'undefined') return;
+    this.lastActivityAt = Date.now();
+    if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
+    this.inactivityTimer = setTimeout(() => {
+      const remaining = SESSION_INACTIVITY_TIMEOUT_MS - (Date.now() - this.lastActivityAt);
+      if (remaining > 0) {
+        this.inactivityTimer = setTimeout(() => this.expireSession(), remaining);
+        return;
+      }
+      this.expireSession();
+    }, SESSION_INACTIVITY_TIMEOUT_MS);
+  }
 
   /** ------------------------
    * TOKEN + ROLE MANAGEMENT
    * ------------------------- */
   private setToken(token: string): void {
-    localStorage.setItem('token', token);
+    this.setSessionValue('token', token);
   }
 
   getToken(): string | null {
-    return localStorage.getItem('token');
+    return this.getSessionValue('token');
   }
 
   private setRole(role: string): void {
-    localStorage.setItem('role', role);
+    this.setSessionValue('role', role);
   }
 
   getRole(): string | null {
-    return localStorage.getItem('role');
+    return this.getSessionValue('role');
   }
 
   getAgencyName(): string | null {
-    return localStorage.getItem('agencyName');
+    return this.getSessionValue('agencyName');
   }
 
   /** ------------------------
@@ -136,8 +185,22 @@ logout(): void {
   }
 
   setCurrentUser(user: User): void {
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    this.setSessionValue('currentUser', JSON.stringify(user));
+    this.setSessionValue('username', user.username);
+    if (user.role) this.setSessionValue('role', user.role);
     this.currentUserSubject.next(user);
+  }
+
+  private getSessionValue(key: string): string | null {
+    return typeof window === 'undefined' ? null : window.sessionStorage.getItem(key);
+  }
+
+  private setSessionValue(key: string, value: string): void {
+    if (typeof window !== 'undefined') window.sessionStorage.setItem(key, value);
+  }
+
+  private removeSessionValue(key: string): void {
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem(key);
   }
 
   /**
@@ -147,8 +210,9 @@ logout(): void {
   initializeDevToken(): void {
     if (!this.getToken()) {
       const devToken = 'dev-test-token-' + Date.now();
-      localStorage.setItem('token', devToken);
-      localStorage.setItem('role', 'admin');
+      this.setSessionValue('token', devToken);
+      this.setSessionValue('role', 'admin');
+      this.recordActivity();
       console.log('✅ [DEV] Test token created for weighbridge testing');
       console.log('   Token:', devToken);
     }
