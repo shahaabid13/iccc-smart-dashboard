@@ -11,6 +11,7 @@ import { SmcService } from '../../services/smc.service';
 import { CharteredBikeService } from '../../services/chartered-bike.service';
 import { TrammService } from '../../services/Tramm.service';
 import { CimsService } from '../../services/cims.service';
+import { CimsTopDefaultersWidgetComponent } from './cims-top-defaulters-widget.component';
 import { TaskService } from '../../services/task.service';
 import { SdnetDashboardService } from '../../features/network-monitor/services/dashboard.service';
 import { Observable, catchError, forkJoin, map, of, switchMap, interval, Subscription } from 'rxjs';
@@ -39,7 +40,7 @@ type ModuleStats = { label: string; value: string | number }[];
 @Component({
   selector: 'app-home-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, MatCardModule, MatButtonModule, MatIconModule, MatProgressBarModule],
+  imports: [CommonModule, RouterModule, MatCardModule, MatButtonModule, MatIconModule, MatProgressBarModule, CimsTopDefaultersWidgetComponent],
   template: `
     <div class="home-dashboard">
       <!-- Top Marquee Banner -->
@@ -176,6 +177,7 @@ type ModuleStats = { label: string; value: string | number }[];
           </button>
         </mat-card>
       </div>
+      <app-cims-top-defaulters-widget *ngIf="canViewAgeingReport()"></app-cims-top-defaulters-widget>
     </div>
   `,
   styles: [
@@ -953,8 +955,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         title: 'Task Management',
         description: 'Track and manage site tasks, assignments, and their resolution status.',
         route: '/tasks/all',
-        active: true,
-        buttonText: 'Go to Tasks',
+        active: this.canAccessTasks(),
+        buttonText: this.canAccessTasks() ? 'Go to Tasks' : 'Access Restricted',
         accent: '#d97706'
       }),
       this.makeCard({
@@ -1014,6 +1016,10 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     ];
 
     this.loadStats();
+  }
+
+  canViewAgeingReport(): boolean {
+    return ['ADMIN', 'COORDINATOR', 'REVIEWER'].includes(this.userRole);
   }
 
   ngOnDestroy(): void {
@@ -1175,6 +1181,10 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private taskStats(): Observable<ModuleStats> {
+    if (!this.canAccessTasks()) {
+      return of(this.failedStats(['Total Tasks', 'Open Tasks', 'Closed Tasks', 'Rejected Tasks']));
+    }
+
     return this.taskService.getDashboardStats().pipe(
       map((stats) => [
         { label: 'Total Tasks', value: stats.totalTasks },
@@ -1253,6 +1263,10 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private cimsStats(): Observable<ModuleStats> {
+    if (!this.canAccessCims()) {
+      return of(this.failedStats(['Total Tickets', 'Open Tickets', 'Pending Review', 'Closed Tickets']));
+    }
+
     const role = this.userRole || (this.authService.getRole() || '').toUpperCase();
     return this.cimsService.getHomeDashboardStats().pipe(
       map((stats) => {
@@ -1308,7 +1322,11 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   canAccessCims(): boolean {
-    return ['SUPPORT_ENGINEER', 'FIELD_PERSON', 'REVIEWER', 'ADMIN'].includes(this.userRole);
+    return ['SUPPORT_ENGINEER', 'FIELD_PERSON', 'COORDINATOR', 'REVIEWER', 'ADMIN'].includes(this.userRole);
+  }
+
+  canAccessTasks(): boolean {
+    return ['SUPPORT_ENGINEER', 'REVIEWER', 'ADMIN'].includes(this.userRole);
   }
 
   getCimsRoute(): string {
@@ -1317,6 +1335,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         return '/cims/support-engineer/dashboard';
       case 'FIELD_PERSON':
         return '/cims/field-person/dashboard';
+      case 'COORDINATOR':
+        return '/cims/coordinator/dashboard';
       case 'REVIEWER':
         return '/cims/reviewer/dashboard';
       case 'ADMIN':

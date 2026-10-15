@@ -55,6 +55,37 @@ export class CimsReviewerGuard implements CanActivate {
 @Injectable({
   providedIn: 'root'
 })
+export class CimsCoordinatorGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) { }
+
+  canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean {
+    if (this.authService.getRole()?.toUpperCase() === 'COORDINATOR') {
+      return true;
+    }
+    this.router.navigate(['/login']);
+    return false;
+  }
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class CimsAgeingGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) { }
+
+  canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean {
+    const role = this.authService.getRole()?.toUpperCase() ?? '';
+    if (['ADMIN', 'COORDINATOR', 'REVIEWER'].includes(role)) {
+      return true;
+    }
+    this.router.navigate(['/login']);
+    return false;
+  }
+}
+
+@Injectable({
+  providedIn: 'root'
+})
 export class CimsAdminGuard implements CanActivate {
   constructor(private authService: AuthService, private router: Router) { }
 

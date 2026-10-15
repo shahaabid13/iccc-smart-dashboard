@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -13,9 +13,8 @@ import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http'
 import { MatIconModule } from '@angular/material/icon';
 import { LocationsService } from '../../../services/locations.service';
 import { DevicesService } from '../../../services/devices.service';
-const EMAILJS_SERVICE_ID  = 'service_654leop';   
-const EMAILJS_TEMPLATE_ID = 'template_ybf7q51'; 
-const EMAILJS_PUBLIC_KEY  = 's5Rl1UDf_tba2Zita';  
+import emailjs from '@emailjs/browser';
+import { environment } from '../../../../environments/environment';
 
 const NOTIFICATION_EMAIL  = 'shahaabid902@gmail.com';
 
@@ -411,7 +410,7 @@ const NOTIFICATION_EMAIL  = 'shahaabid902@gmail.com';
     }
   `]
 })
-export class MaintenanceRequestComponent implements OnInit {
+export class MaintenanceRequestComponent {
   form: FormGroup;
   submitting      = false;
   fetchingDetails = false;
@@ -499,11 +498,6 @@ export class MaintenanceRequestComponent implements OnInit {
         this.loadAvailableSerials();
       }
     });
-  }
-
-  ngOnInit(): void {
-    // Dynamically inject the EmailJS SDK so no npm install is required.
-    this.loadEmailJsScript();
   }
 
   public loadLocations(): void {
@@ -603,22 +597,6 @@ export class MaintenanceRequestComponent implements OnInit {
     });
   }
 
-  // ─── EmailJS SDK loader ───────────────────────────────────────────────────
-
-  private loadEmailJsScript(): void {
-    if (document.getElementById('emailjs-sdk')) return;   // already loaded
-
-    const script   = document.createElement('script');
-    script.id      = 'emailjs-sdk';
-    script.src     = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
-    script.async   = true;
-    script.onload  = () => {
-      (window as any).emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-      console.log('[EmailJS] SDK loaded & initialised.');
-    };
-    document.head.appendChild(script);
-  }
-
   // ─── Send notification email via EmailJS ──────────────────────────────────
 
   /**
@@ -646,13 +624,6 @@ export class MaintenanceRequestComponent implements OnInit {
     newSerial:           string | null;
     remarks:             string | null;
   }): Promise<void> {
-
-    const emailjs = (window as any).emailjs;
-
-    if (!emailjs) {
-      console.warn('[EmailJS] SDK not ready yet — skipping email.');
-      return;
-    }
 
     // Resolve the current user's name from localStorage (adjust key as needed)
     const submittedBy =
@@ -683,7 +654,12 @@ export class MaintenanceRequestComponent implements OnInit {
     this.emailStatusMessage = `Sending notification to ${NOTIFICATION_EMAIL}…`;
 
     try {
-      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+      await emailjs.send(
+        environment.emailjs.serviceId,
+        environment.emailjs.maintenanceTemplateId,
+        templateParams,
+        { publicKey: environment.emailjs.publicKey }
+      );
 
       this.emailStatus        = 'sent';
       this.emailStatusMessage = `✓ Notification sent to ${NOTIFICATION_EMAIL}`;

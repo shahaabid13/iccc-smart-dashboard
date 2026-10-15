@@ -48,7 +48,7 @@ import { Subscription } from 'rxjs';
               title="Mark all as read"
             >
               <mat-icon class="btn-icon">done_all</mat-icon>
-              <span>Mark read</span>
+              <span>Mark all as read</span>
             </button>
             <button
               class="action-btn clear-btn"
@@ -148,6 +148,9 @@ import { Subscription } from 'rxjs';
             <mat-icon class="role-icon">badge</mat-icon>
             <span>{{ userRoleLabel }}</span>
           </div>
+          <button class="desktop-alert-action" type="button" *ngIf="canEnableDesktopAlerts" (click)="enableDesktopAlerts()">
+            Enable desktop alerts
+          </button>
           <a class="settings-action" (click)="openSettings()">
             <mat-icon class="settings-icon">settings</mat-icon>
             <span>Settings</span>
@@ -679,6 +682,16 @@ import { Subscription } from 'rxjs';
         line-height: 15px;
       }
 
+      .desktop-alert-action {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: #2563eb;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
       .settings-action {
         display: inline-flex;
         align-items: center;
@@ -723,8 +736,10 @@ export class CimsNotificationBellComponent implements OnInit, OnDestroy {
   isOpen = false;
   activeTab: 'all' | 'unread' = 'all';
   userRoleLabel = 'User';
+  canEnableDesktopAlerts = false;
 
   private notifSubscription?: Subscription;
+  private unreadSubscription?: Subscription;
 
   constructor(
     private notificationService: CimsNotificationService,
@@ -737,17 +752,20 @@ export class CimsNotificationBellComponent implements OnInit, OnDestroy {
     this.updateUserRoleLabel();
 
     this.notifSubscription = this.notificationService.notifications$.subscribe((items) => {
-      this.allNotifications = items;
-      this.unreadCount = items.filter((n) => !n.read).length;
+      this.allNotifications = items.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       this.applyFilter();
     });
+    this.unreadSubscription = this.notificationService.unreadCount$.subscribe((count) => {
+      this.unreadCount = count;
+    });
+    this.canEnableDesktopAlerts = typeof Notification !== 'undefined' && Notification.permission !== 'granted';
 
     this.startPolling();
   }
 
   ngOnDestroy(): void {
-    this.notificationService.stop();
     this.notifSubscription?.unsubscribe();
+    this.unreadSubscription?.unsubscribe();
   }
 
   private startPolling(): void {
@@ -864,6 +882,11 @@ export class CimsNotificationBellComponent implements OnInit, OnDestroy {
     this.router.navigate(['/cims/notifications/settings']);
   }
 
+  async enableDesktopAlerts(): Promise<void> {
+    const granted = await this.notificationService.requestBrowserPermission();
+    this.canEnableDesktopAlerts = !granted && typeof Notification !== 'undefined' && Notification.permission === 'default';
+  }
+
   getEventMatIcon(eventType: CimsNotificationEventType): string {
     switch (eventType) {
       case 'TICKET_CREATED':
@@ -880,6 +903,8 @@ export class CimsNotificationBellComponent implements OnInit, OnDestroy {
         return 'replay';
       case 'TICKET_REJECTED':
         return 'cancel';
+      case 'TICKET_REMINDER':
+        return 'alarm';
       default:
         return 'notifications';
     }
@@ -901,6 +926,8 @@ export class CimsNotificationBellComponent implements OnInit, OnDestroy {
         return 'event-reopen';
       case 'TICKET_REJECTED':
         return 'event-reject';
+      case 'TICKET_REMINDER':
+        return 'event-reminder';
       default:
         return 'event-create';
     }

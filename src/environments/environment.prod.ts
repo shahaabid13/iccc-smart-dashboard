@@ -4,6 +4,12 @@ export const environment = {
   apiBaseUrl: '',
   apiUrl: '/api',
   swmApiUrl: '/api/weighbridge',
+  emailjs: {
+    serviceId: 'service_654leop',
+    publicKey: 's5Rl1UDf_tba2Zita',
+    maintenanceTemplateId: 'template_ybf7q51',
+    followUpTemplateId: 'template_ejmzqug'
+  },
 
   trafficDashboard: {
     apiBaseUrl: '',

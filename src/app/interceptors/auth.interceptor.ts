@@ -29,6 +29,8 @@ const PROTECTED_ROUTES = [
   '/api/smc',
   '/api/chartered-bike',
   '/api/incidents', // include incidents under protected list
+  '/api/cims',
+  '/api/notifications',
   '/api/attachments',
   '/api/tasks',
   '/api/locations',

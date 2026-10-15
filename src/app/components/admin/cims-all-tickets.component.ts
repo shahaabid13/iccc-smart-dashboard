@@ -16,6 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { CimsService } from '../../services/cims.service';
 import { Ticket, PaginatedResponse, IncidentType } from '../../models/cims.models';
 import * as XLSX from 'xlsx';
@@ -96,6 +97,11 @@ const FETCH_ALL_PAGE_SIZE = 5000;
                 </mat-select>
               </mat-form-field>
 
+              <mat-form-field appearance="outline">
+                <mat-label>Assignee ID</mat-label>
+                <input matInput type="number" min="1" [(ngModel)]="selectedAssigneeId" [ngModelOptions]="{standalone: true}">
+              </mat-form-field>
+
               <!-- From Date -->
               <mat-form-field appearance="outline">
                 <mat-label>From Date</mat-label>
@@ -149,7 +155,9 @@ const FETCH_ALL_PAGE_SIZE = 5000;
               <!-- ID Column -->
               <ng-container matColumnDef="id">
                 <th mat-header-cell *matHeaderCellDef>ID</th>
-                <td mat-cell *matCellDef="let element" class="ticket-id">#{{ element.id }}</td>
+                <td mat-cell *matCellDef="let element" class="ticket-id">
+                  #{{ element.id }} <span class="flagged-badge" *ngIf="element.flagged">Flagged</span>
+                </td>
               </ng-container>
 
               <!-- Type Column -->
@@ -206,7 +214,7 @@ const FETCH_ALL_PAGE_SIZE = 5000;
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Actions</th>
                 <td mat-cell *matCellDef="let element">
-                  <button mat-icon-button matTooltip="View Details" [routerLink]="['/cims/admin/tickets', element.id]">
+                  <button mat-icon-button matTooltip="View Details" [routerLink]="ticketDetailRoute(element.id)">
                     <mat-icon>visibility</mat-icon>
                   </button>
                 </td>
@@ -316,6 +324,22 @@ const FETCH_ALL_PAGE_SIZE = 5000;
       color: #1976d2;
     }
 
+    .flagged-badge {
+      display: inline-block;
+      margin-left: 5px;
+      padding: 3px 6px;
+      color: #a32323;
+      background: #fde4e2;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 750;
+      line-height: 1.2;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .flagged-badge { color: #ffc4bd; background: #5a3030; }
+    }
+
     .badge {
       display: inline-block;
       padding: 0;
@@ -387,15 +411,27 @@ export class CimsAllTicketsComponent implements OnInit {
   // Filter properties (bound to the form controls, applied on Search)
   selectedStatus = '';
   selectedIncidentType: any = '';
+  selectedAssigneeId: number | null = null;
+  private ageMinDays: number | null = null;
+  private ageMaxDays: number | null = null;
   fromDate: any = null;
   toDate: any = null;
 
   constructor(
     private cimsService: CimsService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private route: ActivatedRoute
   ) { }
 
   ngOnInit(): void {
+    const params = this.route.snapshot.queryParamMap;
+    this.selectedIncidentType = this.numberParam(params.get('incidentTypeId')) ?? '';
+    this.selectedAssigneeId = this.numberParam(params.get('assigneeId'));
+    this.ageMinDays = this.numberParam(params.get('ageMinDays'));
+    this.ageMaxDays = this.numberParam(params.get('ageMaxDays'));
+    const createdOn = params.get('createdOn');
+    this.fromDate = createdOn ? new Date(`${createdOn}T00:00:00`) : null;
+    this.toDate = createdOn ? new Date(`${createdOn}T00:00:00`) : null;
     this.loadIncidentTypes();
     this.loadAllTickets();
   }
@@ -447,6 +483,9 @@ export class CimsAllTicketsComponent implements OnInit {
   clearFilters(): void {
     this.selectedStatus = '';
     this.selectedIncidentType = '';
+    this.selectedAssigneeId = null;
+    this.ageMinDays = null;
+    this.ageMaxDays = null;
     this.fromDate = null;
     this.toDate = null;
     this.applyFilters();
@@ -467,11 +506,29 @@ export class CimsAllTicketsComponent implements OnInit {
       }
     }
 
+    if (this.selectedAssigneeId !== null && Number(ticket.fieldPersonId) !== this.selectedAssigneeId) {
+      return false;
+    }
+
+    if (this.ageMinDays !== null || this.ageMaxDays !== null) {
+      const created = new Date(ticket.createdAt).getTime();
+      if (!Number.isFinite(created)) return false;
+      const ageDays = Math.max(0, Math.floor((Date.now() - created) / 86_400_000));
+      if (this.ageMinDays !== null && ageDays < this.ageMinDays) return false;
+      if (this.ageMaxDays !== null && ageDays > this.ageMaxDays) return false;
+    }
+
     if (!this.isWithinDateRange(ticket)) {
       return false;
     }
 
     return true;
+  }
+
+  private numberParam(value: string | null): number | null {
+    if (value === null || value.trim() === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   /** Compares dates by local calendar day (ignoring time-of-day), so a
@@ -531,6 +588,18 @@ export class CimsAllTicketsComponent implements OnInit {
 
   isClosedStatus(status: string): boolean {
     return CLOSED_STATUSES.includes((status || '').toUpperCase());
+  }
+
+  ticketDetailRoute(ticketId: number): string {
+    const role = (sessionStorage.getItem('role') || '').toUpperCase();
+    const routes: Record<string, string> = {
+      ADMIN: '/cims/admin/tickets',
+      COORDINATOR: '/cims/coordinator/tickets',
+      REVIEWER: '/cims/reviewer/tickets',
+      FIELD_PERSON: '/cims/field-person/tickets',
+      SUPPORT_ENGINEER: '/cims/support-engineer/tickets'
+    };
+    return `${routes[role] || '/cims/admin/tickets'}/${ticketId}`;
   }
 
   // ---------------------------------------------------------------------

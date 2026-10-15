@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { AdminGuard } from './guards/admin.guard';
-import { CimsSupportEngineerGuard, CimsFieldPersonGuard, CimsReviewerGuard, CimsAdminGuard, CimsNotificationGuard, CimsTaskGuard, CimsTaskCreateGuard } from './guards/cims.guards';
+import { CimsSupportEngineerGuard, CimsFieldPersonGuard, CimsReviewerGuard, CimsAdminGuard, CimsNotificationGuard, CimsTaskGuard, CimsTaskCreateGuard, CimsAgeingGuard, CimsCoordinatorGuard } from './guards/cims.guards';
 import { AnprAnalyticsTableComponent } from './components/admin/anpr-analytics-table.component';
 import { AnprAnalyticsChartsComponent } from './components/admin/anpr-analytics-charts.component';
 import { BusAnalyticsComponent } from './components/admin/bus-analytics.component';
@@ -165,6 +165,18 @@ export const routes: Routes = [
 
 	// ============ CAMERA INCIDENT MANAGEMENT SYSTEM (CIMS) ============
 	{
+		path: 'cims/tickets',
+		canActivate: [CimsNotificationGuard],
+		loadComponent: () => import('./components/admin/cims-all-tickets.component').then((m) => m.CimsAllTicketsComponent),
+		title: 'CIMS All Tickets',
+	},
+	{
+		path: 'cims/reports/ageing',
+		canActivate: [CimsAgeingGuard],
+		loadComponent: () => import('./components/admin/cims-ageing-report.component').then((m) => m.CimsAgeingReportComponent),
+		title: 'CIMS Ageing Report',
+	},
+	{
 		path: 'cims/notifications/settings',
 		canActivate: [CimsNotificationGuard],
 		loadComponent: () =>
@@ -178,7 +190,7 @@ export const routes: Routes = [
 		children: [
 			{
 				path: 'dashboard',
-				loadComponent: () => import('./components/admin/cims-support-engineer-dashboard.component').then((m) => m.CimsSupportEngineerDashboardComponent),
+				loadComponent: () => import('./components/admin/cims-dashboard.component').then((m) => m.CimsDashboardComponent),
 			},
 			{
 				path: 'my-tickets',
@@ -209,12 +221,26 @@ export const routes: Routes = [
 		]
 	},
 	{
+		path: 'cims/coordinator',
+		canActivate: [CimsCoordinatorGuard],
+		children: [
+			{
+				path: 'dashboard',
+				loadComponent: () => import('./components/admin/cims-dashboard.component').then((m) => m.CimsDashboardComponent),
+			},
+			{
+				path: 'tickets/:id',
+				loadComponent: () => import('./components/admin/cims-ticket-detail.component').then((m) => m.CimsTicketDetailComponent),
+			},
+		]
+	},
+	{
 		path: 'cims/reviewer',
 		canActivate: [CimsReviewerGuard],
 		children: [
 			{
 				path: 'dashboard',
-				loadComponent: () => import('./components/admin/cims-reviewer-dashboard.component').then((m) => m.CimsReviewerDashboardComponent),
+				loadComponent: () => import('./components/admin/cims-dashboard.component').then((m) => m.CimsDashboardComponent),
 			},
 			{
 				path: 'queue',
@@ -232,7 +258,7 @@ export const routes: Routes = [
 		children: [
 			{
 				path: 'dashboard',
-				loadComponent: () => import('./components/admin/cims-admin-dashboard.component').then((m) => m.CimsAdminDashboardComponent),
+				loadComponent: () => import('./components/admin/cims-dashboard.component').then((m) => m.CimsDashboardComponent),
 			},
 			{
 				path: 'all-tickets',

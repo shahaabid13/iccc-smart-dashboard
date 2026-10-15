@@ -76,6 +76,10 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
           </div>
 
           <div class="dropdown-content" *ngIf="openDropdown === 'cims' && !sidebarContentCollapsed">
+            <a *ngIf="['ADMIN', 'COORDINATOR', 'REVIEWER'].includes(userRole)" routerLink="/cims/reports/ageing" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+              <span class="material-symbols-outlined item-icon">schedule</span>
+              <span>Ageing Report</span>
+            </a>
             <!-- Support Engineer -->
             <ng-container *ngIf="userRole === 'SUPPORT_ENGINEER'">
               <a routerLink="/cims/support-engineer/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
@@ -100,6 +104,17 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
               </a>
             </ng-container>
 
+            <ng-container *ngIf="userRole === 'COORDINATOR'">
+              <a routerLink="/cims/coordinator/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                <span class="material-symbols-outlined item-icon">space_dashboard</span>
+                <span>Dashboard</span>
+              </a>
+              <a routerLink="/cims/tickets" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                <span class="material-symbols-outlined item-icon">list_alt</span>
+                <span>All Tickets</span>
+              </a>
+            </ng-container>
+
             <!-- Reviewer -->
             <ng-container *ngIf="userRole === 'REVIEWER'">
               <a routerLink="/cims/reviewer/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
@@ -109,6 +124,10 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
               <a routerLink="/cims/reviewer/queue" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
                 <span class="material-symbols-outlined item-icon">pending_actions</span>
                 <span>Review Queue</span>
+              </a>
+              <a routerLink="/cims/tickets" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                <span class="material-symbols-outlined item-icon">list_alt</span>
+                <span>All Tickets</span>
               </a>
             </ng-container>
 
@@ -397,7 +416,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
           </ul>
 
           <div class="d-flex align-items-center col-auto">
-            <app-cims-notification-bell *ngIf="user" class="me-2"></app-cims-notification-bell>
+            <app-cims-notification-bell *ngIf="user && !['ADMIN', 'COORDINATOR'].includes(userRole)" class="me-2"></app-cims-notification-bell>
             <div class="profile position-relative" (click)="toggleUserDropdown($event)">
               <img src="/download.png" alt="Profile" class="profile-icon img-fluid rounded-circle" />
               <div class="dropdown-menu dropdown-menu-end user-dropdown-menu fixed-menu" [class.show]="userDropdownOpen" (click)="$event.stopPropagation()">

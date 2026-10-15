@@ -356,23 +356,36 @@ export class CimsUserManagementComponent implements OnInit {
   }
 
   saveUser(): void {
-    if (!this.editingUser.username.trim()) {
+    const trimmedUsername = this.editingUser.username.trim();
+
+    if (!trimmedUsername) {
       this.snackBar.open('Username is required', 'Close', { duration: 3000 });
       return;
     }
 
+    const usernameExists = this.users.some((user) => user.username.toLowerCase() === trimmedUsername.toLowerCase());
+    if (!this.editingUser.id && usernameExists) {
+      this.snackBar.open('A user with this username already exists', 'Close', { duration: 4000 });
+      return;
+    }
+
+    const fullName = this.editingUser.fullName?.trim() ?? '';
+    const email = this.editingUser.email?.trim() ?? '';
+    const phone = this.editingUser.phone?.trim() ?? '';
+    const password = this.editingUser.password?.trim() ?? '';
+
     // Backend enforces full name, email and phone for Field Person —
     // validate up front so we don't round-trip a 400 error.
     if (this.isFieldPerson) {
-      if (!this.editingUser.fullName?.trim()) {
+      if (!fullName) {
         this.snackBar.open('Full name is required for Field Person', 'Close', { duration: 3000 });
         return;
       }
-      if (!this.editingUser.email?.trim()) {
+      if (!email) {
         this.snackBar.open('Email is required for Field Person', 'Close', { duration: 3000 });
         return;
       }
-      if (!this.editingUser.phone?.trim()) {
+      if (!phone) {
         this.snackBar.open('Phone is required for Field Person', 'Close', { duration: 3000 });
         return;
       }
@@ -380,25 +393,23 @@ export class CimsUserManagementComponent implements OnInit {
 
     if (!this.editingUser.id) {
       // CREATE
-      if (!this.editingUser.password || !this.editingUser.password.trim()) {
+      if (!password) {
         this.snackBar.open('Password is required for new users', 'Close', { duration: 3000 });
         return;
       }
 
       const payload: CreateAdminUserRequest = {
-        username: this.editingUser.username,
-        password: this.editingUser.password,
+        username: trimmedUsername,
+        password,
         role: this.editingUser.role,
-        fullName: this.editingUser.fullName,
-        // Backend may expect `name` for certain roles (FIELD_PERSON). Include both keys.
-        // This avoids 400 errors when backend validation expects `name` instead of `fullName`.
-        // API: some services validate `name` for FIELD_PERSON users.
-        // Keep `fullName` for backward compatibility.
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        name: this.editingUser.fullName,
-        email: this.editingUser.email,
-        phone: this.editingUser.phone
+        fullName,
+        name: fullName,
+        full_name: fullName,
+        email,
+        phone,
+        mobile: phone,
+        phoneNumber: phone,
+        agencyName: fullName
       };
 
       this.cimsService.createAdminUser(payload).subscribe({
@@ -416,14 +427,13 @@ export class CimsUserManagementComponent implements OnInit {
 
     // EDIT — only send editable fields (never id/password)
     const updatePayload: UpdateUserRequest = {
-      username: this.editingUser.username,
+      username: trimmedUsername,
       role: this.editingUser.role,
-      fullName: this.editingUser.fullName,
-      // include legacy `name` key as some backends expect it for FIELD_PERSON
-      // @ts-ignore
-      name: this.editingUser.fullName,
-      email: this.editingUser.email,
-      phone: this.editingUser.phone
+      fullName,
+      name: fullName,
+      email,
+      phone,
+      full_name: fullName
     };
 
     this.cimsService.updateUser(this.editingUser.id, updatePayload).subscribe({

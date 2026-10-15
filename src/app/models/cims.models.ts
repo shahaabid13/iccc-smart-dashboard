@@ -44,6 +44,7 @@ export interface Ticket {
   resolvedBy?: string;
   resolvedAt?: string;
   revalidationReason?: string;
+  flagged?: boolean;
   ticketHistoryId?: number;
   history: TicketHistory[];
 }
@@ -135,6 +136,179 @@ export interface DashboardStats {
   byPriority: Record<string, number>;
 }
 
+export interface CimsDashboardSummary {
+  ticketsInQueue: number;
+  flaggedTickets: number;
+  averageAgeDays: number;
+  oldestTicketDays: number;
+  tasksPending: number;
+  tasksOverdue: number;
+}
+
+export interface CimsDashboardSummaryResponse {
+  ticketsInQueue?: number;
+  inQueueTickets?: number;
+  queueTickets?: number;
+  inQueue?: number;
+  queueCount?: number;
+  flaggedTickets?: number;
+  flaggedCount?: number;
+  flagged?: number;
+  averageAgeDays?: number;
+  avgAgeDays?: number;
+  averageAge?: number;
+  averageTicketAgeDays?: number;
+  oldestTicketDays?: number;
+  oldestTicketAgeDays?: number;
+  oldestAgeDays?: number;
+  oldestAge?: number;
+  maxAgeDays?: number;
+  tasksPending?: number;
+  pendingTasks?: number;
+  tasksOverdue?: number;
+  overdueTasks?: number;
+  [key: string]: unknown;
+}
+
+export interface TicketsByAssignee {
+  assigneeId: number;
+  assigneeName: string;
+  count: number;
+}
+
+export interface TicketsByAssigneeResponse {
+  assigneeId?: number;
+  fieldPersonId?: number;
+  userId?: number;
+  assigneeName?: string;
+  fieldPersonName?: string;
+  assignedToName?: string;
+  username?: string;
+  name?: string;
+  assignee?: string;
+  count?: number;
+  ticketCount?: number;
+  totalCount?: number;
+  openTickets?: number;
+  inQueueCount?: number;
+  [key: string]: unknown;
+}
+
+export interface TicketsByIncidentType {
+  incidentTypeId: number;
+  incidentTypeName: string;
+  count: number;
+}
+
+export interface TicketsByIncidentTypeResponse {
+  incidentTypeId?: number;
+  typeId?: number;
+  incidentTypeName?: string;
+  typeName?: string;
+  incidentType?: string;
+  incidentName?: string;
+  type?: string;
+  name?: string;
+  count?: number;
+  ticketCount?: number;
+  totalCount?: number;
+  [key: string]: unknown;
+}
+
+export interface TicketsAgeingBucket {
+  bucket: '0-1d' | '1-3d' | '3-7d' | '7d+';
+  count: number;
+}
+
+export interface CimsTicketTrendPoint {
+  date: string;
+  created: number;
+  closed: number;
+}
+
+export interface CimsTicketTrendPointResponse {
+  date?: string;
+  day?: string;
+  created?: number;
+  createdCount?: number;
+  ticketsCreated?: number;
+  closed?: number;
+  closedCount?: number;
+  ticketsClosed?: number;
+  resolvedCount?: number;
+  [key: string]: unknown;
+}
+
+export interface TasksByStatus {
+  status: string;
+  count: number;
+}
+
+export interface TasksByStatusResponse {
+  status?: string;
+  taskStatus?: string;
+  name?: string;
+  count?: number;
+  taskCount?: number;
+  totalCount?: number;
+  [key: string]: unknown;
+}
+
+export interface TasksByAssignee {
+  assigneeId: number;
+  assigneeName: string;
+  pending: number;
+  overdue: number;
+}
+
+export interface TasksByAssigneeResponse {
+  assigneeId?: number;
+  userId?: number;
+  assigneeName?: string;
+  fieldPersonName?: string;
+  assignedToName?: string;
+  username?: string;
+  name?: string;
+  pending?: number;
+  pendingTasks?: number;
+  pendingCount?: number;
+  overdue?: number;
+  overdueTasks?: number;
+  overdueCount?: number;
+  [key: string]: unknown;
+}
+
+export interface CimsFlaggedTicket {
+  id: number;
+  title: string;
+  assigneeName: string;
+  hoursPending: number;
+  remindersSent: number;
+  flagged: boolean;
+}
+
+export interface CimsFlaggedTicketResponse {
+  id?: number;
+  ticketId?: number;
+  title?: string;
+  assigneeName?: string;
+  fieldPersonName?: string;
+  assignedTo?: string;
+  hoursPending?: number;
+  pendingHours?: number;
+  remindersSent?: number;
+  reminderCount?: number;
+  flagged?: boolean;
+  [key: string]: unknown;
+}
+
+export interface CimsFlaggedReminderResponse {
+  ticketId: number;
+  remindersSent?: number;
+  reminderCount?: number;
+  message?: string;
+}
+
 export interface DailyTicketCount {
   date: string;
   count: number;
@@ -146,14 +320,21 @@ export interface CreateAdminUserRequest {
   role: string;
   agencyName?: string;
   fullName?: string;
+  name?: string;
+  full_name?: string;
   email?: string;
   phone?: string;
+  mobile?: string;
+  phoneNumber?: string;
+  [key: string]: any;
 }
 
 export interface UpdateUserRequest {
   username?: string;
   role?: string;
   fullName?: string;
+  name?: string;
+  full_name?: string;
   email?: string;
   phone?: string;
 }
@@ -168,6 +349,59 @@ export interface PaginatedResponse<T> {
   hasPrevious: boolean;
 }
 
+export interface AgeingTicket {
+  id: number;
+  title: string;
+  createdAt: string;
+  daysOpen: number;
+}
+
+export interface AgeingTicketResponse {
+  id?: number;
+  ticketId?: number;
+  title: string;
+  createdAt: string;
+  daysOpen: number;
+}
+
+export interface AgeingReport {
+  userId: number;
+  userName: string;
+  email?: string;
+  openCount: number;
+  oldestDays: number;
+  tickets: AgeingTicket[];
+}
+
+export interface AgeingReportResponse {
+  userId: number;
+  userName: string;
+  email?: string;
+  openCount?: number;
+  openTicketCount?: number;
+  oldestDays?: number;
+  maxDaysOpen?: number;
+  tickets: AgeingTicketResponse[];
+}
+
+export interface TopDefaulter {
+  userId: number;
+  userName: string;
+  email?: string;
+  openCount: number;
+  oldestDays: number;
+}
+
+export interface TopDefaulterResponse {
+  userId: number;
+  userName: string;
+  email?: string;
+  openCount?: number;
+  openTicketCount?: number;
+  oldestDays?: number;
+  maxDaysOpen?: number;
+}
+
 // ============ NOTIFICATIONS (Email/SMS on ticket updates) ============
 
 export type CimsNotificationEventType =
@@ -177,7 +411,8 @@ export type CimsNotificationEventType =
   | 'TICKET_RESOLVED'
   | 'TICKET_ON_HOLD'
   | 'TICKET_REOPENED'
-  | 'TICKET_REJECTED';
+  | 'TICKET_REJECTED'
+  | 'TICKET_REMINDER';
 
 export type NotificationChannel = 'EMAIL' | 'SMS';
 
@@ -194,6 +429,29 @@ export interface CimsNotification {
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
   status?: Ticket['status'];
   channels: NotificationChannel[];
+}
+
+export interface ServerNotification {
+  id: string | number;
+  type?: CimsNotificationEventType;
+  eventType?: CimsNotificationEventType;
+  title: string;
+  message: string;
+  ticketId: number;
+  createdAt: string;
+  read?: boolean;
+}
+
+export interface PendingFieldPersonTicket {
+  id: number;
+  ticketId?: number;
+  title?: string;
+  incidentTypeName?: string;
+  locationName?: string;
+  createdAt?: string;
+  pendingSince?: string;
+  pendingHours?: number;
+  hoursPending?: number;
 }
 
 export interface NotificationSettings {

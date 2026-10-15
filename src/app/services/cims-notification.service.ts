@@ -1,5 +1,9 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Observable, Subscription, interval, combineLatest } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { BehaviorSubject, Observable, Subscription, interval, combineLatest, timer, fromEvent, merge, forkJoin, of } from 'rxjs';
+import { catchError, filter, map, switchMap } from 'rxjs/operators';
 import { CimsService } from './cims.service';
 import { AuthService } from './auth.service';
 import {
@@ -7,7 +11,8 @@ import {
   CimsNotificationEventType,
   NotificationSettings,
   NotificationChannel,
-  Ticket
+  Ticket,
+  ServerNotification
 } from '../models/cims.models';
 
 const DEFAULT_SETTINGS: NotificationSettings = {
@@ -23,7 +28,8 @@ const DEFAULT_SETTINGS: NotificationSettings = {
     TICKET_RESOLVED: { email: true, sms: true },
     TICKET_ON_HOLD: { email: true, sms: true },
     TICKET_REOPENED: { email: true, sms: true },
-    TICKET_REJECTED: { email: true, sms: true }
+    TICKET_REJECTED: { email: true, sms: true },
+    TICKET_REMINDER: { email: false, sms: false }
   }
 };
 
@@ -34,7 +40,8 @@ const EVENT_LABELS: Record<CimsNotificationEventType, string> = {
   TICKET_RESOLVED: 'Ticket Resolved',
   TICKET_ON_HOLD: 'Ticket On Hold',
   TICKET_REOPENED: 'Ticket Reopened',
-  TICKET_REJECTED: 'Ticket Rejected'
+  TICKET_REJECTED: 'Ticket Rejected',
+  TICKET_REMINDER: 'Ticket Reminder'
 };
 
 @Injectable({ providedIn: 'root' })
@@ -54,14 +61,26 @@ export class CimsNotificationService implements OnDestroy {
   private baselineReady = false;
 
   private pollSubscription: Subscription | null = null;
+  private reminderPollSubscription: Subscription | null = null;
   private authSubscription: Subscription | null = null;
   private settingsForPoll: NotificationSettings = this.settingsSubject.value;
 
   private role: string = '';
   private username: string = '';
   private userId: string = '';
+  private remoteNotifications: CimsNotification[] = [];
+  private remoteNotificationIds = new Set<string>();
+  private remoteUnreadCount = 0;
+  private unreadCountLoaded = false;
+  private readonly originalDocumentTitle = typeof document === 'undefined' ? '' : document.title;
 
-  constructor(private cimsService: CimsService, private authService: AuthService) {
+  constructor(
+    private cimsService: CimsService,
+    private authService: AuthService,
+    private http: HttpClient,
+    private snackBar: MatSnackBar,
+    private router: Router
+  ) {
     this.authSubscription = combineLatest([this.authService.currentUser$, this.settings$]).subscribe(
       ([user, settings]) => {
         const newRole = (user?.role || this.authService.getRole() || '').toUpperCase();
@@ -75,8 +94,14 @@ export class CimsNotificationService implements OnDestroy {
         this.userId = newUserId;
         this.settingsForPoll = settings;
 
-        if (userChanged && this.username) {
+        if (userChanged) {
+          this.stop();
+          this.remoteNotifications = [];
+          this.remoteNotificationIds.clear();
+          this.remoteUnreadCount = 0;
+          this.unreadCountLoaded = false;
           this.initUserState();
+          if (this.username && this.authService.isAuthenticated()) this.start();
         }
       }
     );
@@ -86,6 +111,7 @@ export class CimsNotificationService implements OnDestroy {
     this.role = (this.authService.getRole() || '').toUpperCase();
     if (this.username) {
       this.initUserState();
+      if (this.authService.isAuthenticated()) this.start();
     }
   }
 
@@ -105,7 +131,7 @@ export class CimsNotificationService implements OnDestroy {
 
     const notifications = this.loadNotifications();
     this.notificationsSubject.next(notifications);
-    this.unreadCountSubject.next(notifications.filter((n) => !n.read).length);
+    this.publishUnreadCount();
 
     this.baselineReady = Object.keys(this.lastSeen).length > 0;
   }
@@ -115,16 +141,35 @@ export class CimsNotificationService implements OnDestroy {
   // ============================================================
 
   start(): void {
-    if (this.pollSubscription) {
-      return;
+    if (!this.authService.isAuthenticated()) return;
+    if (!this.pollSubscription) {
+      this.pollSubscription = interval(25000).subscribe(() => this.poll());
+      this.poll();
     }
-    this.pollSubscription = interval(25000).subscribe(() => this.poll());
-    this.poll(); // immediate first check
+    if (this.role === 'FIELD_PERSON' && !this.reminderPollSubscription) {
+      const visibleRefresh$ = typeof document === 'undefined'
+        ? of(null)
+        : fromEvent(document, 'visibilitychange').pipe(
+            filter(() => document.visibilityState === 'visible'),
+            map(() => null)
+          );
+      this.reminderPollSubscription = merge(timer(0, 60000), visibleRefresh$)
+        .pipe(
+          filter(() => typeof document === 'undefined' || document.visibilityState === 'visible'),
+          switchMap(() => this.fetchServerReminders().pipe(catchError(() => of(null))))
+        )
+        .subscribe((response) => {
+          if (response) this.applyServerReminderResponse(response);
+        });
+    }
   }
 
   stop(): void {
     this.pollSubscription?.unsubscribe();
     this.pollSubscription = null;
+    this.reminderPollSubscription?.unsubscribe();
+    this.reminderPollSubscription = null;
+    this.updateDocumentTitle(0);
   }
 
   getNotifications(): CimsNotification[] {
@@ -132,17 +177,32 @@ export class CimsNotificationService implements OnDestroy {
   }
 
   getUnreadCount(): number {
+    if (this.role === 'FIELD_PERSON' && this.unreadCountLoaded) return this.remoteUnreadCount;
     return this.notificationsSubject.value.filter((n) => !n.read).length;
   }
 
   markAllRead(): void {
     const updated = this.notificationsSubject.value.map((n) => ({ ...n, read: true }));
     this.persist(updated);
+    if (this.role === 'FIELD_PERSON') {
+      this.http.put('/api/notifications/mark-all-read', {}).pipe(catchError(() => of(null))).subscribe();
+      this.remoteUnreadCount = 0;
+      this.remoteNotifications = this.remoteNotifications.map((n) => ({ ...n, read: true }));
+      this.publishNotifications();
+      this.updateDocumentTitle(0);
+    }
   }
 
   markRead(id: string): void {
     const updated = this.notificationsSubject.value.map((n) => (n.id === id ? { ...n, read: true } : n));
     this.persist(updated);
+    if (this.remoteNotificationIds.has(id)) {
+      this.remoteUnreadCount = Math.max(0, this.remoteUnreadCount - 1);
+      this.remoteNotifications = this.remoteNotifications.map((n) => n.id === id ? { ...n, read: true } : n);
+      this.http.put(`/api/notifications/${encodeURIComponent(id)}/read`, {}).pipe(catchError(() => of(null))).subscribe();
+      this.publishNotifications();
+      this.updateDocumentTitle(this.remoteUnreadCount);
+    }
   }
 
   /**
@@ -352,6 +412,114 @@ export class CimsNotificationService implements OnDestroy {
     }
     const permission = await Notification.requestPermission();
     return permission === 'granted';
+  }
+
+  private fetchServerReminders() {
+    return forkJoin({
+      unreadCount: this.http.get<number | { count?: number; unread?: number; unreadCount?: number }>('/api/notifications/unread-count'),
+      notifications: this.http.get<ServerNotification[] | { content?: ServerNotification[]; data?: ServerNotification[] }>(
+        '/api/notifications', { params: { type: 'TICKET_REMINDER', sort: 'createdAt,desc' } }
+      )
+    });
+  }
+
+  private applyServerReminderResponse(response: {
+    unreadCount: number | { count?: number; unread?: number; unreadCount?: number };
+    notifications: ServerNotification[] | { content?: ServerNotification[]; data?: ServerNotification[] };
+  }): void {
+    const rawCount = typeof response.unreadCount === 'number'
+      ? response.unreadCount
+      : Number(response.unreadCount?.unreadCount ?? response.unreadCount?.count ?? response.unreadCount?.unread ?? 0);
+    const rows = Array.isArray(response.notifications)
+      ? response.notifications
+      : response.notifications?.content ?? response.notifications?.data ?? [];
+    const reminders = rows
+      .filter((item) => (item.eventType || item.type) === 'TICKET_REMINDER')
+      .map((item) => this.toLocalNotification(item))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const lastSeenKey = this.getUserKey('cims.notification.lastReminderId');
+    const lastSeenId = localStorage.getItem(lastSeenKey);
+    const seenKey = this.getUserKey('cims.notification.seenReminderIds');
+    const rawSeenIds = localStorage.getItem(seenKey);
+    let seenIds = new Set<string>();
+    try {
+      if (rawSeenIds) seenIds = new Set<string>(JSON.parse(rawSeenIds));
+    } catch {
+      seenIds = new Set<string>();
+    }
+    const firstPoll = !rawSeenIds && !lastSeenId;
+    const newlyReceived = firstPoll
+      ? reminders.slice(0, 1)
+      : reminders.filter((item) => !seenIds.has(item.id));
+    reminders.forEach((item) => seenIds.add(item.id));
+    if (seenIds.size > 500) seenIds = new Set(Array.from(seenIds).slice(-500));
+    localStorage.setItem(seenKey, JSON.stringify(Array.from(seenIds)));
+    if (reminders.length) localStorage.setItem(lastSeenKey, reminders[0].id);
+    for (const notification of newlyReceived.reverse()) this.deliverReminderToast(notification);
+
+    this.remoteNotifications = reminders;
+    this.remoteNotificationIds = new Set(reminders.map((item) => item.id));
+    this.remoteUnreadCount = Number.isFinite(rawCount) ? rawCount : 0;
+    this.unreadCountLoaded = true;
+    this.publishNotifications();
+    this.updateDocumentTitle(this.remoteUnreadCount);
+  }
+
+  private toLocalNotification(item: ServerNotification): CimsNotification {
+    return {
+      id: String(item.id),
+      ticketId: Number(item.ticketId),
+      eventType: 'TICKET_REMINDER',
+      title: item.title || `Reminder for ticket #${item.ticketId}`,
+      message: item.message || 'A ticket reminder is waiting for you.',
+      read: item.read ?? false,
+      createdAt: item.createdAt,
+      channels: []
+    };
+  }
+
+  private publishNotifications(): void {
+    const merged = [
+      ...this.notificationsSubject.value.filter((item) => !this.remoteNotificationIds.has(item.id)),
+      ...this.remoteNotifications
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    this.notificationsSubject.next(merged);
+    this.publishUnreadCount();
+  }
+
+  private publishUnreadCount(): void {
+    this.unreadCountSubject.next(
+      this.role === 'FIELD_PERSON' && this.unreadCountLoaded
+        ? this.remoteUnreadCount
+        : this.notificationsSubject.value.filter((n) => !n.read).length
+    );
+  }
+
+  private deliverReminderToast(notification: CimsNotification): void {
+    const ref = this.snackBar.open(notification.message, 'View', {
+      duration: 9000,
+      announcementMessage: notification.message,
+      politeness: 'assertive'
+    });
+    ref.onAction().subscribe(() => {
+      this.markRead(notification.id);
+      void this.router.navigate([this.getTicketUrl(notification.ticketId)]);
+    });
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      const native = new Notification(notification.title, { body: notification.message, tag: notification.id });
+      native.onclick = () => {
+        window.focus();
+        void this.router.navigate([this.getTicketUrl(notification.ticketId)]);
+        native.close();
+      };
+    }
+  }
+
+  private updateDocumentTitle(unreadCount: number): void {
+    if (typeof document === 'undefined') return;
+    const baseTitle = this.originalDocumentTitle.replace(/^\(\d+\)\s*/, '');
+    document.title = unreadCount > 0 ? `(${unreadCount}) ${baseTitle}` : baseTitle;
   }
 
   // ============================================================
@@ -568,7 +736,7 @@ export class CimsNotificationService implements OnDestroy {
   private persist(notifications: CimsNotification[]): void {
     localStorage.setItem(this.getUserKey('cims.notifications'), JSON.stringify(notifications));
     this.notificationsSubject.next(notifications);
-    this.unreadCountSubject.next(notifications.filter((n) => !n.read).length);
+    this.publishUnreadCount();
   }
 
   private loadSettings(): NotificationSettings {

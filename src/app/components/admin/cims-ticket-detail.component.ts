@@ -62,6 +62,7 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
                 <mat-chip [class]="'status-' + ticket.status.toLowerCase()">
                   {{ ticket.status }}
                 </mat-chip>
+                <span class="flagged-badge" *ngIf="ticket.flagged">Flagged</span>
               </div>
               <button mat-icon-button matTooltip="Go Back" (click)="goBack()">
                 <mat-icon>arrow_back</mat-icon>
@@ -265,6 +266,21 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
 
     .detail-card {
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .flagged-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 9px;
+      color: #a32323;
+      background: #fde4e2;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 750;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .flagged-badge { color: #ffc4bd; background: #5a3030; }
     }
 
     .header-row {

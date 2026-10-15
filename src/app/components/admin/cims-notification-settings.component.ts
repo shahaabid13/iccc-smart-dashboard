@@ -20,7 +20,8 @@ const EVENT_TYPES: CimsNotificationEventType[] = [
   'TICKET_RESOLVED',
   'TICKET_ON_HOLD',
   'TICKET_REOPENED',
-  'TICKET_REJECTED'
+  'TICKET_REJECTED',
+  'TICKET_REMINDER'
 ];
 
 const EVENT_LABELS: Record<CimsNotificationEventType, string> = {
@@ -30,7 +31,8 @@ const EVENT_LABELS: Record<CimsNotificationEventType, string> = {
   TICKET_RESOLVED: 'Ticket Resolved',
   TICKET_ON_HOLD: 'Ticket On Hold',
   TICKET_REOPENED: 'Ticket Reopened',
-  TICKET_REJECTED: 'Ticket Rejected'
+  TICKET_REJECTED: 'Ticket Rejected',
+  TICKET_REMINDER: 'Ticket Reminder'
 };
 
 @Component({

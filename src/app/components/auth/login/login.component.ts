@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../../services/auth.service';
+import { FieldPersonPendingPromptService } from '../../../services/field-person-pending-prompt.service';
 
 @Component({
   standalone: true,
@@ -471,7 +472,8 @@ export class LoginComponent {
     private fb: FormBuilder,
     private authService: AuthService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private pendingPrompt: FieldPersonPendingPromptService
   ) {
     this.sessionExpired = this.route.snapshot.queryParamMap.get('sessionExpired') === 'true';
     this.loginForm = this.fb.group({
@@ -502,6 +504,7 @@ export class LoginComponent {
 
     this.authService.login(username, password).subscribe({
       next: () => {
+        this.pendingPrompt.showAfterLogin();
         // After login, route every user to the unified Home Dashboard
         this.router.navigate(['/home']);
       },

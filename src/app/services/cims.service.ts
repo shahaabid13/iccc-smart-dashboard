@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import emailjs from '@emailjs/browser';
 import { Observable, catchError, forkJoin, map, of } from 'rxjs';
+import { environment } from '../../environments/environment';
 import {
   CreateTicketRequest,
   TicketActionRequest,
@@ -16,7 +18,28 @@ import {
   DailyTicketCount,
   PaginatedResponse,
   CreateAdminUserRequest,
-  UpdateUserRequest
+  UpdateUserRequest,
+  AgeingReport,
+  AgeingReportResponse,
+  TopDefaulter,
+  TopDefaulterResponse,
+  CimsDashboardSummary,
+  CimsDashboardSummaryResponse,
+  TicketsByAssignee,
+  TicketsByAssigneeResponse,
+  TicketsByIncidentType,
+  TicketsByIncidentTypeResponse,
+  TicketsAgeingBucket,
+  CimsTicketTrendPoint,
+  CimsTicketTrendPointResponse,
+  TasksByStatus,
+  TasksByStatusResponse,
+  TasksByAssignee,
+  TasksByAssigneeResponse,
+  CimsFlaggedTicket,
+  CimsFlaggedTicketResponse,
+  CimsFlaggedReminderResponse,
+  PendingFieldPersonTicket
 } from '../models/cims.models';
 
 @Injectable({
@@ -191,6 +214,308 @@ export class CimsService {
     }
 
     return this.http.get<PaginatedResponse<Ticket>>(`${this.apiUrl}/tickets`, { params });
+  }
+
+  getAgeingReports(): Observable<AgeingReport[]> {
+    return this.http.get<AgeingReportResponse[]>('/api/cims/reports/ageing').pipe(
+      map((reports) => reports.map((report) => this.normalizeAgeingReport(report)))
+    );
+  }
+
+  getTopDefaulters(): Observable<TopDefaulter[]> {
+    return this.http.get<TopDefaulterResponse[]>('/api/cims/reports/ageing/top').pipe(
+      map((users) => users.map((user) => ({
+        userId: user.userId,
+        userName: user.userName,
+        email: user.email,
+        openCount: user.openCount ?? user.openTicketCount ?? 0,
+        oldestDays: user.oldestDays ?? user.maxDaysOpen ?? 0
+      })))
+    );
+  }
+
+  getAgeingReportByUser(userId: number): Observable<AgeingReport> {
+    return this.http.get<AgeingReportResponse>(`/api/cims/reports/ageing/${encodeURIComponent(userId)}`).pipe(
+      map((report) => this.normalizeAgeingReport(report))
+    );
+  }
+
+  async sendFollowUp(user: AgeingReport): Promise<void> {
+    const { serviceId, publicKey, followUpTemplateId } = environment.emailjs;
+    if (!serviceId || !publicKey || !followUpTemplateId) {
+      throw new Error('EmailJS follow-up template is not configured.');
+    }
+
+    await emailjs.send(serviceId, followUpTemplateId, {
+      to_email: user.email,
+      to_name: user.userName,
+      open_count: user.openCount,
+      oldest_days: user.oldestDays,
+      ticket_list: user.tickets.map((ticket) =>
+        `#${ticket.id} - ${ticket.title} (open ${ticket.daysOpen} days)`
+      ).join('\n')
+    }, { publicKey });
+  }
+
+  private normalizeAgeingReport(report: AgeingReportResponse): AgeingReport {
+    const tickets = (report.tickets || []).map((ticket) => ({
+      id: ticket.id ?? ticket.ticketId ?? 0,
+      title: ticket.title,
+      createdAt: ticket.createdAt,
+      daysOpen: ticket.daysOpen
+    }));
+    return {
+      userId: report.userId,
+      userName: report.userName,
+      email: report.email,
+      openCount: report.openCount ?? report.openTicketCount ?? tickets.length,
+      oldestDays: report.oldestDays ?? report.maxDaysOpen ?? Math.max(0, ...tickets.map((ticket) => ticket.daysOpen)),
+      tickets
+    };
+  }
+
+  getCimsDashboardSummary(): Observable<CimsDashboardSummaryResponse> {
+    return this.http.get<CimsDashboardSummaryResponse>('/api/cims/dashboard/summary');
+  }
+
+  getTicketsByAssignee(): Observable<TicketsByAssignee[]> {
+    return this.http.get<unknown>('/api/cims/dashboard/tickets-by-assignee').pipe(
+      map((response) => this.asArray<TicketsByAssigneeResponse>(response).map((item) => ({
+        assigneeId: this.numberValue(item, ['assigneeId', 'fieldPersonId', 'userId', 'id']),
+        assigneeName: this.stringValue(item, ['assigneeName', 'fieldPersonName', 'assignedToName', 'username', 'name', 'assignee']),
+        count: this.numberValue(item, ['count', 'ticketCount', 'totalCount', 'openTickets', 'ticketsInQueue', 'inQueueCount', 'total'])
+      })))
+    );
+  }
+
+  getTicketsByIncidentType(): Observable<TicketsByIncidentType[]> {
+    return this.http.get<unknown>('/api/cims/dashboard/tickets-by-incident-type').pipe(
+      map((response) => this.asArray<TicketsByIncidentTypeResponse>(response).map((item) => ({
+        incidentTypeId: this.numberValue(item, ['incidentTypeId', 'typeId', 'id']),
+        incidentTypeName: this.stringValue(item, ['incidentTypeName', 'typeName', 'incidentType', 'incidentName', 'type', 'name', 'label']),
+        count: this.numberValue(item, ['count', 'ticketCount', 'totalCount', 'tickets', 'total'])
+      })))
+    );
+  }
+
+  getTicketsAgeingBuckets(): Observable<TicketsAgeingBucket[]> {
+    return this.http.get<unknown>('/api/cims/dashboard/tickets-ageing-buckets').pipe(
+      map((response) => this.asArray<Record<string, unknown>>(response).map((item) => ({
+        bucket: this.stringValue(item, ['bucket', 'label', 'ageBucket']) as TicketsAgeingBucket['bucket'],
+        count: this.numberValue(item, ['count', 'ticketCount', 'tickets', 'total'])
+      })))
+    );
+  }
+
+  getTicketsTrend(days: 7 | 30 | 90 = 30): Observable<CimsTicketTrendPoint[]> {
+    return this.http.get<unknown>('/api/cims/dashboard/tickets-trend', {
+      params: { days }
+    }).pipe(
+      map((response) => this.normalizeTrendResponse(response))
+    );
+  }
+
+  private normalizeTrendResponse(response: unknown): CimsTicketTrendPoint[] {
+    if (response === null || response === undefined) return [];
+
+    const wrappers = ['content', 'data', 'items', 'results', 'records', 'points', 'trend'];
+    if (typeof response === 'object' && !Array.isArray(response)) {
+      for (const key of wrappers) {
+        const candidate = (response as Record<string, unknown>)[key];
+        if (candidate !== undefined) {
+          const nested = this.normalizeTrendResponse(candidate);
+          if (nested.length) return nested;
+        }
+      }
+    }
+
+    const rows = this.asArray<CimsTicketTrendPointResponse>(response);
+    if (rows.length) {
+      return rows.map((item) => ({
+        date: this.stringValue(item, ['date', 'day', 'ticketDate']),
+        created: this.extractCreatedValue(item),
+        closed: this.extractClosedValue(item)
+      })).filter((point) => point.date || point.created || point.closed);
+    }
+
+    if (response && typeof response === 'object') {
+      const entries = Object.entries(response as Record<string, unknown>);
+      const hasDateKeys = entries.some(([key]) => /^\d{4}-\d{2}-\d{2}$/.test(key));
+
+      if (hasDateKeys) {
+        return entries.flatMap(([date, value]) => {
+          if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) return [];
+          const record = value as Record<string, unknown>;
+          const created = this.extractCreatedValue(record);
+          const closed = this.extractClosedValue(record);
+          if (date || created || closed) {
+            return [{ date, created, closed }];
+          }
+          return [];
+        }).filter((point) => point.date || point.created || point.closed);
+      }
+
+      const singlePoint = Object.entries(response as Record<string, unknown>)
+        .filter(([key, value]) => value !== null && value !== undefined)
+        .some(([key, value]) => ['date', 'day', 'ticketDate', 'created', 'created_at', 'closed', 'closed_at', 'createdCount', 'closedCount', 'ticketsCreated', 'ticketsClosed', 'resolvedCount'].includes(key));
+      if (singlePoint) {
+        return [{
+          date: this.stringValue(response as Record<string, unknown>, ['date', 'day', 'ticketDate']),
+          created: this.extractCreatedValue(response as Record<string, unknown>),
+          closed: this.extractClosedValue(response as Record<string, unknown>)
+        }].filter((point) => point.date || point.created || point.closed);
+      }
+    }
+
+    return [];
+  }
+
+  getTasksByStatus(): Observable<TasksByStatus[]> {
+    return this.http.get<unknown>('/api/cims/dashboard/tasks-by-status').pipe(
+      map((response) => this.asArray<TasksByStatusResponse>(response).map((item) => ({
+        status: this.stringValue(item, ['status', 'taskStatus', 'name', 'label']),
+        count: this.numberValue(item, ['count', 'taskCount', 'totalCount', 'tasks', 'total'])
+      })))
+    );
+  }
+
+  getTasksByAssignee(): Observable<TasksByAssignee[]> {
+    return this.http.get<unknown>('/api/cims/dashboard/tasks-by-assignee').pipe(
+      map((response) => this.asArray<TasksByAssigneeResponse>(response).map((item) => ({
+        assigneeId: this.numberValue(item, ['assigneeId', 'userId', 'id']),
+        assigneeName: this.stringValue(item, ['assigneeName', 'fieldPersonName', 'assignedToName', 'username', 'name', 'assignee']),
+        pending: this.numberValue(item, ['pending', 'pendingTasks', 'pendingCount']),
+        overdue: this.numberValue(item, ['overdue', 'overdueTasks', 'overdueCount'])
+      })))
+    );
+  }
+
+  getFlaggedTickets(): Observable<CimsFlaggedTicket[]> {
+    return this.http.get<unknown>('/api/cims/flagged-tickets').pipe(
+      map((response) => this.asArray<CimsFlaggedTicketResponse>(response).map((item) => ({
+        id: this.numberValue(item, ['id', 'ticketId']),
+        title: this.stringValue(item, ['title', 'ticketTitle']),
+        assigneeName: this.stringValue(item, ['assigneeName', 'fieldPersonName', 'assignedTo', 'username']),
+        hoursPending: this.numberValue(item, ['hoursPending', 'pendingHours']),
+        remindersSent: this.numberValue(item, ['remindersSent', 'reminderCount']),
+        flagged: item.flagged !== false
+      })))
+    );
+  }
+
+  remindFlaggedTicket(ticketId: number): Observable<CimsFlaggedReminderResponse> {
+    return this.http.post<CimsFlaggedReminderResponse>(`/api/cims/flagged-tickets/${ticketId}/remind`, {});
+  }
+
+  getMyPendingTickets(): Observable<PendingFieldPersonTicket[]> {
+    return this.http.get<unknown>('/api/cims/my-pending-tickets').pipe(
+      map((response) => this.asArray<PendingFieldPersonTicket>(response).map((ticket) => ({
+        ...ticket,
+        id: ticket.id ?? ticket.ticketId ?? 0
+      })))
+    );
+  }
+
+  private asArray<T>(response: unknown): T[] {
+    if (Array.isArray(response)) return response as T[];
+    if (response && typeof response === 'object') {
+      const envelope = response as { content?: unknown; data?: unknown; items?: unknown; results?: unknown; records?: unknown; tickets?: unknown };
+      const rows = envelope.content ?? envelope.data ?? envelope.items ?? envelope.results ?? envelope.records ?? envelope.tickets;
+      if (Array.isArray(rows)) return rows as T[];
+
+      for (const value of Object.values(envelope)) {
+        if (Array.isArray(value)) return value as T[];
+      }
+
+      const entries = Object.entries(envelope)
+        .filter(([, value]) => value !== null && typeof value === 'object' && !Array.isArray(value));
+      if (entries.length) {
+        const asMap = entries.map(([date, value]) => ({ ...(value as Record<string, unknown>), date }));
+        if (asMap.some((item) => 'created' in item || 'closed' in item || 'created_at' in item || 'closed_at' in item || 'date' in item)) {
+          return asMap as T[];
+        }
+      }
+    }
+    return [];
+  }
+
+  private numberValue(record: Record<string, unknown>, keys: string[]): number {
+    const matches = new Map<string, unknown>();
+    for (const [key, value] of Object.entries(record)) {
+      matches.set(this.normalizeKey(key), value);
+    }
+
+    for (const key of keys) {
+      const normalized = this.normalizeKey(key);
+      if (matches.has(normalized)) {
+        const value = matches.get(normalized);
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+      }
+    }
+
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+    }
+    return 0;
+  }
+
+  private extractCreatedValue(record: Record<string, unknown>): number {
+    const fallbackKeys = ['created', 'createdCount', 'ticketsCreated', 'opened', 'created_at', 'createdAt', 'createdCountTotal', 'totalCreated', 'createdTotal', 'created_count', 'total_created', 'newCount', 'newTickets', 'raisedCount'];
+    const value = this.numberValue(record, fallbackKeys);
+    if (value > 0 || Object.keys(record).some((key) => this.normalizeKey(key).includes('created') || this.normalizeKey(key).includes('open') || this.normalizeKey(key).includes('new'))) {
+      return value;
+    }
+    return 0;
+  }
+
+  private extractClosedValue(record: Record<string, unknown>): number {
+    const fallbackKeys = ['closed', 'closedCount', 'ticketsClosed', 'resolvedCount', 'closed_at', 'closedAt', 'closedCountTotal', 'totalClosed', 'closedTotal', 'closed_count', 'total_closed', 'resolvedCountTotal', 'completedCount', 'doneCount'];
+    const value = this.numberValue(record, fallbackKeys);
+    if (value > 0 || Object.keys(record).some((key) => this.normalizeKey(key).includes('closed') || this.normalizeKey(key).includes('resolved') || this.normalizeKey(key).includes('completed') || this.normalizeKey(key).includes('done'))) {
+      return value;
+    }
+    return 0;
+  }
+
+  private stringValue(record: Record<string, unknown>, keys: string[]): string {
+    const matches = new Map<string, unknown>();
+    for (const [key, value] of Object.entries(record)) {
+      matches.set(this.normalizeKey(key), value);
+    }
+
+    for (const key of keys) {
+      const normalized = this.normalizeKey(key);
+      if (matches.has(normalized)) {
+        const value = matches.get(normalized);
+        if (typeof value === 'string' && value.trim() !== '') return value;
+        if (typeof value === 'number') return String(value);
+      }
+    }
+
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim() !== '') return value;
+      if (typeof value === 'number') return String(value);
+    }
+    for (const [key, value] of Object.entries(record)) {
+      if (typeof value === 'string' && value.trim() !== '' && !/(date|time|status)/i.test(key)) return value;
+    }
+    return '';
+  }
+
+  private normalizeKey(value: string): string {
+    return value.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  }
+
+  private matchesCountKeyword(normalizedKey: string, keyword: 'created' | 'closed'): boolean {
+    if (normalizedKey.includes(keyword)) {
+      const disallowed = /(date|time|at|updated|modified|timestamp|createdat|closedat)/i.test(normalizedKey);
+      return !disallowed;
+    }
+    return false;
   }
 
   getDashboardStats(): Observable<DashboardStats> {
