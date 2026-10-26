@@ -38,6 +38,7 @@
               <div class="ticket-top-row">
                 <div class="ticket-meta-left">
                   <ion-badge [color]="colorForPriority(ticket.priority)">{{ ticket.priority }}</ion-badge>
+                  <ion-badge color="danger" *ngIf="ticket.flagged">Flagged</ion-badge>
                 </div>
                 <div class="ticket-meta-right">
                   <ion-button fill="clear" color="primary" size="small" (click)="$event.stopPropagation(); open(ticket)">Action</ion-button>
@@ -59,6 +60,7 @@
           <ion-card>
             <ion-card-content class="empty-state">
               <p class="ion-no-margin">No active tickets.</p>
+              <p class="ion-no-margin ion-text-muted" *ngIf="history.length">{{ history.length }} ticket{{ history.length === 1 ? '' : 's' }} in history.</p>
             </ion-card-content>
           </ion-card>
         </ng-template>

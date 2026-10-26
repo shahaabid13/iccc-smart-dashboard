@@ -5,6 +5,8 @@ import { filter, Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { AboutComponent } from './about/about.component';
 import { AuthService } from './services/auth.service';
+import { FieldReminderService } from './services/field-reminder.service';
+import { PendingTicketPromptService } from './services/pending-ticket-prompt.service';
 
 @Component({
   selector: 'app-root',
@@ -34,36 +36,41 @@ import { AuthService } from './services/auth.service';
 export class AppComponent implements OnInit, OnDestroy {
   showNav = true;
   showBackButton = false;
-  activeTab: 'tickets' | 'tasks' = 'tickets';
+  activeTab: 'dashboard' | 'tickets' | 'tasks' = 'dashboard';
   username: string | null = null;
   private sub: Subscription;
 
   constructor(
     private router: Router, 
     private modalController: ModalController,
-    private authService: AuthService
+    private authService: AuthService,
+    private reminderService: FieldReminderService,
+    private pendingPromptService: PendingTicketPromptService
   ) {
     this.sub = this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe((e: any) => {
       const url = e.urlAfterRedirects ?? e.url;
       this.showNav = url !== '/login';
       this.showBackButton = /^\/(tickets|tasks)\/[^/]+$/.test(url);
-      this.activeTab = url.startsWith('/tasks') ? 'tasks' : 'tickets';
+      this.activeTab = url.startsWith('/tasks') ? 'tasks' : url.startsWith('/tickets') ? 'tickets' : 'dashboard';
+      this.syncFieldServices(url);
     });
   }
 
   async ngOnInit(): Promise<void> {
     // Load username from auth service
     this.username = await this.authService.getUsername();
+    this.syncFieldServices(this.router.url);
   }
 
   navigateToTab(tab: string | undefined): void {
-    if (tab === 'tasks' || tab === 'tickets') {
+    if (tab === 'dashboard' || tab === 'tasks' || tab === 'tickets') {
       void this.router.navigate([`/${tab}`]);
     }
   }
 
   goBack(): void {
-    void this.router.navigate([this.activeTab === 'tasks' ? '/tasks' : '/tickets']);
+    const route = this.activeTab === 'tasks' ? '/tasks' : this.activeTab === 'tickets' ? '/tickets' : '/dashboard';
+    void this.router.navigate([route]);
   }
 
   async openAbout(): Promise<void> {
@@ -75,7 +82,22 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async handleLogout(): Promise<void> {
+    this.reminderService.stop();
+    this.pendingPromptService.stop();
     await this.authService.logout();
+  }
+
+  private syncFieldServices(url: string): void {
+    if (url.startsWith('/login')) {
+      this.reminderService.stop();
+      this.pendingPromptService.stop();
+      return;
+    }
+    void this.authService.isAuthenticated().then(authenticated => {
+      if (!authenticated) return;
+      this.reminderService.start();
+      this.pendingPromptService.startAfterLogin();
+    });
   }
 
   navigateToRecentTicketDetail(): void {

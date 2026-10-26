@@ -60,11 +60,26 @@
             <ng-template #noDescription>
               <p class="ion-text-wrap ion-no-margin">No task description available.</p>
             </ng-template>
+            <app-image-attachment-picker [allowSelection]="false" [attachments]="taskAttachments"></app-image-attachment-picker>
 
             <div class="detail-row ion-margin-top">
               <span><strong>Created:</strong> {{ task.createdAt || 'N/A' }}</span>
               <span><strong>Updated:</strong> {{ task.updatedAt || 'N/A' }}</span>
             </div>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card *ngIf="task.history?.length">
+          <ion-card-header><ion-card-title>History</ion-card-title></ion-card-header>
+          <ion-card-content>
+            <ion-item *ngFor="let entry of task.history" lines="full" class="history-entry">
+              <ion-label>
+                <h3>{{ entry.action }} <small *ngIf="entry.changedAt">· {{ entry.changedAt | date:'medium' }}</small></h3>
+                <p *ngIf="entry.summary">{{ entry.summary }}</p>
+                <p *ngIf="entry.changedBy">by {{ entry.changedBy }}</p>
+                <app-image-attachment-picker [allowSelection]="false" [attachments]="historyAttachments[entry.id] || []"></app-image-attachment-picker>
+              </ion-label>
+            </ion-item>
           </ion-card-content>
         </ion-card>
 
@@ -87,6 +102,9 @@
                 <ion-label position="stacked">Summary</ion-label>
                 <ion-textarea formControlName="summary" autoGrow="true" [disabled]="isSubmitting"></ion-textarea>
               </ion-item>
+
+              <app-image-attachment-picker #actionPicker></app-image-attachment-picker>
+              <ion-text color="danger" *ngIf="actionMessage"><p role="status">{{ actionMessage }}</p></ion-text>
 
               <ion-button expand="block" type="submit" [disabled]="actionForm.invalid || isSubmitting">
                 <span *ngIf="!isSubmitting">Submit</span>

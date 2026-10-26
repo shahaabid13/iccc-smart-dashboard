@@ -1,7 +1,7 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -20,6 +20,7 @@ import {
 import { addIcons } from 'ionicons';
 import { eyeOffOutline, eyeOutline } from 'ionicons/icons';
 import { AuthService } from '../../services/auth.service';
+import { PendingTicketPromptService } from '../../services/pending-ticket-prompt.service';
 import { OfflineBannerComponent } from '../../components/offline-banner.component';
 
 @Component({
@@ -56,8 +57,16 @@ export class LoginPage {
   isSubmitting = false;
   showPassword = false;
 
-  constructor(private authService: AuthService, private router: Router) {
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private route: ActivatedRoute,
+    private pendingTicketPrompt: PendingTicketPromptService
+  ) {
     addIcons({ eyeOutline, eyeOffOutline });
+    if (this.route.snapshot.queryParamMap.get('sessionExpired') === 'true') {
+      this.error = 'Your session expired after 30 minutes of inactivity. Please sign in again.';
+    }
   }
 
   submit(): void {
@@ -78,9 +87,12 @@ export class LoginPage {
     }
 
     this.authService.login(username, password).subscribe({
-      next: () => {
+      next: async () => {
+        const destination = await this.pendingTicketPrompt.startAfterLogin();
         this.isSubmitting = false;
-        void this.router.navigate(['/tickets']);
+        if (destination === 'queue') void this.router.navigate(['/tickets']);
+        else if (destination !== null) void this.router.navigate(['/tickets', destination]);
+        else void this.router.navigate(['/dashboard']);
       },
       error: () => {
         this.isSubmitting = false;

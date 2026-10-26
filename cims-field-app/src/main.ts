@@ -16,7 +16,13 @@ import {
   informationCircleOutline,
   personCircleOutline,
   shieldCheckmarkOutline,
-  wifiOutline
+  wifiOutline,
+  notificationsOutline,
+  logOutOutline,
+  gridOutline,
+  refreshOutline,
+  arrowForwardOutline,
+  chevronForwardOutline
 } from 'ionicons/icons';
 
 defineCustomElements(window);
@@ -30,12 +36,18 @@ addIcons({
   'information-circle-outline': informationCircleOutline,
   'close-outline': closeOutline,
   'arrow-back-outline': arrowBackOutline,
-  'shield-checkmark-outline': shieldCheckmarkOutline
+  'shield-checkmark-outline': shieldCheckmarkOutline,
+  'notifications-outline': notificationsOutline,
+  'log-out-outline': logOutOutline,
+  'grid-outline': gridOutline,
+  'refresh-outline': refreshOutline,
+  'arrow-forward-outline': arrowForwardOutline,
+  'chevron-forward-outline': chevronForwardOutline
 });
 
 bootstrapApplication(AppComponent, {
   providers: [
-    provideIonicAngular(),
+    provideIonicAngular({ innerHTMLTemplatesEnabled: true }),
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     provideHttpClient(withInterceptorsFromDi()),
     provideRouter(routes),

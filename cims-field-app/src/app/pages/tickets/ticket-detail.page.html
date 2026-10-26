@@ -31,6 +31,7 @@
         <ion-card-header>
           <ion-card-title>{{ ticket.incidentTypeName }}</ion-card-title>
           <ion-card-subtitle>{{ ticket.locationName }}</ion-card-subtitle>
+          <ion-badge *ngIf="ticket.flagged" color="danger">Flagged</ion-badge>
         </ion-card-header>
         <ion-card-content>
           <ion-item lines="none">
@@ -56,13 +57,15 @@
             </ion-label>
           </ion-item>
 
+          <app-image-attachment-picker [allowSelection]="false" [attachments]="ticketAttachments"></app-image-attachment-picker>
+
           <ng-template #noDescription>
             <p class="ion-text-wrap ion-no-margin">No description provided.</p>
           </ng-template>
         </ion-card-content>
       </ion-card>
 
-      <ion-card *ngIf="ticket.status === 'OPEN' || ticket.status === 'REOPENED'">
+      <ion-card *ngIf="ticket.status === 'OPEN' || ticket.status === 'REOPENED' || ticket.status === 'PENDING' || ticket.status === 'ACKNOWLEDGED'">
         <ion-card-header>
           <ion-card-title>Field acknowledgement</ion-card-title>
         </ion-card-header>
@@ -81,11 +84,29 @@
               <ion-textarea formControlName="notes" autoGrow="true" [disabled]="isSubmittingAck" placeholder="Enter acknowledgement notes (optional)"></ion-textarea>
             </ion-item>
 
+            <app-image-attachment-picker #ackPicker></app-image-attachment-picker>
+
             <ion-button expand="block" type="submit" [disabled]="isSubmittingAck">
               <span *ngIf="!isSubmittingAck">Take action</span>
               <span *ngIf="isSubmittingAck">Submitting...</span>
             </ion-button>
           </form>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card *ngIf="ticket.history?.length">
+        <ion-card-header>
+          <ion-card-title>History</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-item *ngFor="let entry of ticket.history" lines="full" class="history-entry">
+            <ion-label>
+              <h3>{{ entry.action || entry.toStatus }} <small *ngIf="entry.changedAt">· {{ entry.changedAt | date:'medium' }}</small></h3>
+              <p *ngIf="entry.notes">{{ entry.notes }}</p>
+              <p *ngIf="entry.changedByUsername">by {{ entry.changedByUsername }}</p>
+              <app-image-attachment-picker [allowSelection]="false" [attachments]="historyAttachments[entry.id] || []"></app-image-attachment-picker>
+            </ion-label>
+          </ion-item>
         </ion-card-content>
       </ion-card>
 

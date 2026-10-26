@@ -5,11 +5,17 @@ import { TicketsPage } from './pages/tickets/tickets.page';
 import { TicketDetailPage } from './pages/tickets/ticket-detail.page';
 import { TasksPage } from './pages/tasks/tasks.page';
 import { TaskDetailPage } from './pages/tasks/task-detail.page';
+import { DashboardPage } from './pages/dashboard/dashboard.page';
 
 export const routes: Routes = [
   {
     path: 'login',
     component: LoginPage
+  },
+  {
+    path: 'dashboard',
+    component: DashboardPage,
+    canActivate: [AuthGuard]
   },
   {
     path: 'tickets',
@@ -33,11 +39,11 @@ export const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'tickets',
+    redirectTo: 'dashboard',
     pathMatch: 'full'
   },
   {
     path: '**',
-    redirectTo: 'tickets'
+    redirectTo: 'dashboard'
   }
 ];

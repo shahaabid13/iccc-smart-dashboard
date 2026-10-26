@@ -1,4 +1,4 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, OnInit } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule, ReactiveFormsModule, FormControl, FormGroup, Validators } from '@angular/forms';
@@ -24,7 +24,9 @@ import { TaskService } from '../../services/task.service';
 import { AuthService } from '../../services/auth.service';
 import { OfflineService } from '../../services/offline.service';
 import { ActionQueueService } from '../../services/action-queue.service';
-import { Task } from '../../models/task';
+import { Task, TaskHistoryEntry } from '../../models/task';
+import { AttachmentResponse, AttachmentService } from '../../services/attachment.service';
+import { ImageAttachmentPickerComponent } from '../../components/image-attachment-picker.component';
 import { OfflineBannerComponent } from 'src/app/components/offline-banner.component';
 import { AppHeaderComponent } from 'src/app/components/app-header.component';
 
@@ -37,6 +39,7 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
     ReactiveFormsModule,
     OfflineBannerComponent,
     AppHeaderComponent,
+    ImageAttachmentPickerComponent,
     IonContent,
     IonCard,
     IonCardHeader,
@@ -56,9 +59,13 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
   styleUrls: ['./task-detail.page.scss']
 })
 export class TaskDetailPage implements OnInit, OnDestroy {
+  @ViewChild('actionPicker') actionPicker?: ImageAttachmentPickerComponent;
   task?: Task;
+  taskAttachments: AttachmentResponse[] = [];
+  historyAttachments: Record<number, AttachmentResponse[]> = {};
   loading = true;
   loadingError: string | null = null;
+  actionMessage: string | null = null;
   isSubmitting = false;
   actionForm = new FormGroup({
     status: new FormControl<'RESOLVED' | 'HOLD' | 'REJECTED' | undefined>(undefined, Validators.required),
@@ -74,6 +81,7 @@ export class TaskDetailPage implements OnInit, OnDestroy {
     private offlineService: OfflineService,
     private actionQueue: ActionQueueService,
     private actionSheetCtrl: ActionSheetController,
+    private attachmentService: AttachmentService,
     private authService: AuthService
   ) {}
 
@@ -99,6 +107,7 @@ export class TaskDetailPage implements OnInit, OnDestroy {
         next: data => {
           console.log('[TaskDetailPage] Received data:', data);
           this.task = data;
+          this.loadTaskAttachments(data);
           this.loading = false;
           this.loadingError = null;
           this.setActionOptions();
@@ -109,6 +118,36 @@ export class TaskDetailPage implements OnInit, OnDestroy {
           this.loadingError = `Failed to load task: ${error?.status ? `(${error.status})` : error?.message || 'Unknown error'}`;
         }
       });
+  }
+
+  private loadTaskAttachments(task: Task): void {
+    this.attachmentService.getAttachments('TASK', task.id).subscribe({
+      next: attachments => this.taskAttachments = attachments || [],
+      error: () => this.taskAttachments = []
+    });
+    this.historyAttachments = {};
+    for (const entry of task.history || []) {
+      this.loadHistoryAttachments(entry);
+    }
+  }
+
+  private loadHistoryAttachments(entry: TaskHistoryEntry): void {
+    if (!entry.id) return;
+    this.attachmentService.getAttachments('TASK_ACTION', entry.id).subscribe({
+      next: attachments => this.historyAttachments[entry.id] = attachments || [],
+      error: () => this.historyAttachments[entry.id] = []
+    });
+  }
+
+  private refreshTask(): void {
+    if (!this.task) return;
+    this.taskService.getTaskById(this.task.id).pipe(takeUntil(this.destroy$)).subscribe({
+      next: task => {
+        this.task = task;
+        this.loadTaskAttachments(task);
+        this.setActionOptions();
+      }
+    });
   }
 
   ngOnDestroy() {
@@ -170,36 +209,47 @@ export class TaskDetailPage implements OnInit, OnDestroy {
     this.isSubmitting = true;
     const status = this.actionForm.value.status as 'RESOLVED' | 'HOLD' | 'REJECTED';
     const summary = this.actionForm.value.summary || '';
+    const files = this.actionPicker?.getPendingFiles() ?? [];
+    this.actionMessage = null;
     
     console.log('[TaskDetailPage] Submitting action:', { taskId: this.task.id, status, summary });
     
     this.taskService.action(this.task.id, status, summary)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: () => {
+        next: response => {
           console.log('[TaskDetailPage] Action submitted successfully');
-          void this.actionQueue.addTaskAction(this.task!.id, status, summary);
-          if (this.task) {
-            this.taskService.getTaskById(this.task.id)
-              .pipe(takeUntil(this.destroy$))
-              .subscribe({
-                next: task => {
-                  console.log('[TaskDetailPage] Task refreshed after action');
-                  this.task = task;
-                  this.isSubmitting = false;
-                  this.setActionOptions();
-                },
-                error: (error) => {
-                  console.error('[TaskDetailPage] Failed to refresh task:', error);
-                  this.isSubmitting = false;
-                }
-              });
-          }
+          const responseHistory = response.history || [];
+          const historyId = response.taskHistoryId || response.historyId || response.taskHistory?.id || responseHistory[responseHistory.length - 1]?.id;
+          const uploadAndRefresh = () => {
+            if (!files.length) {
+              this.isSubmitting = false;
+              this.refreshTask();
+              return;
+            }
+            if (!historyId) {
+              this.actionMessage = 'Action saved, but screenshots could not be attached because no history ID was returned.';
+              this.isSubmitting = false;
+              this.refreshTask();
+              return;
+            }
+            this.attachmentService.uploadAttachments(files, 'TASK_ACTION', historyId).subscribe(result => {
+              if (result.failed) this.actionMessage = `Action saved, but ${result.failed} of ${files.length} screenshots failed to upload.`;
+              this.isSubmitting = false;
+              this.refreshTask();
+            });
+          };
+          uploadAndRefresh();
         },
         error: (error) => {
-          console.error('[TaskDetailPage] Failed to submit action:', error);
-          void this.actionQueue.addTaskAction(this.task!.id, status, summary);
-          this.isSubmitting = false;
+          console.error('[TaskDetailPage] Failed to submit action; queueing for retry:', error);
+          void this.actionQueue.addTaskAction(this.task!.id, status, summary, files).then(() => {
+            this.actionMessage = 'No connection. Action and screenshots queued to retry.';
+            this.isSubmitting = false;
+          }).catch(() => {
+            this.actionMessage = 'Could not queue the action. Please try again.';
+            this.isSubmitting = false;
+          });
         }
       });
   }

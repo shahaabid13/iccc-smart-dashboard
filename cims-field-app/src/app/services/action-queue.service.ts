@@ -4,6 +4,8 @@ import { OfflineService } from './offline.service';
 import { TicketService } from './ticket.service';
 import { TaskService } from './task.service';
 import { BehaviorSubject } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
+import { AttachmentService, AttachmentEntityType } from './attachment.service';
 
 interface QueuedAction {
   id: string;
@@ -11,9 +13,13 @@ interface QueuedAction {
   ticketId?: number;
   taskId?: number;
   reviewerId?: number;
+  action?: 'resolved' | 'revalidation';
   status?: string;
   notes?: string;
   summary?: string;
+  attachmentDataUrls?: string[];
+  historyId?: number;
+  actionCompleted?: boolean;
   timestamp: number;
 }
 
@@ -26,7 +32,8 @@ export class ActionQueueService {
   constructor(
     private offlineService: OfflineService,
     private ticketService: TicketService,
-    private taskService: TaskService
+    private taskService: TaskService,
+    private attachmentService: AttachmentService
   ) {
     this.loadQueue();
     this.offlineService.isOnline$.subscribe(isOnline => {
@@ -36,12 +43,14 @@ export class ActionQueueService {
     });
   }
 
-  async addAckTicket(ticketId: number, notes: string) {
+  async addAckTicket(ticketId: number, actionType: 'resolved' | 'revalidation', notes: string, files: Blob[] = []) {
     const action: QueuedAction = {
       id: `ack-${ticketId}-${Date.now()}`,
       type: 'ticket-acknowledge',
       ticketId,
+      action: actionType,
       notes,
+      attachmentDataUrls: await this.filesToDataUrls(files),
       timestamp: Date.now()
     };
     await this.enqueueAction(action);
@@ -58,13 +67,14 @@ export class ActionQueueService {
     await this.enqueueAction(action);
   }
 
-  async addTaskAction(taskId: number, status: string, summary: string) {
+  async addTaskAction(taskId: number, status: string, summary: string, files: Blob[] = []) {
     const action: QueuedAction = {
       id: `task-${taskId}-${Date.now()}`,
       type: 'task-action',
       taskId,
       status,
       summary,
+      attachmentDataUrls: await this.filesToDataUrls(files),
       timestamp: Date.now()
     };
     await this.enqueueAction(action);
@@ -98,8 +108,9 @@ export class ActionQueueService {
 
     for (const action of queue) {
       try {
-        await this.executeAction(action);
-        toRemove.push(action.id);
+        const complete = await this.executeAction(action);
+        if (complete) toRemove.push(action.id);
+        await this.saveQueue(queue);
       } catch (err) {
         console.error('Failed to retry action:', action, err);
       }
@@ -110,16 +121,57 @@ export class ActionQueueService {
     await this.saveQueue(remaining);
   }
 
-  private executeAction(action: QueuedAction): Promise<any> {
-    switch (action.type) {
-      case 'ticket-acknowledge':
-        return this.ticketService.acknowledge(action.ticketId!, action.notes!).toPromise() as Promise<any>;
-      case 'ticket-assign':
-        return this.ticketService.assignReviewer(action.ticketId!, action.reviewerId!).toPromise() as Promise<any>;
-      case 'task-action':
-        return this.taskService.action(action.taskId!, action.status as any, action.summary!).toPromise() as Promise<any>;
-      default:
-        return Promise.reject('Unknown action type');
+  private async executeAction(action: QueuedAction): Promise<boolean> {
+    if (!action.actionCompleted) {
+      let response: any;
+      switch (action.type) {
+        case 'ticket-acknowledge':
+          response = await firstValueFrom(this.ticketService.acknowledge(action.ticketId!, action.action ?? 'resolved', action.notes!));
+          action.historyId = response?.ticketHistoryId;
+          break;
+        case 'ticket-assign':
+          await firstValueFrom(this.ticketService.assignReviewer(action.ticketId!, action.reviewerId!));
+          action.actionCompleted = true;
+          return true;
+        case 'task-action':
+          response = await firstValueFrom(this.taskService.action(action.taskId!, action.status as any, action.summary!));
+          action.historyId = response?.taskHistoryId || response?.historyId || response?.taskHistory?.id || response?.history?.at(-1)?.id;
+          break;
+        default:
+          throw new Error('Unknown queued action');
+      }
+      action.actionCompleted = true;
+      await this.saveQueue(this.queue$.value);
     }
+
+    const dataUrls = action.attachmentDataUrls || [];
+    if (!dataUrls.length) return true;
+    if (!action.historyId) throw new Error('Action completed without a history ID; attachments remain queued');
+
+    const entityType: AttachmentEntityType = action.type === 'task-action' ? 'TASK_ACTION' : 'TICKET_ACTION';
+    const result = await firstValueFrom(this.attachmentService.uploadAttachments(
+      dataUrls.map((value) => this.dataUrlToBlob(value)), entityType, action.historyId
+    ));
+    if (result.failed) throw new Error(`${result.failed} queued screenshots failed to upload`);
+    action.attachmentDataUrls = [];
+    return true;
+  }
+
+  private filesToDataUrls(files: Blob[]): Promise<string[]> {
+    return Promise.all(files.map((file) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not save screenshot'));
+      reader.onerror = () => reject(reader.error || new Error('Could not save screenshot'));
+      reader.readAsDataURL(file);
+    })));
+  }
+
+  private dataUrlToBlob(dataUrl: string): Blob {
+    const [metadata, data] = dataUrl.split(',');
+    const mimeType = metadata.match(/data:(.*?);base64/)?.[1] || 'image/jpeg';
+    const bytes = atob(data);
+    const array = new Uint8Array(bytes.length);
+    for (let index = 0; index < bytes.length; index++) array[index] = bytes.charCodeAt(index);
+    return new Blob([array], { type: mimeType });
   }
 }

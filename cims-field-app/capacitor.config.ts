@@ -12,6 +12,13 @@ const config: CapacitorConfig = {
   },
   android: {
     minWebViewVersion: 100
+  },
+  plugins: {
+    LocalNotifications: {
+      smallIcon: 'ic_stat_cims_notification',
+      iconColor: '#1457b7',
+      presentationOptions: ['badge', 'sound', 'banner', 'list']
+    }
   }
 };
 

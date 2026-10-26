@@ -107,3 +107,9 @@ ion-badge,
 ion-chip {
   font-weight: 600;
 }
+
+ion-alert.pending-ticket-alert {
+  --width: min(560px, calc(100vw - 32px));
+  --max-width: min(560px, calc(100vw - 32px));
+  --max-height: calc(100dvh - 32px);
+}

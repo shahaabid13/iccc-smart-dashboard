@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, of, switchMap, tap } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { getApiBaseUrl } from '../../environments/environment';
-import { Task } from '../models/task';
+import { Task, TaskActionResponse } from '../models/task';
 import { CacheService } from './cache.service';
 
 @Injectable({ providedIn: 'root' })
@@ -126,8 +126,8 @@ export class TaskService {
     );
   }
 
-  action(id: number, status: 'RESOLVED' | 'HOLD' | 'REJECTED', summary: string) {
-    return this.http.put(`${this.getBase()}/${id}/action`, { status, summary });
+  action(id: number, status: 'RESOLVED' | 'HOLD' | 'REJECTED', summary: string): Observable<TaskActionResponse> {
+    return this.http.put<TaskActionResponse>(`${this.getBase()}/${id}/action`, { status, summary });
   }
 
 }

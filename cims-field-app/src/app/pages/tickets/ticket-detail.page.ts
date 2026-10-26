@@ -1,4 +1,4 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, OnInit } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
@@ -19,13 +19,16 @@ import {
   IonTextarea,
   IonSelect,
   IonSelectOption,
-  ActionSheetController
+  ActionSheetController,
+  ToastController
 } from '@ionic/angular/standalone';
 import { TicketService } from '../../services/ticket.service';
 import { AuthService } from '../../services/auth.service';
 import { OfflineService } from '../../services/offline.service';
 import { ActionQueueService } from '../../services/action-queue.service';
-import { Ticket } from '../../models/ticket';
+import { Ticket, TicketHistoryEntry } from '../../models/ticket';
+import { AttachmentResponse, AttachmentService } from '../../services/attachment.service';
+import { ImageAttachmentPickerComponent } from '../../components/image-attachment-picker.component';
 import { OfflineBannerComponent } from 'src/app/components/offline-banner.component';
 import { AppHeaderComponent } from 'src/app/components/app-header.component';
 
@@ -38,6 +41,7 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
     FormsModule,
     OfflineBannerComponent,
     AppHeaderComponent,
+    ImageAttachmentPickerComponent,
     IonContent,
     IonCard,
     IonCardHeader,
@@ -57,7 +61,10 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
   styleUrls: ['./ticket-detail.page.scss']
 })
 export class TicketDetailPage implements OnInit, OnDestroy {
+  @ViewChild('ackPicker') ackPicker?: ImageAttachmentPickerComponent;
   ticket?: Ticket;
+  ticketAttachments: AttachmentResponse[] = [];
+  historyAttachments: Record<number, AttachmentResponse[]> = {};
   reviewers: Array<{ id: number; name: string }> = [];
   bilalReviewerId: number | null = null;
   loading = true;
@@ -78,7 +85,9 @@ export class TicketDetailPage implements OnInit, OnDestroy {
     private offlineService: OfflineService,
     private actionQueue: ActionQueueService,
     private actionSheetCtrl: ActionSheetController,
-    private authService: AuthService
+    private authService: AuthService,
+    private attachmentService: AttachmentService,
+    private toastController: ToastController
   ) {}
 
   ngOnInit() {
@@ -103,6 +112,7 @@ export class TicketDetailPage implements OnInit, OnDestroy {
         next: data => {
           console.log('[TicketDetailPage] Received data:', data);
           this.ticket = data;
+          this.loadTicketAttachments(data);
           this.loading = false;
           this.loadingError = null;
         },
@@ -143,6 +153,25 @@ export class TicketDetailPage implements OnInit, OnDestroy {
         },
         error: () => this.reviewers = []
       });
+  }
+
+  private loadTicketAttachments(ticket: Ticket): void {
+    this.attachmentService.getAttachments('TICKET', ticket.id).subscribe({
+      next: attachments => this.ticketAttachments = attachments || [],
+      error: () => this.ticketAttachments = []
+    });
+    this.historyAttachments = {};
+    for (const entry of ticket.history || []) {
+      if (!entry.id) continue;
+      this.attachmentService.getAttachments('TICKET_ACTION', entry.id).subscribe({
+        next: attachments => this.historyAttachments[entry.id] = attachments || [],
+        error: () => this.historyAttachments[entry.id] = []
+      });
+    }
+  }
+
+  private showActionNotice(message: string, color: 'success' | 'warning' | 'danger' = 'warning'): void {
+    void this.toastController.create({ message, duration: 4500, color, position: 'bottom' }).then(toast => toast.present());
   }
 
   ngOnDestroy() {
@@ -266,66 +295,72 @@ export class TicketDetailPage implements OnInit, OnDestroy {
     const notes = this.ackForm.value.notes?.trim() || 'Acknowledged by field engineer';
     const ticketId = this.ticket.id;
     const selectedAction = this.ackForm.value.action ?? 'resolved';
-    const targetReviewerId = await this.resolveActionTargetId();
+    const targetReviewerId = selectedAction === 'resolved' ? await this.resolveActionTargetId() : null;
+    const files = this.ackPicker?.getPendingFiles() ?? [];
 
     console.log('[TicketDetailPage] Processing ticket action:', { ticketId, selectedAction, notes, targetReviewerId });
 
     const isOnline = await this.offlineService.isOnline();
     if (!isOnline) {
       console.log('[TicketDetailPage] App is offline. Queuing acknowledgement.');
-      void this.actionQueue.addAckTicket(ticketId, notes);
-      if (targetReviewerId) {
-        void this.actionQueue.addAssignReviewer(ticketId, targetReviewerId);
-      }
+      await this.actionQueue.addAckTicket(ticketId, selectedAction, notes, files);
+      if (selectedAction === 'resolved' && targetReviewerId) await this.actionQueue.addAssignReviewer(ticketId, targetReviewerId);
+      this.showActionNotice('No connection. Action and screenshots queued to retry.');
       this.isSubmittingAck = false;
       void this.router.navigate(['/tickets']);
       return;
     }
 
-    this.ticketService.acknowledge(ticketId, notes)
+    this.ticketService.acknowledge(ticketId, selectedAction, notes)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: () => {
-          if (targetReviewerId) {
-            this.ticketService.assignReviewer(ticketId, targetReviewerId)
-              .pipe(takeUntil(this.destroy$))
-              .subscribe({
-                next: () => {
-                  if (selectedAction === 'revalidation') {
-                    this.ticket = {
-                      ...this.ticket!,
-                      status: 'REVALIDATED',
-                      reviewerId: targetReviewerId
-                    };
-                  }
-                  console.log('[TicketDetailPage] Ticket forwarded successfully for action:', selectedAction);
-                  this.isSubmittingAck = false;
-                  void this.router.navigate(['/tickets']);
-                },
-                error: (error) => {
-                  console.error('[TicketDetailPage] Failed to forward ticket after acknowledgement:', error);
-                  void this.actionQueue.addAssignReviewer(ticketId, targetReviewerId);
-                  this.isSubmittingAck = false;
-                  void this.router.navigate(['/tickets']);
-                }
-              });
-            return;
-          }
-
-          console.log('[TicketDetailPage] Acknowledgement submitted successfully ONLINE.');
-          this.isSubmittingAck = false;
-          void this.router.navigate(['/tickets']);
+        next: response => {
+          void this.completeAcknowledgement(response, ticketId, selectedAction, targetReviewerId, files);
         },
         error: (error) => {
           console.error('[TicketDetailPage] Failed to acknowledge ticket online. Queuing action.', error);
-          void this.actionQueue.addAckTicket(ticketId, notes);
-          if (targetReviewerId) {
-            void this.actionQueue.addAssignReviewer(ticketId, targetReviewerId);
-          }
-          this.isSubmittingAck = false;
-          void this.router.navigate(['/tickets']);
+          void this.actionQueue.addAckTicket(ticketId, selectedAction, notes, files).then(async () => {
+            if (selectedAction === 'resolved' && targetReviewerId) await this.actionQueue.addAssignReviewer(ticketId, targetReviewerId);
+            this.showActionNotice('Action could not reach the server. It and its screenshots were queued to retry.');
+            this.isSubmittingAck = false;
+            void this.router.navigate(['/tickets']);
+          }).catch(() => {
+            this.showActionNotice('Could not queue the action or screenshots. Please try again.', 'danger');
+            this.isSubmittingAck = false;
+          });
         }
       });
+  }
+
+  private async completeAcknowledgement(
+    response: any,
+    ticketId: number,
+    action: 'resolved' | 'revalidation',
+    reviewerId: number | null,
+    files: Blob[]
+  ): Promise<void> {
+    if (action === 'resolved' && reviewerId) {
+      try {
+        await firstValueFrom(this.ticketService.assignReviewer(ticketId, reviewerId));
+      } catch (error) {
+        console.error('[TicketDetailPage] Reviewer assignment failed after resolve:', error);
+        await this.actionQueue.addAssignReviewer(ticketId, reviewerId);
+        this.showActionNotice('Ticket resolved; reviewer assignment is queued to retry.');
+      }
+    }
+
+    if (files.length) {
+      const historyId = response?.ticketHistoryId;
+      if (!historyId) {
+        this.showActionNotice('Action completed, but screenshots could not be attached because the history ID was not returned.');
+      } else {
+        const result = await firstValueFrom(this.attachmentService.uploadAttachments(files, 'TICKET_ACTION', historyId));
+        if (result.failed) this.showActionNotice(`Action completed; ${result.failed} of ${files.length} screenshots failed to upload.`);
+      }
+    }
+
+    this.isSubmittingAck = false;
+    void this.router.navigate(['/tickets']);
   }
 
   private refreshTicket(id: number) {

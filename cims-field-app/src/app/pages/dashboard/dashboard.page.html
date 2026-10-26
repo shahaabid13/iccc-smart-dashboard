@@ -1,0 +1,201 @@
+<ion-page class="dashboard-page">
+  <app-offline-banner></app-offline-banner>
+  <app-header></app-header>
+
+  <ion-content>
+    <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+      <ion-refresher-content pullingText="Pull to refresh" refreshingSpinner="crescent"></ion-refresher-content>
+    </ion-refresher>
+
+    <main class="dashboard-shell">
+
+      <!-- Page heading -->
+      <header class="page-head">
+        <div class="page-titles">
+          <h1>My dashboard</h1>
+          <p>
+            <ng-container *ngIf="lastUpdated; else subtitle">Updated {{ lastUpdated | date:'shortTime' }}</ng-container>
+            <ng-template #subtitle>Active incidents and assigned work</ng-template>
+          </p>
+        </div>
+        <button type="button" class="refresh-btn" (click)="load()" [disabled]="refreshing" aria-label="Refresh dashboard">
+          <ion-spinner *ngIf="refreshing" name="crescent"></ion-spinner>
+          <ion-icon *ngIf="!refreshing" name="refresh-outline"></ion-icon>
+          <span>Refresh</span>
+        </button>
+      </header>
+
+      <!-- Overview: queue hero + tasks -->
+      <section class="overview" aria-label="Workload summary">
+
+        <article class="hero">
+          <div class="hero-top">
+            <div>
+              <span class="hero-label">Active tickets</span>
+              <strong class="hero-value" *ngIf="!loading">{{ queue.length }}</strong>
+              <ion-skeleton-text *ngIf="loading" animated class="hero-skeleton"></ion-skeleton-text>
+            </div>
+            <button type="button" class="hero-action" (click)="openQueue()">
+              Open queue
+              <ion-icon name="arrow-forward-outline"></ion-icon>
+            </button>
+          </div>
+
+          <dl class="hero-stats">
+            <div>
+              <dt>Average age</dt>
+              <dd>{{ hero.average }}</dd>
+            </div>
+            <div>
+              <dt>Oldest</dt>
+              <dd>{{ hero.oldest }}</dd>
+            </div>
+            <div [class.alert]="hero.flaggedCount > 0">
+              <dt>Flagged</dt>
+              <dd>{{ hero.flagged }}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="card tasks-card">
+          <header class="card-head">
+            <h2>My tasks</h2>
+          </header>
+          <dl class="task-stats">
+            <div *ngFor="let stat of taskStats; trackBy: trackByLabel" [class.danger]="stat.tone === 'danger'">
+              <dd *ngIf="!loading">{{ stat.value }}</dd>
+              <ion-skeleton-text *ngIf="loading" animated class="stat-skeleton"></ion-skeleton-text>
+              <dt>{{ stat.label }}</dt>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <!-- Active tickets -->
+      <section class="tickets" aria-label="Active tickets">
+        <header class="section-head">
+          <h2>Active tickets</h2>
+          <button type="button" class="link-btn" (click)="openHistory()">
+            History ({{ history.length }})
+          </button>
+        </header>
+
+        <div class="card" *ngIf="loading">
+          <ion-skeleton-text animated class="line w70"></ion-skeleton-text>
+          <ion-skeleton-text animated class="line w45"></ion-skeleton-text>
+        </div>
+
+        <ul class="ticket-list" *ngIf="!loading && queue.length">
+          <li *ngFor="let ticket of queue.slice(0, previewLimit); trackBy: trackByTicket">
+            <button type="button" class="ticket" [ngClass]="'tone-' + ageTone(ticket)" (click)="openTicket(ticket)">
+              <span class="ticket-main">
+                <strong>{{ ticket.incidentTypeName }}</strong>
+                <span class="ticket-meta">{{ ticket.locationName }}</span>
+                <span class="ticket-meta">Ticket #{{ ticket.id }}</span>
+              </span>
+              <span class="ticket-side">
+                <span class="age-pill" [ngClass]="'tone-' + ageTone(ticket)">{{ ageLabel(ticket) }}</span>
+                <span class="flag-pill" *ngIf="ticket.flagged">Flagged</span>
+              </span>
+              <ion-icon name="chevron-forward-outline" class="ticket-chevron"></ion-icon>
+            </button>
+          </li>
+        </ul>
+
+        <button type="button" class="more-btn" *ngIf="!loading && queue.length > previewLimit" (click)="openQueue()">
+          View all {{ queue.length }} tickets
+        </button>
+
+        <div class="card empty-card" *ngIf="!loading && !queue.length">
+          <strong>No active tickets</strong>
+          <span>{{ history.length }} ticket{{ history.length === 1 ? '' : 's' }} in history</span>
+          <button type="button" class="link-btn" (click)="openHistory()">View ticket history</button>
+        </div>
+      </section>
+
+      <!-- Insights -->
+      <section class="insights" *ngIf="breakdowns" aria-label="Insights">
+        <header class="section-head">
+          <h2>Insights</h2>
+        </header>
+
+        <div class="insight-grid">
+
+          <article class="card" *ngIf="breakdowns.incidentTypes.length">
+            <header class="card-head">
+              <h3>Queue by incident type</h3>
+              <span>{{ queue.length }} total</span>
+            </header>
+            <div class="bar-row" *ngFor="let item of breakdowns.incidentTypes; trackBy: trackByLabel">
+              <div class="bar-label"><span>{{ item.label }}</span><strong>{{ item.count }}</strong></div>
+              <div class="bar-track"><span class="bar-fill teal" [style.width]="width(item.count, incidentMaximum)"></span></div>
+            </div>
+          </article>
+
+          <article class="card" *ngIf="breakdowns.ageing.length">
+            <header class="card-head">
+              <h3>Ticket ageing</h3>
+              <span>Days open</span>
+            </header>
+            <div class="bar-row" *ngFor="let item of breakdowns.ageing; trackBy: trackByLabel">
+              <div class="bar-label"><span>{{ item.label }}</span><strong>{{ item.count }}</strong></div>
+              <div class="bar-track">
+                <span class="bar-fill"
+                      [class.warm]="item.label === '3-7d'"
+                      [class.hot]="item.label === '7d+'"
+                      [style.width]="width(item.count, ageingMaximum)"></span>
+              </div>
+            </div>
+          </article>
+
+          <article class="card" *ngIf="trendPreview.length">
+            <header class="card-head">
+              <h3>Created vs closed</h3>
+              <span>Last 30 days</span>
+            </header>
+
+            <div class="trend-totals">
+              <div><i class="dot created"></i><strong>{{ trendCreatedTotal }}</strong> created</div>
+              <div><i class="dot closed"></i><strong>{{ trendClosedTotal }}</strong> closed</div>
+            </div>
+
+            <div class="trend-chart" role="img"
+                 [attr.aria-label]="trendCreatedTotal + ' tickets created and ' + trendClosedTotal + ' closed in the last 30 days'">
+              <div class="trend-col" *ngFor="let point of trendPreview; trackBy: trackByDate">
+                <span class="col created" [class.zero]="!point.created" [style.height]="heightPct(point.created, trendMaximum)"></span>
+                <span class="col closed" [class.zero]="!point.closed" [style.height]="heightPct(point.closed, trendMaximum)"></span>
+              </div>
+            </div>
+            <div class="trend-axis">
+              <span>{{ trendPreview[0].date | date:'MMM d' }}</span>
+              <span>{{ trendPreview[trendPreview.length - 1].date | date:'MMM d' }}</span>
+            </div>
+          </article>
+
+          <article class="card" *ngIf="breakdowns.taskStatuses.length || breakdowns.tasksByAssignee.length">
+            <header class="card-head">
+              <h3>Task progress</h3>
+              <span>My assignments</span>
+            </header>
+            <div class="bar-row" *ngFor="let item of breakdowns.taskStatuses; trackBy: trackByLabel">
+              <div class="bar-label"><span>{{ item.label }}</span><strong>{{ item.count }}</strong></div>
+              <div class="bar-track"><span class="bar-fill task-fill" [style.width]="width(item.count, taskMaximum)"></span></div>
+            </div>
+            <div class="assignee-row" *ngFor="let item of breakdowns.tasksByAssignee; trackBy: trackByLabel">
+              <span class="assignee-name">{{ item.label }}</span>
+              <span>Pending {{ item.pending }}</span>
+              <strong>Overdue {{ item.overdue }}</strong>
+            </div>
+          </article>
+
+          <article class="card empty-card"
+                   *ngIf="!breakdowns.incidentTypes.length && !breakdowns.ageing.length && !breakdowns.trend.length && !breakdowns.taskStatuses.length">
+            <strong>Nothing in your workload yet</strong>
+            <span>Your queue, ticket history and assigned tasks will show up here.</span>
+          </article>
+
+        </div>
+      </section>
+    </main>
+  </ion-content>
+</ion-page>
