@@ -37,34 +37,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
         </div>
 
         <!-- AI (E-Bus) -->
-        <div class="dropdown-container" *ngIf="userRole !== 'FIELD_PERSON' && !isSupportEngineer" [class.collapsed]="sidebarContentCollapsed">
-          <div class="dropdown-header" [class.open]="openDropdown === 'ai'" (click)="toggleDropdown('ai')">
-            <span class="material-symbols-outlined dropdown-icon">directions_bus</span>
-            <span class="dropdown-title" *ngIf="!sidebarContentCollapsed">AI (E-Bus)</span>
-            <span class="material-symbols-outlined dropdown-arrow" *ngIf="!sidebarContentCollapsed" [class.rotated]="openDropdown === 'ai'">
-              expand_more
-            </span>
-          </div>
-
-          <div class="dropdown-content" *ngIf="openDropdown === 'ai' && !sidebarContentCollapsed">
-            <div class="dropdown-item disabled-item" title="Coming soon">
-              <span class="material-symbols-outlined item-icon">space_dashboard</span>
-              <span>Dashboard</span>
-              <span class="coming-soon-badge">Coming Soon</span>
-            </div>
-            <div class="dropdown-item disabled-item" title="Coming soon">
-              <span class="material-symbols-outlined item-icon">directions_bus_filled</span>
-              <span>Fleet Management</span>
-              <span class="coming-soon-badge">Coming Soon</span>
-            </div>
-            <div class="dropdown-item disabled-item" title="Coming soon">
-              <span class="material-symbols-outlined item-icon">alt_route</span>
-              <span>Route</span>
-              <span class="coming-soon-badge">Coming Soon</span>
-            </div>
-          </div>
-        </div>
-
+        
         <!-- CIMS -->
         <div class="dropdown-container" *ngIf="isCimsRole" [class.collapsed]="sidebarContentCollapsed">
           <div class="dropdown-header" [class.open]="openDropdown === 'cims'" (click)="toggleDropdown('cims')">

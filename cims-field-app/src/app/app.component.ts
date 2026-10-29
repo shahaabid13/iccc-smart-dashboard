@@ -82,14 +82,14 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async handleLogout(): Promise<void> {
-    this.reminderService.stop();
+    this.reminderService.stop(true);
     this.pendingPromptService.stop();
     await this.authService.logout();
   }
 
   private syncFieldServices(url: string): void {
     if (url.startsWith('/login')) {
-      this.reminderService.stop();
+      this.reminderService.stop(true);
       this.pendingPromptService.stop();
       return;
     }

@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { Badge } from '@capawesome/capacitor-badge';
 import { BehaviorSubject, EMPTY, Subscription, fromEvent, merge, timer } from 'rxjs';
 import { catchError, filter, map, switchMap } from 'rxjs/operators';
 import { getApiBaseUrl } from '../../environments/environment';
@@ -40,6 +41,7 @@ export class FieldReminderService implements OnDestroy {
   private readonly lastIdKey = 'field-app.last-reminder-id';
   private seenIds = this.loadSeenIds();
   private actionListenerReady = false;
+  private badgeSync: Promise<void> = Promise.resolve();
 
   constructor(private http: HttpClient, private router: Router, private toastController: ToastController) {}
 
@@ -80,14 +82,16 @@ export class FieldReminderService implements OnDestroy {
       });
   }
 
-  stop(): void {
+  stop(clearBadge = false): void {
     this.polling?.unsubscribe();
     this.polling = undefined;
+    if (clearBadge) this.syncAppBadge(0);
   }
 
   async markRead(reminder: FieldReminder): Promise<void> {
     this.remindersSubject.next(this.remindersSubject.value.map(item => item.id === reminder.id ? { ...item, read: true } : item));
     this.unreadSubject.next(Math.max(0, this.unreadSubject.value - (reminder.read ? 0 : 1)));
+    this.syncAppBadge(this.unreadSubject.value);
     this.http.put(`${this.baseUrl}/${encodeURIComponent(reminder.id)}/read`, {}).pipe(catchError(() => EMPTY)).subscribe();
     const ticketId = Number(reminder.ticketId);
     if (Number.isSafeInteger(ticketId) && ticketId > 0) {
@@ -100,13 +104,18 @@ export class FieldReminderService implements OnDestroy {
   markAllRead(): void {
     this.remindersSubject.next(this.remindersSubject.value.map(item => ({ ...item, read: true })));
     this.unreadSubject.next(0);
+    this.syncAppBadge(0);
     this.http.put(`${this.baseUrl}/mark-all-read`, {}).pipe(catchError(() => EMPTY)).subscribe();
   }
 
   async requestDesktopPermission(): Promise<boolean> {
     if (Capacitor.isNativePlatform()) {
-      const result = await LocalNotifications.requestPermissions();
-      return result.display === 'granted';
+      const notificationPermission = await LocalNotifications.requestPermissions();
+      if (notificationPermission.display !== 'granted') return false;
+      const badgePermission = await Badge.requestPermissions();
+      const granted = badgePermission.display === 'granted';
+      if (granted) this.syncAppBadge(this.unreadSubject.value);
+      return granted;
     }
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       return (await Notification.requestPermission()) === 'granted';
@@ -164,7 +173,20 @@ export class FieldReminderService implements OnDestroy {
     if (reminders.length) localStorage.setItem(this.lastIdKey, reminders[0].id);
     this.remindersSubject.next(reminders);
     this.unreadSubject.next(Number.isFinite(rawCount) ? rawCount : reminders.filter(item => !item.read).length);
+    this.syncAppBadge(this.unreadSubject.value);
     this.updateTitle(this.unreadSubject.value);
+  }
+
+  private syncAppBadge(count: number): void {
+    if (!Capacitor.isNativePlatform()) return;
+    this.badgeSync = this.badgeSync
+      .then(async () => {
+        const permission = await Badge.checkPermissions();
+        if (permission.display === 'granted') {
+          await Badge.set({ count: Math.max(0, count) });
+        }
+      })
+      .catch(error => console.error('[FieldReminderService] Failed to update app icon badge:', error));
   }
 
   private async showReminder(reminder: FieldReminder): Promise<void> {

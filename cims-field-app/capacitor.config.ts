@@ -14,6 +14,10 @@ const config: CapacitorConfig = {
     minWebViewVersion: 100
   },
   plugins: {
+    Badge: {
+      persist: true,
+      autoClear: false
+    },
     LocalNotifications: {
       smallIcon: 'ic_stat_cims_notification',
       iconColor: '#1457b7',

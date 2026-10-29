@@ -5,12 +5,22 @@
       <h1>ITMS Events</h1>
     </div>
     <div class="header-actions">
-      <button *ngIf="isAdmin" mat-stroked-button class="light-button" (click)="goToUpload()">
+      <button *ngIf="isAdmin" mat-stroked-button class="header-action-button upload-button" (click)="goToUpload()">
         <mat-icon>upload_file</mat-icon> Upload Excel
       </button>
-      <button mat-flat-button color="primary" (click)="exportExcel()" [disabled]="loading">
-        <mat-icon>download</mat-icon> Export Excel
+      <button mat-stroked-button class="header-action-button export-button" [matMenuTriggerFor]="exportMenu" [disabled]="loading || exporting">
+        <mat-icon>download</mat-icon> {{ exporting ? 'Preparing export…' : 'Export' }}
       </button>
+      <mat-menu #exportMenu="matMenu" panelClass="itms-export-menu">
+        <button mat-menu-item (click)="exportExcel()">
+          <mat-icon>table_view</mat-icon>
+          <span>Export Excel</span>
+        </button>
+        <button mat-menu-item (click)="exportPdf()">
+          <mat-icon>picture_as_pdf</mat-icon>
+          <span>Export PDF</span>
+        </button>
+      </mat-menu>
     </div>
   </header>
 

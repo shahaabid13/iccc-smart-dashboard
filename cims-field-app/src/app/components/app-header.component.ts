@@ -5,6 +5,7 @@ import { filter, Subscription } from 'rxjs';
 import { FieldReminder, FieldReminderService } from '../services/field-reminder.service';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { Badge } from '@capawesome/capacitor-badge';
 import {
   IonHeader,
   IonToolbar,
@@ -203,11 +204,17 @@ export class AppHeaderComponent implements OnInit, OnDestroy {
 
   async enableDesktopAlerts(): Promise<void> {
     this.canEnableDesktopAlerts = !(await this.reminderService.requestDesktopPermission());
+    this.refreshNotificationPermission();
   }
 
   private refreshNotificationPermission(): void {
     if (Capacitor.isNativePlatform()) {
-      void LocalNotifications.checkPermissions().then(result => this.canEnableDesktopAlerts = result.display !== 'granted');
+      void Promise.all([
+        LocalNotifications.checkPermissions(),
+        Badge.checkPermissions()
+      ]).then(([notificationPermission, badgePermission]) => {
+        this.canEnableDesktopAlerts = notificationPermission.display !== 'granted' || badgePermission.display !== 'granted';
+      }).catch(error => console.error('[AppHeaderComponent] Failed to check notification permissions:', error));
       return;
     }
     this.canEnableDesktopAlerts = typeof Notification !== 'undefined' && Notification.permission !== 'granted';
