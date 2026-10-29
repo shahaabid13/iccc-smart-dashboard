@@ -43,7 +43,7 @@ export class DashboardHomeComponent {
       description: 'Search and analyze events from cameras',
       icon: 'search',
       action: 'Search Events',
-      route: '/traffic-dashboard/dashboard/events/search',
+      route: '/itms/events',
       bgColor: 'bg-purple-50'
     },
     {
@@ -51,7 +51,7 @@ export class DashboardHomeComponent {
       description: 'View detailed event results and analytics',
       icon: 'table_chart',
       action: 'View Results',
-      route: '/traffic-dashboard/dashboard/events/results',
+      route: '/itms/events',
       bgColor: 'bg-orange-50'
     },
     {
@@ -59,7 +59,7 @@ export class DashboardHomeComponent {
       description: 'Intelligent Traffic Management System',
       icon: 'directions_transit',
       action: 'Manage ITMS',
-      route: '/traffic-dashboard/dashboard/itms',
+      route: '/itms/dashboard',
       bgColor: 'bg-red-50'
     }
   ];

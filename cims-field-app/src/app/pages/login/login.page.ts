@@ -3,14 +3,8 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
   IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardSubtitle,
   IonCardContent,
   IonInput,
   IonButton,
@@ -18,7 +12,17 @@ import {
   IonIcon
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { eyeOffOutline, eyeOutline } from 'ionicons/icons';
+import {
+  alertCircleOutline,
+  arrowForwardOutline,
+  businessOutline,
+  eyeOffOutline,
+  eyeOutline,
+  informationCircleOutline,
+  lockClosedOutline,
+  personOutline,
+  shieldCheckmarkOutline
+} from 'ionicons/icons';
 import { AuthService } from '../../services/auth.service';
 import { PendingTicketPromptService } from '../../services/pending-ticket-prompt.service';
 import { OfflineBannerComponent } from '../../components/offline-banner.component';
@@ -30,14 +34,8 @@ import { OfflineBannerComponent } from '../../components/offline-banner.componen
     CommonModule,
     ReactiveFormsModule,
     OfflineBannerComponent,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
     IonContent,
     IonCard,
-    IonCardHeader,
-    IonCardTitle,
-    IonCardSubtitle,
     IonCardContent,
     IonInput,
     IonButton,
@@ -56,6 +54,18 @@ export class LoginPage {
   error = '';
   isSubmitting = false;
   showPassword = false;
+  capsLockOn = false;
+  formSubmitted = false;
+  sessionExpired = false;
+  readonly appVersion = '0.0.1';
+
+  get usernameControl(): FormControl<string | null> {
+    return this.form.controls.username;
+  }
+
+  get passwordControl(): FormControl<string | null> {
+    return this.form.controls.password;
+  }
 
   constructor(
     private authService: AuthService,
@@ -63,19 +73,33 @@ export class LoginPage {
     private route: ActivatedRoute,
     private pendingTicketPrompt: PendingTicketPromptService
   ) {
-    addIcons({ eyeOutline, eyeOffOutline });
+    addIcons({
+      alertCircleOutline,
+      arrowForwardOutline,
+      businessOutline,
+      eyeOffOutline,
+      eyeOutline,
+      informationCircleOutline,
+      lockClosedOutline,
+      personOutline,
+      shieldCheckmarkOutline
+    });
     if (this.route.snapshot.queryParamMap.get('sessionExpired') === 'true') {
+      this.sessionExpired = true;
       this.error = 'Your session expired after 30 minutes of inactivity. Please sign in again.';
     }
   }
 
   submit(): void {
+    this.formSubmitted = true;
     if (this.form.invalid) {
+      this.sessionExpired = false;
       this.error = 'Username and password are required.';
       return;
     }
 
     this.error = '';
+    this.sessionExpired = false;
     this.isSubmitting = true;
 
     const { username, password } = this.form.value;
@@ -99,6 +123,10 @@ export class LoginPage {
         this.error = 'Login failed. Please check your credentials.';
       }
     });
+  }
+
+  checkCapsLock(event: KeyboardEvent): void {
+    this.capsLockOn = event.getModifierState('CapsLock');
   }
 
   togglePasswordVisibility(): void {

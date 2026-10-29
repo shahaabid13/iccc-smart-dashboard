@@ -1,0 +1,127 @@
+<main class="itms-page">
+  <header class="page-header">
+    <div>
+      <div class="breadcrumb">Monitoring Tools / ITMS</div>
+      <h1>ITMS Events</h1>
+    </div>
+    <div class="header-actions">
+      <button *ngIf="isAdmin" mat-stroked-button class="light-button" (click)="goToUpload()">
+        <mat-icon>upload_file</mat-icon> Upload Excel
+      </button>
+      <button mat-flat-button color="primary" (click)="exportExcel()" [disabled]="loading">
+        <mat-icon>download</mat-icon> Export Excel
+      </button>
+    </div>
+  </header>
+
+  <section class="filter-card">
+    <div class="filter-grid">
+      <label class="filter-control">
+        <span>From</span>
+        <input type="date" [(ngModel)]="fromDate">
+      </label>
+      <label class="filter-control">
+        <span>To</span>
+        <input type="date" [(ngModel)]="toDate">
+      </label>
+      <mat-form-field appearance="outline">
+        <mat-label>Event type</mat-label>
+        <mat-select [(value)]="eventType" [disabled]="filtersLoading">
+          <mat-option value="">All event types</mat-option>
+          <mat-option *ngFor="let value of filters.eventTypes" [value]="value">{{ value }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Junction</mat-label>
+        <mat-select [(value)]="junction" [disabled]="filtersLoading">
+          <mat-option value="">All junctions</mat-option>
+          <mat-option *ngFor="let value of filters.junctions" [value]="value">{{ value }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Priority</mat-label>
+        <mat-select [(value)]="priority" [disabled]="filtersLoading">
+          <mat-option value="">All priorities</mat-option>
+          <mat-option *ngFor="let value of filters.priorities" [value]="value">{{ value }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Vehicle number</mat-label>
+        <input matInput [(ngModel)]="vehicleNumber" (keyup.enter)="applyFilters()" placeholder="Search vehicle number">
+      </mat-form-field>
+    </div>
+    <div class="filter-actions">
+      <button mat-flat-button color="primary" (click)="applyFilters()">Apply filters</button>
+      <button mat-button (click)="clearFilters()">Clear</button>
+    </div>
+  </section>
+
+  <div class="error-banner" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <section class="table-card">
+    <div class="table-toolbar">
+      <div>
+        <h2>Events</h2>
+        <span>{{ totalElements | number }} records</span>
+      </div>
+      <span class="loading-label" *ngIf="loading">Loading events…</span>
+    </div>
+    <div class="table-scroll">
+      <table mat-table [dataSource]="events" matSort
+             [matSortActive]="sortBy" [matSortDirection]="sortDirection"
+             (matSortChange)="onSortChange($event)">
+        <ng-container matColumnDef="eventTime">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="eventTime">Time</th>
+          <td mat-cell *matCellDef="let row">{{ row.eventTime | date:'medium' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="eventType">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="eventType">Alert</th>
+          <td mat-cell *matCellDef="let row">{{ row.eventType }}</td>
+        </ng-container>
+        <ng-container matColumnDef="cameraName">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="cameraName">Channel</th>
+          <td mat-cell *matCellDef="let row">{{ row.cameraName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="junction">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="junction">Location</th>
+          <td mat-cell *matCellDef="let row">{{ row.junction }}</td>
+        </ng-container>
+        <ng-container matColumnDef="message">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="message">Message</th>
+          <td mat-cell *matCellDef="let row" class="message-cell">{{ row.message }}</td>
+        </ng-container>
+        <ng-container matColumnDef="vehicleNumber">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="vehicleNumber">Vehicle Number</th>
+          <td mat-cell *matCellDef="let row">{{ row.vehicleNumber || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="priority">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="priority">Priority</th>
+          <td mat-cell *matCellDef="let row"><span class="tag priority-tag">{{ row.priority || '—' }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="status">Status</th>
+          <td mat-cell *matCellDef="let row"><span class="tag status-tag">{{ row.status || '—' }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="speedKmph">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="speedKmph">Speed</th>
+          <td mat-cell *matCellDef="let row">{{ row.speedKmph == null ? '—' : row.speedKmph + ' km/h' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="vehicleColor">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="vehicleColor">Color</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="color-value"><i *ngIf="row.vehicleColor" [style.background-color]="row.vehicleColor"></i>{{ row.vehicleColor || '—' }}</span>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns" (click)="openDetails(row)" class="event-row"></tr>
+      </table>
+    </div>
+    <div class="empty-table" *ngIf="!loading && events.length === 0">
+      {{ errorMessage ? 'Events could not be loaded.' : 'No events match these filters.' }}
+    </div>
+    <mat-paginator [length]="totalElements" [pageIndex]="pageIndex" [pageSize]="pageSize"
+                   [pageSizeOptions]="[10, 20, 50, 100]" (page)="onPageChange($event)"
+                   showFirstLastButtons></mat-paginator>
+  </section>
+</main>

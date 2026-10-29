@@ -14,6 +14,7 @@ import { CimsService } from '../../services/cims.service';
 import { CimsTopDefaultersWidgetComponent } from './cims-top-defaulters-widget.component';
 import { TaskService } from '../../services/task.service';
 import { SdnetDashboardService } from '../../features/network-monitor/services/dashboard.service';
+import { ItmsBatch, ItmsService } from '../../features/itms/itms.service';
 import { Observable, catchError, forkJoin, map, of, switchMap, interval, Subscription } from 'rxjs';
 
 interface ModuleCard {
@@ -912,7 +913,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     private trammService: TrammService,
     private cimsService: CimsService,
     private taskService: TaskService,
-    private sdnetDashboardService: SdnetDashboardService
+    private sdnetDashboardService: SdnetDashboardService,
+    private itmsService: ItmsService
   ) {}
 
   ngOnInit(): void {
@@ -1007,8 +1009,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       this.makeCard({
         icon: 'traffic',
         title: 'ITMS',
-        description: 'Traffic Management System for real-time traffic monitoring and control.',
-        route: '/traffic-dashboard/dashboard/events/results',
+        description: 'Traffic Management System for imported event analytics and review.',
+        route: '/itms/dashboard',
         active: true,
         buttonText: 'Go to ITMS',
         accent: '#0891b2'
@@ -1151,7 +1153,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         'Task Management': this.taskStats(),
         SWM: this.swmStats(),
         PBS: this.pbsStats(),
-        TraMM: this.trammStats()
+        TraMM: this.trammStats(),
+        ITMS: this.itmsStats()
       });
     }
 
@@ -1315,6 +1318,63 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       ]),
       catchError(() => of(this.failedStats(['Devices', 'Down', 'Junctions', 'Links'])))
     );
+  }
+
+  private itmsStats(): Observable<ModuleStats> {
+    const labels = ['Total Events', 'Unique Vehicles', 'Junctions', 'Top Event Type'];
+    return this.itmsService.getBatches().pipe(
+      switchMap((batches) => {
+        const latest = [...batches].sort(
+          (a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt)
+        )[0];
+        if (!latest) {
+          return of([
+            { label: 'Total Events', value: 0 },
+            { label: 'Unique Vehicles', value: 0 },
+            { label: 'Junctions', value: 0 },
+            { label: 'Top Event Type', value: '—' }
+          ]);
+        }
+
+        const from = this.itmsBatchDate(
+          latest.periodFrom ?? latest.periodStart ?? latest.startDate ?? latest.from
+        ) || this.itmsBatchDate(latest.uploadedAt);
+        const to = this.itmsBatchDate(
+          latest.periodTo ?? latest.periodEnd ?? latest.endDate ?? latest.to
+        ) || this.itmsBatchDate(latest.uploadedAt);
+        if (!from || !to) {
+          return of(this.failedStats(labels));
+        }
+
+        return forkJoin({
+          summary: this.itmsService.getSummary(from, to),
+          byType: this.itmsService.getByType(from, to)
+        }).pipe(
+          map(({ summary, byType }) => {
+            const totalEvents = summary.totalEvents ||
+              byType.reduce((total, item) => total + item.count, 0);
+            const topType = [...byType].sort((a, b) => b.count - a.count)[0]?.eventType ||
+              summary.topEventType || '—';
+            return [
+              { label: 'Total Events', value: totalEvents },
+              { label: 'Unique Vehicles', value: summary.uniqueVehicles },
+              { label: 'Junctions', value: summary.junctions || summary.totalJunctions || 0 },
+              { label: 'Top Event Type', value: topType }
+            ];
+          })
+        );
+      }),
+      catchError((error) => {
+        console.error('Failed to load ITMS home dashboard stats:', error);
+        return of(this.failedStats(labels));
+      })
+    );
+  }
+
+  private itmsBatchDate(value?: string): string {
+    if (!value) return '';
+    const date = value.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
   }
 
   private failedStats(labels: string[]): ModuleStats {

@@ -36,6 +36,7 @@ const PROTECTED_ROUTES = [
   '/api/locations',
   '/api/approach-roads',
   '/api/device-types',
+  '/api/itms',
    '/api/tramm',
    // Traffic/Video Management Dashboard
    '/api/servers',

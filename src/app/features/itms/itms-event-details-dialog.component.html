@@ -1,0 +1,14 @@
+<h2 mat-dialog-title>Event details</h2>
+<mat-dialog-content>
+  <img *ngIf="data.snapPath" class="snapshot" [src]="data.snapPath" [alt]="'Event snapshot for ' + (data.vehicleNumber || 'vehicle')">
+  <div class="no-snapshot" *ngIf="!data.snapPath">No snapshot available.</div>
+  <dl class="details-grid">
+    <div *ngFor="let field of fields">
+      <dt>{{ field.label }}</dt>
+      <dd>{{ field.value === null || field.value === '' ? '—' : field.value }}</dd>
+    </div>
+  </dl>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

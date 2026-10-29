@@ -1,63 +1,162 @@
-<ion-page>
+<ion-page class="login-page">
   <app-offline-banner></app-offline-banner>
-  <ion-header translucent>
-    <ion-toolbar>
-      <div class="header-branding">
-        <img src="assets/IMG_20251203_100849.jpg" alt="Logo" class="header-logo" />
-        <ion-title>CIMS Field App</ion-title>
-      </div>
-    </ion-toolbar>
-  </ion-header>
 
-  <ion-content class="ion-padding login-content" [fullscreen]="true">
-    <div class="login-wrapper">
-      <ion-card class="login-card">
-        <ion-card-header>
-          <ion-card-title>Field-person login</ion-card-title>
-          <ion-card-subtitle>Sign in to access incident assignments</ion-card-subtitle>
-        </ion-card-header>
+  <ion-content class="login-content" [fullscreen]="true">
+    <main class="login-layout">
+      <section class="brand-panel" aria-label="CIMS Field App">
+        <picture class="hero-picture">
+          <source
+            srcset="assets/cims-login-hero.webp"
+            type="image/webp"
+            width="1600"
+            height="1200"
+          />
+          <img
+            src="assets/cims-login-hero.jpg"
+            alt="Srinagar Smart City Integrated Command and Control Centre"
+            width="1600"
+            height="1200"
+            decoding="async"
+            fetchpriority="high"
+          />
+        </picture>
+        <div class="brand-overlay"></div>
+        <div class="brand-content">
+          <div class="brand-mark" aria-hidden="true">
+            <ion-icon name="business-outline"></ion-icon>
+          </div>
+          <p class="brand-eyebrow">FIELD OPERATIONS</p>
+          <h1>CIMS Field App</h1>
+          <p class="brand-tagline">Sign in to access incident assignments</p>
+          <div class="trust-note">
+            <ion-icon name="shield-checkmark-outline" aria-hidden="true"></ion-icon>
+            <span>Secure access for authorized field personnel</span>
+          </div>
+        </div>
+        <span class="ambient-shape ambient-shape-one" aria-hidden="true"></span>
+        <span class="ambient-shape ambient-shape-two" aria-hidden="true"></span>
+      </section>
 
-        <ion-card-content>
-          <form [formGroup]="form" (ngSubmit)="submit()" class="form-stack">
-            <ion-input
-              label="Username"
-              label-placement="floating"
-              fill="outline"
-              formControlName="username"
-              type="text"
-              autocomplete="username"
-              class="form-field"
-            ></ion-input>
+      <section class="login-side" aria-label="Sign in">
+        <ion-card class="login-card">
+          <ion-card-content>
+            <header class="form-heading">
+              <p class="form-eyebrow">WELCOME BACK</p>
+              <h2>Sign in</h2>
+              <p>Use your assigned account to continue.</p>
+            </header>
 
-            <ion-input
-              label="Password"
-              label-placement="floating"
-              fill="outline"
-              formControlName="password"
-              [type]="showPassword ? 'text' : 'password'"
-              autocomplete="current-password"
-              class="form-field"
-            >
-              <ion-button
-                slot="end"
-                fill="clear"
-                (click)="togglePasswordVisibility()"
-                size="small"
-                class="visibility-toggle"
+            <form [formGroup]="form" (ngSubmit)="submit()" class="form-stack" novalidate>
+              <div class="field-group">
+                <ion-input
+                  id="username"
+                  label="Username"
+                  label-placement="floating"
+                  fill="outline"
+                  formControlName="username"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="username"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  enterkeyhint="next"
+                  aria-describedby="username-error"
+                  [attr.aria-invalid]="usernameControl.invalid && (usernameControl.touched || formSubmitted)"
+                  class="form-field"
+                >
+                  <ion-icon slot="start" name="person-outline" aria-hidden="true"></ion-icon>
+                </ion-input>
+                <p
+                  class="field-error"
+                  id="username-error"
+                  *ngIf="usernameControl.hasError('required') && (usernameControl.touched || formSubmitted)"
+                >
+                  Enter your username.
+                </p>
+              </div>
+
+              <div class="field-group">
+                <ion-input
+                  id="password"
+                  label="Password"
+                  label-placement="floating"
+                  fill="outline"
+                  formControlName="password"
+                  [type]="showPassword ? 'text' : 'password'"
+                  inputmode="text"
+                  autocomplete="current-password"
+                  enterkeyhint="go"
+                  aria-describedby="password-error caps-lock-warning"
+                  [attr.aria-invalid]="passwordControl.invalid && (passwordControl.touched || formSubmitted)"
+                  class="form-field"
+                  (keyup)="checkCapsLock($event)"
+                  (ionBlur)="capsLockOn = false"
+                >
+                  <ion-icon slot="start" name="lock-closed-outline" aria-hidden="true"></ion-icon>
+                  <button
+                    slot="end"
+                    type="button"
+                    class="visibility-toggle"
+                    [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
+                    [attr.aria-pressed]="showPassword"
+                    (click)="togglePasswordVisibility()"
+                  >
+                    <ion-icon name="eye-outline" [class.icon-active]="showPassword" aria-hidden="true"></ion-icon>
+                    <ion-icon name="eye-off-outline" [class.icon-active]="!showPassword" aria-hidden="true"></ion-icon>
+                  </button>
+                </ion-input>
+                <p
+                  class="field-error"
+                  id="password-error"
+                  *ngIf="passwordControl.hasError('required') && (passwordControl.touched || formSubmitted)"
+                >
+                  Enter your password.
+                </p>
+                <p class="caps-warning" id="caps-lock-warning" *ngIf="capsLockOn" role="status">
+                  Caps Lock is on.
+                </p>
+              </div>
+
+              <div
+                class="login-message"
+                *ngIf="error"
+                [class.info-message]="sessionExpired"
+                [class.error-message]="!sessionExpired"
+                [attr.role]="sessionExpired ? 'status' : 'alert'"
+                aria-live="polite"
               >
-                <ion-icon [name]="showPassword ? 'eye-outline' : 'eye-off-outline'"></ion-icon>
+                <ion-icon
+                  [name]="sessionExpired ? 'information-circle-outline' : 'alert-circle-outline'"
+                  aria-hidden="true"
+                ></ion-icon>
+                <span>{{ error }}</span>
+              </div>
+
+              <ion-button
+                expand="block"
+                type="submit"
+                color="primary"
+                [disabled]="isSubmitting"
+                class="submit-btn"
+              >
+                <ion-spinner *ngIf="isSubmitting" name="crescent" slot="start"></ion-spinner>
+                <span>{{ isSubmitting ? 'Signing in…' : 'Sign in securely' }}</span>
+                <ion-icon *ngIf="!isSubmitting" name="arrow-forward-outline" slot="end" aria-hidden="true"></ion-icon>
               </ion-button>
-            </ion-input>
+            </form>
 
-            <div class="error-message" *ngIf="error">{{ error }}</div>
+            <div class="security-note">
+              <ion-icon name="lock-closed-outline" aria-hidden="true"></ion-icon>
+              <span>Your sign-in details are protected.</span>
+            </div>
+          </ion-card-content>
+        </ion-card>
 
-            <ion-button expand="block" type="submit" color="primary" [disabled]="isSubmitting" class="submit-btn">
-              <ion-spinner *ngIf="isSubmitting" name="crescent" slot="start"></ion-spinner>
-              {{ isSubmitting ? 'Signing in...' : 'Sign In' }}
-            </ion-button>
-          </form>
-        </ion-card-content>
-      </ion-card>
-    </div>
+        <footer class="login-footer">
+          <span>CIMS Field App · v{{ appVersion }}</span>
+          <span>Forgot your password? Contact your administrator.</span>
+        </footer>
+      </section>
+    </main>
   </ion-content>
 </ion-page>

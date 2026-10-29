@@ -22,7 +22,6 @@ import {
   AgeingReport,
   AgeingReportResponse,
   TopDefaulter,
-  TopDefaulterResponse,
   CimsDashboardSummary,
   CimsDashboardSummaryResponse,
   TicketsByAssignee,
@@ -223,14 +222,16 @@ export class CimsService {
   }
 
   getTopDefaulters(): Observable<TopDefaulter[]> {
-    return this.http.get<TopDefaulterResponse[]>('/api/cims/reports/ageing/top').pipe(
-      map((users) => users.map((user) => ({
+    return this.getAgeingReports().pipe(
+      map((reports) => reports
+        .map((user) => ({
         userId: user.userId,
         userName: user.userName,
         email: user.email,
-        openCount: user.openCount ?? user.openTicketCount ?? 0,
-        oldestDays: user.oldestDays ?? user.maxDaysOpen ?? 0
-      })))
+        openCount: user.openCount,
+        oldestDays: user.oldestDays
+        }))
+        .sort((a, b) => b.oldestDays - a.oldestDays))
     );
   }
 

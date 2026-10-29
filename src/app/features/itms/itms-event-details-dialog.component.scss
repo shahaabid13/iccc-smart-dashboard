@@ -1,0 +1,7 @@
+.snapshot { display: block; max-width: 100%; max-height: 340px; margin: 0 auto 18px; object-fit: contain; border-radius: 8px; background: #eef4f8; }
+.no-snapshot { display: grid; place-items: center; height: 100px; margin-bottom: 16px; color: #60758e; background: #f4f7fa; border-radius: 8px; }
+.details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.details-grid div { min-width: 0; padding: 10px 12px; background: #f5f8fb; border-radius: 7px; }
+dt { margin-bottom: 4px; color: #60758e; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+dd { margin: 0; color: #17324d; font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .details-grid { grid-template-columns: 1fr; } }

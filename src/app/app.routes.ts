@@ -9,6 +9,23 @@ import { BusAnalyticsComponent } from './components/admin/bus-analytics.componen
 export const routes: Routes = [
 	{ path: '', redirectTo: 'login', pathMatch: 'full' },
 	{
+		path: 'itms/dashboard',
+		loadComponent: () => import('./features/itms/itms-dashboard.component').then((m) => m.ItmsDashboardComponent),
+		title: 'ITMS Dashboard',
+	},
+	{
+		path: 'itms/events',
+		loadComponent: () => import('./features/itms/itms-events.component').then((m) => m.ItmsEventsComponent),
+		title: 'ITMS Events',
+	},
+	{
+		path: 'itms/upload',
+		loadComponent: () => import('./features/itms/itms-upload.component').then((m) => m.ItmsUploadComponent),
+		canActivate: [AdminGuard],
+		title: 'ITMS Upload',
+	},
+	{ path: 'itms', redirectTo: 'itms/dashboard', pathMatch: 'full' },
+	{
 		path: 'login',
 		loadComponent: () => import('./components/auth/login/login.component').then((m) => m.LoginComponent),
 	},
@@ -318,7 +335,7 @@ export const routes: Routes = [
 				children: [
 					{
 						path: '',
-						redirectTo: 'events/search',
+						redirectTo: '/itms/dashboard',
 						pathMatch: 'full',
 					},
 					{

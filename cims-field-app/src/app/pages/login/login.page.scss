@@ -1,64 +1,415 @@
-.header-branding {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-left: 4px;
+:host {
+  display: block;
+  --login-page-bg: var(--ion-background-color, #f4f7fb);
+  --login-surface: var(--ion-card-background, #fff);
+  --login-input-bg: var(--ion-color-light-tint, #f8fafc);
+  --login-muted: var(--ion-color-medium-shade, #475569);
+  --login-foreground: var(--ion-text-color, #0f172a);
+  --login-line: var(--ion-color-step-150, #e2e8f0);
+  --login-focus-ring: rgba(var(--ion-color-primary-rgb, 15, 108, 143), .18);
+  --login-card-radius: 16px;
+  --login-card-shadow: 0 18px 48px rgba(15, 23, 42, .12);
+  --login-form-width: 440px;
 }
 
-.header-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
+.login-page {
+  background: var(--login-page-bg);
+}
+
+.login-page app-offline-banner {
+  position: relative;
+  z-index: 5;
 }
 
 .login-content {
-  --background: linear-gradient(180deg, #eef3fb 0%, #f7f9fc 100%);
+  --background: var(--login-page-bg);
+  --padding-bottom: 0;
+  --padding-start: 0;
+  --padding-end: 0;
 }
 
-.login-wrapper {
+.login-content::part(scroll) {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.login-layout {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100%;
+  min-height: 100dvh;
+  color: var(--login-foreground);
+}
+
+.brand-panel {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  min-height: clamp(230px, 34svh, 370px);
+  padding: max(22px, env(safe-area-inset-top)) 24px 48px;
+  overflow: hidden;
+  background: var(--ion-color-primary-shade, #0c5c7b);
+  color: #fff;
+}
+
+.hero-picture,
+.hero-picture img,
+.brand-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-picture {
+  z-index: -2;
+  display: block;
+  background: var(--ion-color-primary-shade, #0c5c7b);
+}
+
+.hero-picture img {
+  object-fit: cover;
+  object-position: center 44%;
+  animation: hero-ken-burns 24s ease-in-out infinite alternate;
+}
+
+.brand-overlay {
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(7, 27, 40, .26) 0%, rgba(7, 31, 45, .55) 47%, rgba(8, 50, 68, .96) 100%),
+    linear-gradient(90deg, rgba(8, 38, 55, .28), transparent 78%);
+}
+
+.brand-content {
+  position: relative;
+  width: min(100%, 560px);
+  margin: 0 auto;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .28);
+  animation: brand-enter 520ms cubic-bezier(.2, .75, .25, 1) both;
+}
+
+.brand-mark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 14px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .46);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, .16);
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, .08);
+  backdrop-filter: blur(8px);
+  color: #fff;
+
+  ion-icon { font-size: 25px; }
+}
+
+.brand-eyebrow,
+.form-eyebrow {
+  margin: 0 0 7px;
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .14em;
+}
+
+.brand-eyebrow { color: rgba(255, 255, 255, .82); }
+.brand-content h1 { margin: 0; color: #fff; font-size: clamp(1.7rem, 7vw, 2.25rem); font-weight: 760; letter-spacing: -.035em; line-height: 1.12; }
+.brand-tagline { margin: 8px 0 0; color: rgba(255, 255, 255, .96); font-size: .94rem; font-weight: 500; }
+
+.trust-note {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 100%;
-  padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+  gap: 7px;
+  margin-top: 17px;
+  color: rgba(255, 255, 255, .91);
+  font-size: .75rem;
+  font-weight: 550;
+
+  ion-icon { font-size: 17px; }
+}
+
+.ambient-shape {
+  position: absolute;
+  z-index: -1;
+  width: 180px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(42, 124, 149, .55);
+  filter: blur(36px);
+  opacity: .48;
+  pointer-events: none;
+  animation: ambient-float 12s ease-in-out infinite alternate;
+}
+
+.ambient-shape-one { top: 12%; right: -52px; }
+.ambient-shape-two { top: 42%; left: -106px; width: 210px; animation-delay: -5s; opacity: .32; }
+
+.login-side {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px max(20px, env(safe-area-inset-bottom));
+  background: var(--login-page-bg);
 }
 
 .login-card {
-  width: 100%;
-  max-width: 420px;
-  margin: auto;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  width: min(100%, var(--login-form-width));
+  margin: -30px auto 0;
+  overflow: visible;
+  border: 1px solid rgba(255, 255, 255, .78);
+  border-radius: var(--login-card-radius);
+  background: #fff;
+  background: color-mix(in srgb, var(--login-surface) 94%, transparent);
+  box-shadow: var(--login-card-shadow);
+  backdrop-filter: blur(14px);
+  animation: card-enter 520ms cubic-bezier(.2, .75, .25, 1) 70ms both;
 }
+
+.login-card ion-card-content {
+  padding: 24px 22px 19px;
+}
+
+.form-heading { margin: 0 0 21px; animation: field-enter 200ms ease 80ms both; }
+.form-eyebrow { margin-bottom: 5px; color: var(--ion-color-primary); }
+.form-heading h2 { margin: 0; color: var(--login-foreground); font-size: 1.55rem; font-weight: 740; letter-spacing: -.025em; }
+.form-heading > p:last-child { margin: 5px 0 0; color: var(--login-muted); font-size: .84rem; }
 
 .form-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-top: 8px;
+  display: grid;
+  gap: 15px;
 }
 
+.field-group { min-width: 0; }
+.field-group:nth-child(1) { animation: field-enter 200ms ease 140ms both; }
+.field-group:nth-child(2) { animation: field-enter 200ms ease 200ms both; }
+
 .form-field {
-  --border-radius: 10px;
+  --background: var(--login-input-bg);
+  --border-color: var(--login-line);
+  --border-radius: 12px;
+  --color: var(--ion-text-color, #0f172a);
+  --highlight-color-focused: var(--ion-color-primary);
+  --highlight-color-invalid: var(--ion-color-danger);
+  --label-color: var(--login-muted);
+  --label-color-focused: var(--ion-color-primary);
+  --padding-start: 12px;
+  --padding-end: 8px;
+  --min-height: 58px;
+  min-height: 58px;
+  border-radius: 12px;
+  transition: box-shadow 180ms ease, transform 180ms ease;
+
+  &:focus-within {
+    box-shadow: 0 0 0 4px var(--login-focus-ring);
+    transform: translateY(-1px);
+  }
+
+  ion-icon[slot='start'] {
+    margin-inline-end: 11px;
+    color: var(--ion-color-medium);
+    font-size: 19px;
+  }
+}
+
+.form-field[aria-invalid='true'] {
+  --border-color: var(--ion-color-danger);
 }
 
 .visibility-toggle {
-  margin: 0;
-  --padding-start: 4px;
-  --padding-end: 4px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0 2px 0 0;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--login-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible { outline: 2px solid var(--ion-color-primary); outline-offset: 1px; }
+  ion-icon { grid-area: 1 / 1; font-size: 19px; opacity: 0; transform: scale(.88); transition: opacity 140ms ease, transform 140ms ease; }
+  ion-icon.icon-active { opacity: 1; transform: scale(1); }
 }
 
-.error-message {
-  color: var(--ion-color-danger);
-  font-size: 0.9rem;
-  margin-top: -8px;
+.field-error,
+.caps-warning {
+  margin: 6px 4px 0;
+  font-size: .75rem;
+  line-height: 1.35;
 }
+
+.field-error { color: var(--ion-color-danger); }
+.caps-warning { color: var(--ion-color-warning); font-weight: 650; }
+
+.login-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font-size: .81rem;
+  line-height: 1.45;
+  animation: message-enter 360ms ease both, message-shake 260ms ease 360ms;
+
+  ion-icon { flex: 0 0 auto; margin-top: 1px; font-size: 18px; }
+}
+
+.error-message { border-color: rgba(var(--ion-color-danger-rgb, 191, 79, 79), .2); background: rgba(var(--ion-color-danger-rgb, 191, 79, 79), .08); color: var(--ion-color-danger); }
+.info-message { border-color: rgba(var(--ion-color-primary-rgb, 15, 108, 143), .22); background: rgba(var(--ion-color-primary-rgb, 15, 108, 143), .08); color: var(--ion-color-primary-shade); }
 
 .submit-btn {
-  margin-top: 8px;
-  --border-radius: 10px;
-  height: 48px;
-  font-weight: 600;
+  min-height: 52px;
+  margin: 3px 0 0;
+  --border-radius: 12px;
+  --box-shadow: 0 8px 18px rgba(var(--ion-color-primary-rgb, 15, 108, 143), .24);
+  font-size: .96rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  transition: transform 140ms ease, opacity 140ms ease;
+  animation: field-enter 200ms ease 260ms both;
+
+  &:active:not([disabled]) { transform: scale(.985); }
+  ion-spinner { width: 19px; height: 19px; }
+}
+
+.security-note {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  color: var(--login-muted);
+  font-size: .72rem;
+  animation: field-enter 200ms ease 320ms both;
+
+  ion-icon { color: var(--ion-color-primary); font-size: 15px; }
+}
+
+.login-footer {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  width: min(100%, var(--login-form-width));
+  padding: 15px 8px 0;
+  color: var(--login-muted);
+  font-size: .71rem;
+  line-height: 1.45;
+  text-align: center;
+  animation: field-enter 200ms ease 400ms both;
+}
+
+@keyframes brand-enter {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes field-enter {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hero-ken-burns {
+  from { transform: scale(1.015) translate3d(0, 0, 0); }
+  to { transform: scale(1.08) translate3d(-.5%, -.6%, 0); }
+}
+
+@keyframes ambient-float {
+  from { opacity: .25; transform: translate3d(0, 8px, 0) scale(.94); }
+  to { opacity: .52; transform: translate3d(0, -12px, 0) scale(1.06); }
+}
+
+@keyframes message-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes message-shake {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(-3px); }
+  70% { transform: translateX(3px); }
+}
+
+@media (min-width: 720px), (orientation: landscape) and (min-width: 600px) {
+  .login-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(380px, .92fr);
+    grid-template-rows: minmax(100dvh, 1fr);
+    overflow: auto;
+  }
+
+  .brand-panel {
+    position: sticky;
+    top: 0;
+    align-items: center;
+    min-height: 100dvh;
+    padding: max(42px, env(safe-area-inset-top)) clamp(28px, 5vw, 76px) max(42px, env(safe-area-inset-bottom));
+  }
+
+  .hero-picture img { object-position: 54% center; }
+  .brand-overlay { background: linear-gradient(90deg, rgba(7, 27, 40, .77), rgba(8, 50, 68, .56) 72%, rgba(8, 50, 68, .72)); }
+  .brand-content { width: min(100%, 520px); }
+  .brand-mark { width: 54px; height: 54px; margin-bottom: 22px; border-radius: 17px; }
+  .brand-mark ion-icon { font-size: 29px; }
+  .brand-tagline { max-width: 330px; font-size: 1rem; }
+  .trust-note { margin-top: 25px; }
+
+  .login-side {
+    justify-content: center;
+    padding: max(28px, env(safe-area-inset-top)) 28px max(20px, env(safe-area-inset-bottom));
+  }
+
+  .login-card { margin: 0 auto; }
+  .login-card ion-card-content { padding: clamp(28px, 4vw, 42px); }
+  .login-footer { padding-top: 19px; }
+}
+
+@media (max-width: 380px) and (orientation: portrait) {
+  .brand-panel { min-height: 220px; padding-inline: 20px; padding-bottom: 43px; }
+  .brand-mark { width: 40px; height: 40px; margin-bottom: 11px; border-radius: 13px; }
+  .brand-mark ion-icon { font-size: 22px; }
+  .trust-note { margin-top: 12px; font-size: .7rem; }
+  .login-side { padding-inline: 12px; }
+  .login-card { margin-top: -26px; }
+  .login-card ion-card-content { padding: 20px 17px 17px; }
+  .form-heading { margin-bottom: 16px; }
+  .form-stack { gap: 12px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --login-page-bg: #101923;
+    --login-surface: #182531;
+    --login-input-bg: #14212d;
+    --login-muted: #b7c5cf;
+    --login-foreground: #f3f7fa;
+    --login-line: #344756;
+    --login-focus-ring: rgba(var(--ion-color-primary-rgb, 15, 108, 143), .28);
+    --login-card-shadow: 0 18px 48px rgba(0, 0, 0, .34);
+  }
+
+  .login-card { border-color: rgba(255, 255, 255, .08); }
+  .form-field { --color: #f3f7fa; --label-color: #b7c5cf; }
+  .info-message { color: #8ed3e4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }

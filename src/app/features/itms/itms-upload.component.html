@@ -1,0 +1,115 @@
+<main class="itms-page">
+  <header class="page-header">
+    <div>
+      <div class="breadcrumb">Monitoring Tools / ITMS</div>
+      <h1>ITMS Upload</h1>
+    </div>
+  </header>
+
+  <div class="error-banner" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <mat-card class="upload-card">
+    <h2>Upload Excel workbook</h2>
+    <p class="hint">Choose or drop an .xlsx workbook to import static ITMS event data.</p>
+    <input #fileInput type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+           hidden (change)="onFileInput($event)">
+    <div class="drop-zone" [class.dragging]="isDragging"
+         (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+      <mat-icon>cloud_upload</mat-icon>
+      <strong>Drag and drop your Excel file here</strong>
+      <span>Only .xlsx files are accepted</span>
+      <button mat-stroked-button type="button" (click)="openFilePicker(fileInput)">Choose Excel</button>
+    </div>
+
+    <div class="selected-file" *ngIf="selectedFile">
+      <mat-icon>description</mat-icon>
+      <div><strong>{{ selectedFile.name }}</strong><span>{{ fileSize(selectedFile.size) }}</span></div>
+      <button mat-icon-button aria-label="Remove selected file" (click)="selectedFile = null" [disabled]="uploading">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="progress-section" *ngIf="uploading">
+      <mat-progress-bar mode="determinate" [value]="uploadProgress"></mat-progress-bar>
+      <span>{{ uploadProgress }}% uploaded</span>
+    </div>
+    <button mat-flat-button color="primary" class="upload-button" (click)="uploadFile()"
+            [disabled]="!selectedFile || uploading">
+      <mat-icon>upload</mat-icon>{{ uploading ? 'Uploading…' : 'Upload Excel' }}
+    </button>
+  </mat-card>
+
+  <mat-card class="result-card" *ngIf="result">
+    <h2>Upload result</h2>
+    <p class="batch-id">Batch ID: {{ result.batchId }} · {{ result.totalRows | number }} rows processed</p>
+    <div class="result-grid">
+      <div class="result-value inserted"><span>Inserted</span><strong>{{ result.inserted | number }}</strong></div>
+      <div class="result-value duplicates"><span>Duplicates</span><strong>{{ result.duplicateRows | number }}</strong></div>
+      <div class="result-value errors"><span>Failed</span><strong>{{ result.failedRows | number }}</strong></div>
+    </div>
+    <details class="error-list" *ngIf="result.errors.length">
+      <summary>Show upload errors ({{ result.errors.length }})</summary>
+      <ul><li *ngFor="let error of result.errors">{{ error }}</li></ul>
+    </details>
+  </mat-card>
+
+  <mat-card class="history-card">
+    <div class="history-heading">
+      <div><h2>Upload history</h2><p>Previously imported Excel files</p></div>
+      <span *ngIf="historyLoading">Loading…</span>
+    </div>
+    <div class="table-scroll">
+      <table mat-table [dataSource]="batches">
+        <ng-container matColumnDef="fileName">
+          <th mat-header-cell *matHeaderCellDef>File name</th>
+          <td mat-cell *matCellDef="let row">{{ row.fileName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="period">
+          <th mat-header-cell *matHeaderCellDef>Period</th>
+          <td mat-cell *matCellDef="let row">{{ batchPeriod(row) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="rows">
+          <th mat-header-cell *matHeaderCellDef>Rows</th>
+          <td mat-cell *matCellDef="let row">{{ row.totalRows | number }}</td>
+        </ng-container>
+        <ng-container matColumnDef="duplicates">
+          <th mat-header-cell *matHeaderCellDef>Duplicates</th>
+          <td mat-cell *matCellDef="let row">{{ row.duplicateRows | number }}</td>
+        </ng-container>
+        <ng-container matColumnDef="failed">
+          <th mat-header-cell *matHeaderCellDef>Failed</th>
+          <td mat-cell *matCellDef="let row">{{ row.failedRows | number }}</td>
+        </ng-container>
+        <ng-container matColumnDef="snapStatus">
+          <th mat-header-cell *matHeaderCellDef>Snapshots</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="snapshot-chip" [ngClass]="snapshotStatusClass(row.snapStatus)">
+              {{ row.snapStatus || 'Unknown' }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="uploadedBy">
+          <th mat-header-cell *matHeaderCellDef>Uploaded by</th>
+          <td mat-cell *matCellDef="let row">{{ row.uploadedBy || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="uploadedAt">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let row">{{ row.uploadedAt | date:'medium' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let row">
+            <button mat-icon-button color="warn" aria-label="Delete upload"
+                    (click)="deleteBatch(row); $event.stopPropagation()"
+                    [disabled]="deletingId === row.id">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </div>
+    <div class="empty-history" *ngIf="!historyLoading && batches.length === 0">No Excel uploads yet.</div>
+  </mat-card>
+</main>

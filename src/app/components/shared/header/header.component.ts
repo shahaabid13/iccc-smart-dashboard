@@ -229,13 +229,17 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
               </div>
 
               <div class="dropdown-content" *ngIf="monitoringItmsOpen && !sidebarContentCollapsed">
-                <a routerLink="/traffic-dashboard/dashboard/events/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                <a routerLink="/itms/dashboard" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
                   <span class="material-symbols-outlined item-icon">bar_chart</span>
                   <span>Dashboard</span>
                 </a>
-                <a routerLink="/traffic-dashboard/dashboard/events/search" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                <a routerLink="/itms/events" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
                   <span class="material-symbols-outlined item-icon">event</span>
                   <span>Events</span>
+                </a>
+                <a *ngIf="isAdmin" routerLink="/itms/upload" routerLinkActive="active" class="dropdown-item" (click)="closeSidebarIfMobile()">
+                  <span class="material-symbols-outlined item-icon">upload_file</span>
+                  <span>ITMS Upload</span>
                 </a>
               </div>
             </div>

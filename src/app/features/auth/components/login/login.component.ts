@@ -57,7 +57,7 @@ export class LoginComponent {
       next: (response: any) => {
         this.loading.set(false);
         this.snackBar.open('Login successful!', 'Close', { duration: 2000 });
-        this.router.navigate(['/traffic-dashboard/dashboard/events/search']);
+        this.router.navigate(['/itms/events']);
       },
       error: (error: any) => {
         this.loading.set(false);
