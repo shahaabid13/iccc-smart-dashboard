@@ -3,6 +3,20 @@
   <app-header></app-header>
 
   <ion-content class="ion-padding detail-page-content" [fullscreen]="true">
+    <ion-segment [(ngModel)]="selectedSegment" aria-label="Task detail sections">
+      <ion-segment-button value="details"><ion-label>Details</ion-label></ion-segment-button>
+      <ion-segment-button value="conversation"><ion-label>Conversation</ion-label></ion-segment-button>
+    </ion-segment>
+    <ion-refresher *ngIf="selectedSegment === 'conversation' && task" slot="fixed" (ionRefresh)="conversationPanel?.refresh($event)">
+      <ion-refresher-content pullingText="Pull to refresh" refreshingSpinner="crescent"></ion-refresher-content>
+    </ion-refresher>
+    <ng-container [ngSwitch]="selectedSegment">
+      <ng-container *ngSwitchCase="'conversation'">
+        <app-conversation-panel #conversationPanel *ngIf="task" [entityType]="'TASK'" [entityId]="task.id" [highlightLatest]="highlightLatest"></app-conversation-panel>
+        <ion-card *ngIf="!task && loading"><ion-card-content><ion-skeleton-text animated style="width: 80%"></ion-skeleton-text></ion-card-content></ion-card>
+        <ion-card *ngIf="!task && loadingError"><ion-card-content>{{ loadingError }}</ion-card-content></ion-card>
+      </ng-container>
+      <ng-container *ngSwitchDefault>
     <div class="page-shell">
       <ng-container *ngIf="loading">
         <ion-card>
@@ -115,5 +129,7 @@
         </ion-card>
       </ng-container>
     </div>
+      </ng-container>
+    </ng-container>
   </ion-content>
 </ion-page>

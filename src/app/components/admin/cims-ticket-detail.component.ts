@@ -21,6 +21,8 @@ import { AuthService } from '../../services/auth.service';
 import { FieldPerson, Ticket } from '../../models/cims.models';
 import { AttachmentResponse, AttachmentService } from '../../services/attachment.service';
 import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
+import { ConversationThreadComponent } from '../shared/conversation-thread.component';
+import { ConversationService } from '../../services/conversation.service';
 
 @Component({
   selector: 'app-cims-ticket-detail',
@@ -41,7 +43,8 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
     MatDatepickerModule,
     MatNativeDateModule,
     FormsModule,
-    ImageAttachmentPickerComponent
+    ImageAttachmentPickerComponent,
+    ConversationThreadComponent
   ],
   template: `
     <div class="cims-container">
@@ -53,6 +56,9 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
 
       <!-- Ticket Details -->
       <div *ngIf="!isLoading && ticket" class="ticket-detail">
+        <mat-tab-group class="detail-tabs" [selectedIndex]="activeDetailTab">
+          <mat-tab label="Details">
+            <ng-template matTabContent>
         <mat-card class="detail-card">
           <mat-card-header>
             <div class="header-row">
@@ -232,6 +238,23 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
             </mat-tab-group>
           </mat-card-content>
         </mat-card>
+            </ng-template>
+          </mat-tab>
+          <mat-tab>
+            <ng-template mat-tab-label>
+              Conversation
+              <span class="conversation-unread" *ngIf="conversationUnread > 0">{{ conversationUnread }}</span>
+            </ng-template>
+            <ng-template matTabContent>
+              <app-conversation-thread entityType="TICKET" [entityId]="ticket.id"
+                [title]="'Ticket #' + ticket.id"
+                [creatorName]="ticket.raisedByUsername || ''"
+                [assigneeName]="ticket.fieldPersonName || ticket.assignedToReviewerName || ''"
+                (unreadCountChange)="conversationUnread = $event">
+              </app-conversation-thread>
+            </ng-template>
+          </mat-tab>
+        </mat-tab-group>
       </div>
 
       <!-- Error State -->
@@ -253,6 +276,19 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
       padding: 24px;
       max-width: 1000px;
       margin: 0 auto;
+    }
+    .conversation-unread {
+      display:inline-grid;
+      place-items:center;
+      min-width:20px;
+      height:20px;
+      margin-left:6px;
+      padding:0 5px;
+      border-radius:11px;
+      background:#dc2626;
+      color:#fff;
+      font-size:11px;
+      font-weight:700;
     }
 
     .loading-container {
@@ -654,6 +690,8 @@ export class CimsTicketDetailComponent implements OnInit {
   ticketActionNotes = '';
   assignmentRemarks = '';
   minFutureAssignmentDate = new Date();
+  conversationUnread = 0;
+  activeDetailTab = 0;
 
   constructor(
     private route: ActivatedRoute,
@@ -662,7 +700,8 @@ export class CimsTicketDetailComponent implements OnInit {
     private router: Router,
     private snackBar: MatSnackBar,
     private location: Location,
-    private attachmentService: AttachmentService
+    private attachmentService: AttachmentService,
+    private conversationService: ConversationService
   ) {
     this.minFutureAssignmentDate.setHours(0, 0, 0, 0);
     this.minFutureAssignmentDate.setDate(this.minFutureAssignmentDate.getDate() + 1);
@@ -673,8 +712,17 @@ export class CimsTicketDetailComponent implements OnInit {
     this.route.params.subscribe((params: any) => {
       this.ticketId = Number(params['id']);
       if (!isNaN(this.ticketId)) {
+        if (this.route.snapshot.queryParamMap.get('tab') === 'conversation') {
+          this.activeDetailTab = 1;
+        }
         this.loadTicket();
         this.loadAssignableFieldPersons();
+        this.conversationService.getUnreadSummary().subscribe({
+          next: items => this.conversationUnread = items.find(item =>
+            item.entityType === 'TICKET' && item.entityId === this.ticketId
+          )?.unreadCount || 0,
+          error: () => this.conversationUnread = 0
+        });
       }
     });
   }

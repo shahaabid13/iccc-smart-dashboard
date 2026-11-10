@@ -42,6 +42,7 @@
                 <p class="ion-text-wrap ion-text-muted">{{ task.status }} • {{ task.dueDate || 'No due date' }}</p>
               </ion-label>
               <ion-badge [color]="colorForStatus(task.status)" slot="end">{{ task.status }}</ion-badge>
+              <ion-badge *ngIf="unreadCount(task) > 0" color="primary" slot="end" [attr.aria-label]="unreadCount(task) + ' unread messages'">{{ unreadCount(task) > 99 ? '99+' : unreadCount(task) }}</ion-badge>
               <ion-button slot="end" fill="clear" color="primary" (click)="$event.stopPropagation(); openTask(task)">Action</ion-button>
             </ion-item>
           </ion-list>
@@ -64,6 +65,7 @@
                 <p>{{ task.status }} • {{ task.updatedAt || task.createdAt || 'No date' }}</p>
               </ion-label>
               <ion-badge [color]="colorForStatus(task.status)" slot="end">{{ task.status }}</ion-badge>
+              <ion-badge *ngIf="unreadCount(task) > 0" color="primary" slot="end" [attr.aria-label]="unreadCount(task) + ' unread messages'">{{ unreadCount(task) > 99 ? '99+' : unreadCount(task) }}</ion-badge>
             </ion-item>
           </ion-list>
 

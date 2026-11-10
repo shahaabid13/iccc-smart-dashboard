@@ -429,6 +429,8 @@ export interface CimsNotification {
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
   status?: Ticket['status'];
   channels: NotificationChannel[];
+  conversationEntityType?: 'TASK' | 'TICKET';
+  conversationEntityId?: number;
 }
 
 export interface ServerNotification {

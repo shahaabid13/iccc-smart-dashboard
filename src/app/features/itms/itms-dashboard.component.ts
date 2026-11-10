@@ -25,6 +25,11 @@ import {
   ItmsStatusCount
 } from './itms.service';
 
+interface AvailableYearPeriod {
+  year: number;
+  months: number[];
+}
+
 @Component({
   selector: 'app-itms-dashboard',
   standalone: true,
@@ -46,6 +51,12 @@ export class ItmsDashboardComponent implements OnInit {
 
   fromDate = '';
   toDate = '';
+  periodFilterLabel = 'Date range';
+  periodMenuOpen = false;
+  openYear: number | null = null;
+  availablePeriods: AvailableYearPeriod[] = [];
+  private allEventsFrom = '';
+  private allEventsTo = '';
   loading = false;
   initializing = true;
   hasBatch = false;
@@ -114,7 +125,65 @@ export class ItmsDashboardComponent implements OnInit {
     const value = (event.target as HTMLInputElement).value;
     if (which === 'from') this.fromDate = value;
     else this.toDate = value;
+    this.periodFilterLabel = 'Date range';
     if (this.fromDate && this.toDate) this.loadDashboard();
+  }
+
+  togglePeriodMenu(): void {
+    this.periodMenuOpen = !this.periodMenuOpen;
+    if (!this.periodMenuOpen) this.openYear = null;
+  }
+
+  openYearMenu(year: number): void {
+    this.openYear = year;
+  }
+
+  closeYearMenu(year: number): void {
+    if (this.openYear === year) this.openYear = null;
+  }
+
+  toggleYearMenu(year: number): void {
+    this.openYear = this.openYear === year ? null : year;
+  }
+
+  selectAllEvents(): void {
+    if (!this.allEventsFrom || !this.allEventsTo) return;
+    this.fromDate = this.allEventsFrom;
+    this.toDate = this.allEventsTo;
+    this.periodFilterLabel = 'All events';
+    this.closePeriodMenu();
+    this.loadDashboard();
+  }
+
+  selectYear(year: number): void {
+    const period = this.availablePeriods.find(item => item.year === year);
+    if (!period?.months.length) return;
+    const firstMonth = Math.min(...period.months);
+    const lastMonth = Math.max(...period.months);
+    this.fromDate = `${year}-${String(firstMonth).padStart(2, '0')}-01`;
+    this.toDate = this.lastDayOfMonth(year, lastMonth);
+    this.periodFilterLabel = String(year);
+    this.closePeriodMenu();
+    this.loadDashboard();
+  }
+
+  selectMonth(year: number, month: number): void {
+    const value = `${year}-${String(month).padStart(2, '0')}`;
+    this.fromDate = `${value}-01`;
+    this.toDate = this.lastDayOfMonth(year, month);
+    this.periodFilterLabel = `${this.monthName(month)} ${year}`;
+    this.closePeriodMenu();
+    this.loadDashboard();
+  }
+
+  monthName(month: number): string {
+    return new Intl.DateTimeFormat('en', { month: 'long', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(2020, month - 1, 1)));
+  }
+
+  isMonthSelected(year: number, month: number): boolean {
+    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+    return this.fromDate === monthStart && this.toDate === this.lastDayOfMonth(year, month);
   }
 
   openVehicleEvents(vehicleNumber: string): void {
@@ -153,6 +222,13 @@ export class ItmsDashboardComponent implements OnInit {
       return;
     }
     this.hasBatch = true;
+    this.availablePeriods = this.getAvailablePeriods(batches);
+    const batchRanges = batches.map(batch => ({
+      from: this.toInputDate(batch.periodFrom ?? batch.periodStart ?? batch.startDate ?? batch.from),
+      to: this.toInputDate(batch.periodTo ?? batch.periodEnd ?? batch.endDate ?? batch.to)
+    })).filter(range => range.from && range.to && range.from <= range.to);
+    this.allEventsFrom = batchRanges.map(range => range.from).sort()[0] ?? '';
+    this.allEventsTo = batchRanges.map(range => range.to).sort().at(-1) ?? '';
     const latest = [...batches].sort(
       (a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt)
     )[0];
@@ -163,6 +239,39 @@ export class ItmsDashboardComponent implements OnInit {
       return;
     }
     this.loadDashboard();
+  }
+
+  private getAvailablePeriods(batches: ItmsBatch[]): AvailableYearPeriod[] {
+    const monthsByYear = new Map<number, Set<number>>();
+    for (const batch of batches) {
+      const start = this.toInputDate(batch.periodFrom ?? batch.periodStart ?? batch.startDate ?? batch.from);
+      const end = this.toInputDate(batch.periodTo ?? batch.periodEnd ?? batch.endDate ?? batch.to);
+      if (!start || !end || start > end) continue;
+
+      const [startYear, startMonth] = start.split('-').map(Number);
+      const [endYear, endMonth] = end.split('-').map(Number);
+      for (let year = startYear; year <= endYear; year++) {
+        const firstMonth = year === startYear ? startMonth : 1;
+        const lastMonth = year === endYear ? endMonth : 12;
+        const months = monthsByYear.get(year) ?? new Set<number>();
+        for (let month = firstMonth; month <= lastMonth; month++) months.add(month);
+        monthsByYear.set(year, months);
+      }
+    }
+
+    return [...monthsByYear.entries()]
+      .sort(([yearA], [yearB]) => yearB - yearA)
+      .map(([year, months]) => ({ year, months: [...months].sort((a, b) => a - b) }));
+  }
+
+  private lastDayOfMonth(year: number, month: number): string {
+    const day = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  private closePeriodMenu(): void {
+    this.periodMenuOpen = false;
+    this.openYear = null;
   }
 
   private loadDashboard(): void {

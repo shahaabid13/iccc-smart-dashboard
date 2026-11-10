@@ -115,6 +115,9 @@ import { Subscription } from 'rxjs';
               <!-- Tags / Meta -->
               <div class="item-meta-tags">
                 <span class="tag tag-id" *ngIf="item.ticketId">#{{ item.ticketId }}</span>
+                <span class="tag tag-status" *ngIf="item.conversationEntityType">
+                  {{ item.conversationEntityType === 'TASK' ? 'Task conversation' : 'Ticket conversation' }}
+                </span>
                 <span class="tag tag-status" *ngIf="item.status">{{ formatStatus(item.status) }}</span>
                 <span
                   class="tag tag-priority"
@@ -857,6 +860,16 @@ export class CimsNotificationBellComponent implements OnInit, OnDestroy {
 
   openNotification(notification: CimsNotification): void {
     this.notificationService.markRead(notification.id);
+    if (notification.conversationEntityType && notification.conversationEntityId) {
+      const url = notification.conversationEntityType === 'TASK'
+        ? `/tasks/${notification.conversationEntityId}`
+        : this.notificationService.getTicketUrl(notification.conversationEntityId);
+      if (url) {
+        this.isOpen = false;
+        void this.router.navigateByUrl(`${url}?tab=conversation`);
+      }
+      return;
+    }
     const url = this.notificationService.getTicketUrl(notification.ticketId);
     if (url) {
       this.isOpen = false;

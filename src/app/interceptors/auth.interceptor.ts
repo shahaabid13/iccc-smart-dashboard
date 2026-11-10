@@ -31,6 +31,7 @@ const PROTECTED_ROUTES = [
   '/api/incidents', // include incidents under protected list
   '/api/cims',
   '/api/notifications',
+  '/api/conversations',
   '/api/attachments',
   '/api/tasks',
   '/api/locations',

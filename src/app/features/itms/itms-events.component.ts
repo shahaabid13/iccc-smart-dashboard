@@ -12,12 +12,14 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { FormsModule } from '@angular/forms';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { EMPTY, expand, reduce } from 'rxjs';
+import * as XLSX from 'xlsx';
+import { EMPTY, expand, forkJoin, map, Observable, reduce } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import {
   ItmsEvent,
@@ -40,6 +42,7 @@ import { ItmsEventDetailsDialogComponent } from './itms-event-details-dialog.com
     MatInputModule,
     MatMenuModule,
     MatPaginatorModule,
+    MatProgressSpinnerModule,
     MatSelectModule,
     MatSnackBarModule,
     MatSortModule,
@@ -50,6 +53,7 @@ import { ItmsEventDetailsDialogComponent } from './itms-event-details-dialog.com
 })
 export class ItmsEventsComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
+  readonly allEventTypesOption = '__all_event_types__';
 
   readonly displayedColumns = [
     'eventTime',
@@ -68,7 +72,7 @@ export class ItmsEventsComponent implements OnInit {
   filters: ItmsFilterOptions = { eventTypes: [], junctions: [], priorities: [] };
   fromDate = '';
   toDate = '';
-  eventType = '';
+  eventTypes: string[] = [];
   junction = '';
   priority = '';
   vehicleNumber = '';
@@ -125,10 +129,17 @@ export class ItmsEventsComponent implements OnInit {
   clearFilters(): void {
     this.fromDate = '';
     this.toDate = '';
-    this.eventType = '';
+    this.eventTypes = [];
     this.junction = '';
     this.priority = '';
     this.vehicleNumber = '';
+    this.applyFilters();
+  }
+
+  onEventTypeSelectionChange(): void {
+    if (this.eventTypes.includes(this.allEventTypesOption)) {
+      this.eventTypes = [];
+    }
     this.applyFilters();
   }
 
@@ -160,6 +171,35 @@ export class ItmsEventsComponent implements OnInit {
 
   exportExcel(): void {
     this.exporting = true;
+    if (this.eventTypes.length > 1) {
+      this.fetchAllMatchingEvents().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: events => {
+          const rows = events.map(event => ({
+            Time: this.formatEventTime(event.eventTime),
+            Alert: event.eventType || '—',
+            Channel: event.cameraName || '—',
+            Location: event.junction || '—',
+            Message: event.message || '—',
+            'Vehicle Number': event.vehicleNumber || '—',
+            Priority: event.priority || '—',
+            Status: event.status || '—',
+            Speed: event.speedKmph == null ? '—' : `${event.speedKmph} km/h`,
+            Color: event.vehicleColor || '—'
+          }));
+          const worksheet = XLSX.utils.json_to_sheet(rows);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, 'ITMS Events');
+          XLSX.writeFile(workbook, `ITMS-events-${new Date().toISOString().slice(0, 10)}.xlsx`);
+          this.exporting = false;
+        },
+        error: error => {
+          this.exporting = false;
+          this.snackBar.open(this.getErrorMessage(error, 'Could not export events.'), 'Close', { duration: 5000 });
+        }
+      });
+      return;
+    }
+
     this.itms.exportEvents(this.queryFilters())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -181,14 +221,7 @@ export class ItmsEventsComponent implements OnInit {
 
   exportPdf(): void {
     this.exporting = true;
-    const query = { ...this.queryFilters(), page: 0, size: 100, sort: `${this.sortBy},${this.sortDirection || 'desc'}` };
-    this.itms.getEvents(query).pipe(
-      expand(response => response.number + 1 < response.totalPages
-        ? this.itms.getEvents({ ...query, page: response.number + 1 })
-        : EMPTY),
-      reduce((allEvents, response) => allEvents.concat(response.content), [] as ItmsEvent[]),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe({
+    this.fetchAllMatchingEvents().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: events => {
         this.loadPdfLogo()
           .catch(error => {
@@ -241,7 +274,7 @@ export class ItmsEventsComponent implements OnInit {
       : 'All dates';
     const activeFilters = [
       `Period: ${dateRange}`,
-      this.eventType ? `Event type: ${this.eventType}` : '',
+      this.eventTypes.length ? `Event types: ${this.eventTypes.join(', ')}` : '',
       this.junction ? `Junction: ${this.junction}` : '',
       this.priority ? `Priority: ${this.priority}` : '',
       this.vehicleNumber.trim() ? `Vehicle: ${this.vehicleNumber.trim()}` : ''
@@ -314,9 +347,9 @@ export class ItmsEventsComponent implements OnInit {
       columnStyles: {
         0: { cellWidth: 34 },
         1: { cellWidth: 28 },
-        2: { cellWidth: 48 },
+        2: { cellWidth: 78 },
         3: { cellWidth: 35 },
-        4: { cellWidth: 127 },
+        4: { cellWidth: 97 },
         5: { cellWidth: 30 },
         6: { cellWidth: 22 },
         7: { cellWidth: 24 },
@@ -357,6 +390,24 @@ export class ItmsEventsComponent implements OnInit {
   private loadEvents(): void {
     this.loading = true;
     this.errorMessage = '';
+    if (this.eventTypes.length > 1) {
+      this.fetchMatchingEventsPage().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: result => {
+          this.totalElements = result.totalElements;
+          const start = this.pageIndex * this.pageSize;
+          this.events = result.events.slice(start, start + this.pageSize);
+          this.loading = false;
+        },
+        error: error => {
+          this.events = [];
+          this.totalElements = 0;
+          this.loading = false;
+          this.errorMessage = this.getErrorMessage(error, 'Could not load ITMS events.');
+        }
+      });
+      return;
+    }
+
     const query: ItmsEventQuery = {
       ...this.queryFilters(),
       page: this.pageIndex,
@@ -384,11 +435,78 @@ export class ItmsEventsComponent implements OnInit {
     return {
       from: this.fromDate || undefined,
       to: this.toDate || undefined,
-      eventType: this.eventType || undefined,
+      eventType: this.eventTypes.length === 1 ? this.eventTypes[0] : undefined,
       junction: this.junction || undefined,
       priority: this.priority || undefined,
       vehicleNumber: this.vehicleNumber.trim() || undefined
     };
+  }
+
+  private fetchAllMatchingEvents(): Observable<ItmsEvent[]> {
+    const filters = this.queryFilters();
+    const sort = `${this.sortBy},${this.sortDirection || 'desc'}`;
+    if (this.eventTypes.length > 1) {
+      return forkJoin(this.eventTypes.map(eventType =>
+        this.fetchAllEvents({ ...filters, eventType, page: 0, size: 100, sort })
+      )).pipe(
+        map(groups => {
+          const uniqueEvents = new Map<string, ItmsEvent>();
+          for (const event of groups.flat()) uniqueEvents.set(String(event.id), event);
+          return [...uniqueEvents.values()].sort((left, right) => this.compareEvents(left, right));
+        })
+      );
+    }
+    return this.fetchAllEvents({ ...filters, page: 0, size: 100, sort });
+  }
+
+  private fetchMatchingEventsPage(): Observable<{ events: ItmsEvent[]; totalElements: number }> {
+    const filters = this.queryFilters();
+    const sort = `${this.sortBy},${this.sortDirection || 'desc'}`;
+    const requiredRecords = (this.pageIndex + 1) * this.pageSize;
+    return forkJoin(this.eventTypes.map(eventType =>
+      this.itms.getEvents({
+        ...filters,
+        eventType,
+        page: 0,
+        size: requiredRecords,
+        sort
+      })
+    )).pipe(
+      map(responses => ({
+        events: responses.flatMap(response => response.content)
+          .sort((left, right) => this.compareEvents(left, right)),
+        totalElements: responses.reduce((total, response) => total + response.totalElements, 0)
+      }))
+    );
+  }
+
+  private fetchAllEvents(query: ItmsEventQuery): Observable<ItmsEvent[]> {
+    return this.itms.getEvents(query).pipe(
+      expand(response => response.number + 1 < response.totalPages
+        ? this.itms.getEvents({ ...query, page: response.number + 1 })
+        : EMPTY),
+      reduce((allEvents, response) => allEvents.concat(response.content), [] as ItmsEvent[])
+    );
+  }
+
+  private compareEvents(left: ItmsEvent, right: ItmsEvent): number {
+    const key = this.sortBy as keyof ItmsEvent;
+    const leftValue = left[key];
+    const rightValue = right[key];
+    let comparison = 0;
+    if (leftValue == null || rightValue == null) {
+      comparison = leftValue == null ? (rightValue == null ? 0 : -1) : 1;
+    } else if (key === 'eventTime') {
+      comparison = new Date(String(leftValue)).getTime() - new Date(String(rightValue)).getTime();
+    } else if (typeof leftValue === 'number' && typeof rightValue === 'number') {
+      comparison = leftValue - rightValue;
+    } else {
+      comparison = String(leftValue).localeCompare(String(rightValue), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      });
+    }
+    return this.sortDirection === 'asc' ? comparison : -comparison;
   }
 
   private getErrorMessage(error: HttpErrorResponse, fallback: string): string {

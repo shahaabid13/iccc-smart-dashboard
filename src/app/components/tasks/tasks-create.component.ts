@@ -6,10 +6,12 @@ import { TaskService } from '../../services/task.service';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AttachmentService } from '../../services/attachment.service';
 import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
+import { ConversationService } from '../../services/conversation.service';
+import { ConversationUserPickerComponent } from '../shared/conversation-user-picker.component';
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatSnackBarModule, ImageAttachmentPickerComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatSnackBarModule, ImageAttachmentPickerComponent, ConversationUserPickerComponent],
   selector: 'app-tasks-create',
   template: `
     <div class="container">
@@ -33,6 +35,17 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
           <textarea class="form-control" rows="6" formControlName="description"></textarea>
         </div>
 
+        <div class="mb-3">
+          <app-conversation-user-picker label="Tag people (optional)" (selectedIdsChange)="tagUserIds = $event"></app-conversation-user-picker>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="task-first-message">Start the conversation (optional)</label>
+          <textarea id="task-first-message" class="form-control" rows="3" maxlength="2000"
+            [(ngModel)]="initialComment" [ngModelOptions]="{standalone:true}"
+            placeholder="Write the first conversation message"></textarea>
+          <div class="form-text">{{ initialComment.length }}/2000</div>
+        </div>
+
         <app-image-attachment-picker #imagePicker></app-image-attachment-picker>
 
         <button class="btn btn-primary" [disabled]="form.invalid || submitting">{{ submitting ? 'Submitting...' : 'Submit' }}</button>
@@ -45,13 +58,16 @@ export class TasksCreateComponent implements OnInit {
   form!: FormGroup;
   users: any[] = [];
   submitting = false;
+  tagUserIds: number[] = [];
+  initialComment = '';
 
   constructor(
     private fb: FormBuilder,
     private taskService: TaskService,
     private router: Router,
     private attachmentService: AttachmentService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private conversationService: ConversationService
   ) {
     this.form = this.fb.group({
       assignedToId: [null],
@@ -76,18 +92,60 @@ export class TasksCreateComponent implements OnInit {
     const files = this.imagePicker?.getPendingFiles() ?? [];
     this.taskService.createTask(payload).subscribe({
       next: (task) => {
-      if (!files.length) {
-        this.submitting = false;
-        this.router.navigate(['/tasks/all']);
-        return;
-      }
-      this.attachmentService.uploadAttachments(files, 'TASK', task.id).subscribe((result) => {
-        if (result.failed) {
-          this.snackBar.open(`Task created, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
+        const finishCreation = () => {
+          if (!files.length) {
+            this.submitting = false;
+            this.router.navigate(['/tasks/all']);
+            return;
+          }
+          this.attachmentService.uploadAttachments(files, 'TASK', task.id).subscribe({
+            next: result => {
+              if (result.failed) {
+                this.snackBar.open(`Task created, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
+              }
+              this.submitting = false;
+              this.router.navigate(['/tasks/all']);
+            },
+            error: () => {
+              this.submitting = false;
+              this.snackBar.open('Task created, but screenshots could not be uploaded.', 'Close', { duration: 7000 });
+            }
+          });
+        };
+        const postStarterMessage = () => {
+          const starter = this.initialComment.trim();
+          if (!starter) {
+            finishCreation();
+            return;
+          }
+          this.conversationService.postComment('TASK', task.id, starter).subscribe({
+            next: response => {
+              if (response.ignoredMentions?.length) {
+                this.snackBar.open(`Task created, but these mentions were not resolved: ${response.ignoredMentions.join(', ')}`, 'Close', { duration: 7000 });
+              }
+              finishCreation();
+            },
+            error: error => {
+              this.snackBar.open(
+                error?.error?.message || 'Task created, but the first conversation message could not be sent.',
+                'Close',
+                { duration: 7000 }
+              );
+              finishCreation();
+            }
+          });
+        };
+        if (this.tagUserIds.length) {
+          this.conversationService.addParticipants('TASK', task.id, this.tagUserIds).subscribe({
+            next: postStarterMessage,
+            error: error => {
+              this.snackBar.open(error?.error?.message || 'Task created, but the selected people could not be tagged.', 'Close', { duration: 7000 });
+              postStarterMessage();
+            }
+          });
+          return;
         }
-        this.submitting = false;
-        this.router.navigate(['/tasks/all']);
-      });
+        postStarterMessage();
       },
       error: (error) => {
         this.submitting = false;

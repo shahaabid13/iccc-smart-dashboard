@@ -2,7 +2,7 @@ import { Component, OnInit, ViewChild } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -20,6 +20,8 @@ import { DevicesService } from '../../services/devices.service';
 import { IncidentType, FieldPerson, Ticket, Location, ApproachRoad, DeviceType } from '../../models/cims.models';
 import { AttachmentService } from '../../services/attachment.service';
 import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
+import { ConversationService } from '../../services/conversation.service';
+import { ConversationUserPickerComponent } from '../shared/conversation-user-picker.component';
 
 interface PriorityOption {
   value: string;
@@ -31,6 +33,7 @@ interface PriorityOption {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -42,7 +45,8 @@ interface PriorityOption {
     MatProgressSpinnerModule,
     MatIconModule,
     MatDividerModule,
-    ImageAttachmentPickerComponent
+    ImageAttachmentPickerComponent,
+    ConversationUserPickerComponent
   ],
   template: `
     <div class="cims-container">
@@ -207,6 +211,18 @@ interface PriorityOption {
                 <mat-error *ngIf="getControl('description')?.hasError('minlength')">
                   Description must be at least 10 characters if provided
                 </mat-error>
+              </mat-form-field>
+              <app-conversation-user-picker #conversationUserPicker class="form-field full-width"
+                [loadDirectory]="false"
+                unavailableMessage="After creating the ticket, open its Conversation tab to tag eligible people."
+                (selectedIdsChange)="conversationUserIds = $event">
+              </app-conversation-user-picker>
+              <mat-form-field appearance="outline" class="form-field full-width">
+                <mat-label>Start the conversation (optional)</mat-label>
+                <textarea matInput [(ngModel)]="initialConversationMessage"
+                  [ngModelOptions]="{standalone:true}" maxlength="2000" rows="3"
+                  placeholder="Write the first conversation message"></textarea>
+                <mat-hint align="end">{{ initialConversationMessage.length }}/2000</mat-hint>
               </mat-form-field>
               <app-image-attachment-picker #imagePicker class="form-field full-width"></app-image-attachment-picker>
             </div>
@@ -432,8 +448,11 @@ interface PriorityOption {
 })
 export class CimsCreateTicketComponent implements OnInit {
   @ViewChild('imagePicker') imagePicker?: ImageAttachmentPickerComponent;
+  @ViewChild('conversationUserPicker') conversationUserPicker?: ConversationUserPickerComponent;
   ticketForm!: FormGroup;
   isLoading = false;
+  conversationUserIds: number[] = [];
+  initialConversationMessage = '';
 
   incidentTypes: IncidentType[] = [];
   fieldPersons: FieldPerson[] = [];
@@ -468,7 +487,8 @@ export class CimsCreateTicketComponent implements OnInit {
     private devicesService: DevicesService,
     private router: Router,
     private snackBar: MatSnackBar,
-    private attachmentService: AttachmentService
+    private attachmentService: AttachmentService,
+    private conversationService: ConversationService
   ) {
     this.initializeForm();
   }
@@ -787,18 +807,60 @@ export class CimsCreateTicketComponent implements OnInit {
         console.error('[CIMS Form] notifyTicketUpdate failed (non-blocking):', notifyErr);
       }
 
-      if (!files.length) {
-        this.isLoading = false;
-        this.redirectToMyTickets();
+      const uploadAndRedirect = () => {
+        if (!files.length) {
+          this.isLoading = false;
+          this.redirectToMyTickets();
+          return;
+        }
+        this.attachmentService.uploadAttachments(files, 'TICKET', response.id).subscribe({
+          next: result => {
+            if (result.failed) {
+              this.snackBar.open(`Ticket created, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
+            }
+            this.isLoading = false;
+            this.redirectToMyTickets();
+          },
+          error: error => {
+            console.error('[CIMS Form] Ticket created but screenshot upload failed:', error);
+            this.snackBar.open('Ticket created, but screenshots could not be uploaded.', 'Close', { duration: 7000 });
+            this.isLoading = false;
+            this.redirectToMyTickets();
+          }
+        });
+      };
+      const postFirstMessage = () => {
+        const body = this.initialConversationMessage.trim();
+        if (!body) {
+          uploadAndRedirect();
+          return;
+        }
+        this.conversationService.postComment('TICKET', response.id, body).subscribe({
+          next: result => {
+            if (result.ignoredMentions?.length) {
+              this.snackBar.open(`Ticket created, but these mentions were not resolved: ${result.ignoredMentions.join(', ')}`, 'Close', { duration: 7000 });
+            }
+            uploadAndRedirect();
+          },
+          error: error => {
+            console.error('[CIMS Form] Ticket created but first conversation message failed:', error);
+            this.snackBar.open(error?.error?.message || 'Ticket created, but the first conversation message could not be sent.', 'Close', { duration: 7000 });
+            uploadAndRedirect();
+          }
+        });
+      };
+      if (this.conversationUserIds.length) {
+        this.conversationService.addParticipants('TICKET', response.id, this.conversationUserIds).subscribe({
+          next: postFirstMessage,
+          error: error => {
+            console.error('[CIMS Form] Ticket created but tagging participants failed:', error);
+            this.snackBar.open(error?.error?.message || 'Ticket created, but some people could not be tagged.', 'Close', { duration: 7000 });
+            postFirstMessage();
+          }
+        });
         return;
       }
-      this.attachmentService.uploadAttachments(files, 'TICKET', response.id).subscribe((result) => {
-        if (result.failed) {
-          this.snackBar.open(`Ticket created, but ${result.failed} of ${files.length} screenshots failed to upload`, 'Close', { duration: 7000 });
-        }
-        this.isLoading = false;
-        this.redirectToMyTickets();
-      });
+      postFirstMessage();
     },
     error: (err: any) => {
       this.isLoading = false;
@@ -876,6 +938,9 @@ export class CimsCreateTicketComponent implements OnInit {
     this.incidentTypeCtrl.setValue('');
     this.fieldPersonCtrl.setValue('');
     this.priorityCtrl.setValue(this.priorityOptions[1]);
+    this.conversationUserPicker?.clearSelection();
+    this.conversationUserIds = [];
+    this.initialConversationMessage = '';
   }
 
   goBack(): void {

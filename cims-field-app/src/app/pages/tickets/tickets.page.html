@@ -39,6 +39,7 @@
                 <div class="ticket-meta-left">
                   <ion-badge [color]="colorForPriority(ticket.priority)">{{ ticket.priority }}</ion-badge>
                   <ion-badge color="danger" *ngIf="ticket.flagged">Flagged</ion-badge>
+                  <ion-badge color="primary" *ngIf="unreadCount(ticket) > 0" [attr.aria-label]="unreadCount(ticket) + ' unread messages'">{{ unreadCount(ticket) > 99 ? '99+' : unreadCount(ticket) }}</ion-badge>
                 </div>
                 <div class="ticket-meta-right">
                   <ion-button fill="clear" color="primary" size="small" (click)="$event.stopPropagation(); open(ticket)">Action</ion-button>
@@ -76,6 +77,7 @@
                 </div>
                 <div class="ticket-meta-right">
                   <ion-badge [color]="ticket.status === 'OPEN' ? 'primary' : ticket.status === 'RESOLVED' ? 'success' : ticket.status === 'REJECTED' ? 'danger' : ticket.status === 'HOLD' ? 'warning' : 'medium'">{{ ticket.status }}</ion-badge>
+                  <ion-badge *ngIf="unreadCount(ticket) > 0" color="primary" [attr.aria-label]="unreadCount(ticket) + ' unread messages'">{{ unreadCount(ticket) > 99 ? '99+' : unreadCount(ticket) }}</ion-badge>
                 </div>
               </div>
 

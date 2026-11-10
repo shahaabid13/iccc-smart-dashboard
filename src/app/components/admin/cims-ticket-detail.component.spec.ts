@@ -51,7 +51,10 @@ describe('CimsTicketDetailComponent workflow', () => {
       router,
       snackBar,
       location,
-      attachmentService as any
+      attachmentService as any,
+      {
+        getUnreadSummary: jasmine.createSpy('getUnreadSummary').and.returnValue(of([]))
+      } as any
     );
 
     component.ticket = {

@@ -14,6 +14,7 @@ import {
   Ticket,
   ServerNotification
 } from '../models/cims.models';
+import { UnreadConversation } from './conversation.service';
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   emailEnabled: false,
@@ -62,6 +63,7 @@ export class CimsNotificationService implements OnDestroy {
 
   private pollSubscription: Subscription | null = null;
   private reminderPollSubscription: Subscription | null = null;
+  private conversationPollSubscription: Subscription | null = null;
   private authSubscription: Subscription | null = null;
   private settingsForPoll: NotificationSettings = this.settingsSubject.value;
 
@@ -72,6 +74,9 @@ export class CimsNotificationService implements OnDestroy {
   private remoteNotificationIds = new Set<string>();
   private remoteUnreadCount = 0;
   private unreadCountLoaded = false;
+  private conversationNotifications: CimsNotification[] = [];
+  private conversationNotificationIds = new Set<string>();
+  private conversationUnreadCount = 0;
   private readonly originalDocumentTitle = typeof document === 'undefined' ? '' : document.title;
 
   constructor(
@@ -100,6 +105,9 @@ export class CimsNotificationService implements OnDestroy {
           this.remoteNotificationIds.clear();
           this.remoteUnreadCount = 0;
           this.unreadCountLoaded = false;
+          this.conversationNotifications = [];
+          this.conversationNotificationIds.clear();
+          this.conversationUnreadCount = 0;
           this.initUserState();
           if (this.username && this.authService.isAuthenticated()) this.start();
         }
@@ -162,6 +170,28 @@ export class CimsNotificationService implements OnDestroy {
           if (response) this.applyServerReminderResponse(response);
         });
     }
+    if (!this.conversationPollSubscription) {
+      const visibleRefresh$ = typeof document === 'undefined'
+        ? of(null)
+        : fromEvent(document, 'visibilitychange').pipe(
+            filter(() => document.visibilityState === 'visible'),
+            map(() => null)
+          );
+      this.conversationPollSubscription = merge(timer(0, 60000), visibleRefresh$)
+        .pipe(
+          filter(() => typeof document === 'undefined' || document.visibilityState === 'visible'),
+          switchMap(() => forkJoin({
+            notifications: this.http.get<any>('/api/notifications/my'),
+            unread: this.http.get<UnreadConversation[]>('/api/conversations/unread-summary')
+          }).pipe(catchError(error => {
+            console.error('[CimsNotificationService] Failed to refresh conversation notifications:', error);
+            return of(null);
+          })))
+        )
+        .subscribe(response => {
+          if (response) this.applyConversationResponse(response.notifications, response.unread);
+        });
+    }
   }
 
   stop(): void {
@@ -169,6 +199,8 @@ export class CimsNotificationService implements OnDestroy {
     this.pollSubscription = null;
     this.reminderPollSubscription?.unsubscribe();
     this.reminderPollSubscription = null;
+    this.conversationPollSubscription?.unsubscribe();
+    this.conversationPollSubscription = null;
     this.updateDocumentTitle(0);
   }
 
@@ -177,8 +209,11 @@ export class CimsNotificationService implements OnDestroy {
   }
 
   getUnreadCount(): number {
-    if (this.role === 'FIELD_PERSON' && this.unreadCountLoaded) return this.remoteUnreadCount;
-    return this.notificationsSubject.value.filter((n) => !n.read).length;
+    if (this.role === 'FIELD_PERSON' && this.unreadCountLoaded) {
+      return this.remoteUnreadCount + this.conversationUnreadCount;
+    }
+    return this.notificationsSubject.value.filter((n) => !n.read && !n.conversationEntityType).length +
+      this.conversationUnreadCount;
   }
 
   markAllRead(): void {
@@ -191,6 +226,8 @@ export class CimsNotificationService implements OnDestroy {
       this.publishNotifications();
       this.updateDocumentTitle(0);
     }
+    this.conversationNotifications = this.conversationNotifications.map(notification => ({ ...notification, read: true }));
+    this.publishNotifications();
   }
 
   markRead(id: string): void {
@@ -202,6 +239,14 @@ export class CimsNotificationService implements OnDestroy {
       this.http.put(`/api/notifications/${encodeURIComponent(id)}/read`, {}).pipe(catchError(() => of(null))).subscribe();
       this.publishNotifications();
       this.updateDocumentTitle(this.remoteUnreadCount);
+    }
+    if (this.conversationNotificationIds.has(id)) {
+      this.conversationNotifications = this.conversationNotifications.map(notification =>
+        notification.id === id ? { ...notification, read: true } : notification
+      );
+      this.http.put(`/api/notifications/${encodeURIComponent(id)}/read`, {}).pipe(catchError(() => of(null))).subscribe();
+      this.refreshConversationUnread();
+      this.publishNotifications();
     }
   }
 
@@ -482,7 +527,8 @@ export class CimsNotificationService implements OnDestroy {
   private publishNotifications(): void {
     const merged = [
       ...this.notificationsSubject.value.filter((item) => !this.remoteNotificationIds.has(item.id)),
-      ...this.remoteNotifications
+      ...this.remoteNotifications.filter(item => !this.conversationNotificationIds.has(item.id)),
+      ...this.conversationNotifications
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     this.notificationsSubject.next(merged);
     this.publishUnreadCount();
@@ -491,9 +537,49 @@ export class CimsNotificationService implements OnDestroy {
   private publishUnreadCount(): void {
     this.unreadCountSubject.next(
       this.role === 'FIELD_PERSON' && this.unreadCountLoaded
-        ? this.remoteUnreadCount
-        : this.notificationsSubject.value.filter((n) => !n.read).length
+        ? this.remoteUnreadCount + this.conversationUnreadCount
+        : this.notificationsSubject.value.filter((n) => !n.read && !n.conversationEntityType).length +
+          this.conversationUnreadCount
     );
+  }
+
+  private applyConversationResponse(notificationsResponse: any, unread: UnreadConversation[]): void {
+    const rows: any[] = Array.isArray(notificationsResponse)
+      ? notificationsResponse
+      : notificationsResponse?.content ?? notificationsResponse?.data ?? [];
+    this.conversationNotifications = rows
+      .filter(item =>
+        (item.type === 'CONVERSATION_TASK' || item.type === 'CONVERSATION_TICKET') &&
+        !this.dismissedIds.has(String(item.id))
+      )
+      .map(item => {
+        const entityType = item.type === 'CONVERSATION_TASK' ? 'TASK' : 'TICKET';
+        const entityId = Number(item.referenceId);
+        return {
+          id: String(item.id),
+          ticketId: entityId,
+          eventType: 'TICKET_REMINDER' as CimsNotificationEventType,
+          title: item.title || `${entityType === 'TASK' ? 'Task' : 'Ticket'} #${entityId}`,
+          message: item.message || 'New conversation activity',
+          read: item.read ?? false,
+          createdAt: item.createdAt,
+          channels: [],
+          conversationEntityType: entityType,
+          conversationEntityId: entityId
+        };
+      });
+    this.conversationNotificationIds = new Set(this.conversationNotifications.map(item => item.id));
+    this.conversationUnreadCount = unread.reduce((sum, item) => sum + (item.unreadCount || 0), 0);
+    this.publishNotifications();
+  }
+
+  private refreshConversationUnread(): void {
+    this.http.get<UnreadConversation[]>('/api/conversations/unread-summary').pipe(
+      catchError(() => of([]))
+    ).subscribe(items => {
+      this.conversationUnreadCount = items.reduce((sum, item) => sum + (item.unreadCount || 0), 0);
+      this.publishNotifications();
+    });
   }
 
   private deliverReminderToast(notification: CimsNotification): void {

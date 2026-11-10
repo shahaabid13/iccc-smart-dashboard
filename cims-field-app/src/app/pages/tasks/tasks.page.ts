@@ -12,6 +12,7 @@ import { AuthService } from '../../services/auth.service';
 import { Task } from '../../models/task';
 import { OfflineBannerComponent } from 'src/app/components/offline-banner.component';
 import { AppHeaderComponent } from 'src/app/components/app-header.component';
+import { ConversationUnreadService } from '../../services/conversation.service';
 
 @Component({
   selector: 'app-tasks',
@@ -40,15 +41,18 @@ export class TasksPage implements OnDestroy, OnInit {
     private actionSheetCtrl: ActionSheetController,
     private authService: AuthService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    public conversationUnread: ConversationUnreadService
   ) {}
 
   ngOnDestroy() {
+    this.conversationUnread.stop();
     this.destroy$.next();
     this.destroy$.complete();
   }
 
   ngOnInit() {
+    this.conversationUnread.start();
     console.log('[TasksPage] ngOnInit called');
     this.selectedTab = this.route.snapshot.queryParamMap.get('tab') === 'history' ? 'history' : 'queue';
     this.load();
@@ -128,6 +132,10 @@ export class TasksPage implements OnDestroy, OnInit {
       default: // RESOLVED and any other state
         return 'success';
     }
+  }
+
+  unreadCount(task: Task): number {
+    return this.conversationUnread.count(task.category === 'TICKET' ? 'TICKET' : 'TASK', task.id);
   }
 
   async showProfile() {

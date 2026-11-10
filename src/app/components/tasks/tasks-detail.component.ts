@@ -6,10 +6,12 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Task } from '../../models/cims.models';
 import { AttachmentService } from '../../services/attachment.service';
 import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picker.component';
+import { ConversationThreadComponent } from '../shared/conversation-thread.component';
+import { ConversationService } from '../../services/conversation.service';
 
 @Component({
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, ImageAttachmentPickerComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, ImageAttachmentPickerComponent, ConversationThreadComponent],
   selector: 'app-tasks-detail',
   template: `
     <div class="container">
@@ -27,6 +29,18 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
           <span class="badge" [ngClass]="statusBadgeClass(task.status)">{{ task.status }}</span>
         </div>
 
+        <div class="detail-tabs" role="tablist" aria-label="Task detail sections">
+          <button id="task-details-tab" type="button" role="tab" aria-controls="task-details-panel"
+            [attr.aria-selected]="activeTab === 'details'" [attr.tabindex]="activeTab === 'details' ? 0 : -1"
+            (click)="activeTab = 'details'" (keydown)="onTabKeydown($event)">Details</button>
+          <button id="task-conversation-tab" type="button" role="tab" aria-controls="task-conversation-panel"
+            [attr.aria-selected]="activeTab === 'conversation'" [attr.tabindex]="activeTab === 'conversation' ? 0 : -1"
+            (click)="openConversation()" (keydown)="onTabKeydown($event)">
+            Conversation <span class="unread-badge" *ngIf="conversationUnread > 0">{{ conversationUnread }}</span>
+          </button>
+        </div>
+
+        <div id="task-details-panel" role="tabpanel" aria-labelledby="task-details-tab" *ngIf="activeTab === 'details'">
         <div class="card p-3 mb-3">
           <div class="row mb-2">
             <div class="col-md-6">
@@ -98,9 +112,25 @@ import { ImageAttachmentPickerComponent } from '../shared/image-attachment-picke
             </div>
           </form>
         </div>
+        </div>
+
+        <div id="task-conversation-panel" role="tabpanel" aria-labelledby="task-conversation-tab" *ngIf="activeTab === 'conversation'">
+          <app-conversation-thread entityType="TASK" [entityId]="task.id" [title]="task.title"
+            [creatorName]="task.assignedByFullName || task.assignedByName || task.assignedByUsername || ''"
+            [assigneeName]="task.assignedToFullName || task.assignedToUsername || ''"
+            (unreadCountChange)="conversationUnread = $event">
+          </app-conversation-thread>
+        </div>
       </div>
     </div>
-  `
+  `,
+  styles: [`
+    .detail-tabs { display:flex; gap:4px; border-bottom:1px solid #dbe3ee; margin-bottom:16px; }
+    .detail-tabs button { border:0; border-bottom:2px solid transparent; background:transparent; color:#334155; padding:10px 14px; cursor:pointer; font:inherit; }
+    .detail-tabs button[aria-selected="true"] { border-color:#2563eb; color:#1d4ed8; font-weight:700; }
+    .detail-tabs button:focus-visible { outline:3px solid #93c5fd; outline-offset:2px; }
+    .unread-badge { display:inline-grid; place-items:center; min-width:20px; height:20px; margin-left:6px; padding:0 5px; border-radius:11px; background:#dc2626; color:#fff; font-size:11px; font-weight:700; }
+  `]
 })
 export class TasksDetailComponent implements OnInit {
   @ViewChild('imagePicker') imagePicker?: ImageAttachmentPickerComponent;
@@ -110,6 +140,8 @@ export class TasksDetailComponent implements OnInit {
   form!: FormGroup;
   submitting = false;
   errorMsg = '';
+  activeTab: 'details' | 'conversation' = 'details';
+  conversationUnread = 0;
   private cameFromHistory = false;
 
   constructor(
@@ -118,7 +150,8 @@ export class TasksDetailComponent implements OnInit {
     private location: Location,
     private taskService: TaskService,
     private fb: FormBuilder,
-    private attachmentService: AttachmentService
+    private attachmentService: AttachmentService,
+    private conversationService: ConversationService
   ) {
     this.form = this.fb.group({ action: ['RESOLVED', Validators.required], summary: ['', Validators.required] });
   }
@@ -128,11 +161,29 @@ export class TasksDetailComponent implements OnInit {
     this.cameFromHistory = typeof window !== 'undefined' && window.history.length > 1;
 
     const id = Number(this.route.snapshot.paramMap.get('id'));
+    if (this.route.snapshot.queryParamMap.get('tab') === 'conversation') {
+      this.activeTab = 'conversation';
+    }
     if (id) {
       this.loadTask(id);
+      this.conversationService.getUnreadSummary().subscribe({
+        next: items => this.conversationUnread = items.find(item => item.entityType === 'TASK' && item.entityId === id)?.unreadCount || 0,
+        error: () => this.conversationUnread = 0
+      });
     }
   }
 
+  openConversation(): void {
+    this.activeTab = 'conversation';
+  }
+
+  onTabKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+    event.preventDefault();
+    this.activeTab = event.key === 'Home' || event.key === 'ArrowLeft' ? 'details' : 'conversation';
+    const tabId = this.activeTab === 'details' ? 'task-details-tab' : 'task-conversation-tab';
+    document.getElementById(tabId)?.focus();
+  }
   private loadTask(id: number): void {
     this.taskService.getTaskDetail(id).subscribe((task) => {
       this.task = task;

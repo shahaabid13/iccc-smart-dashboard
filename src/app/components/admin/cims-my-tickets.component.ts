@@ -16,6 +16,7 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { CimsService } from '../../services/cims.service';
 import { Ticket, PaginatedResponse } from '../../models/cims.models';
+import { ConversationService } from '../../services/conversation.service';
 
 @Component({
   selector: 'app-cims-my-tickets',
@@ -127,7 +128,12 @@ import { Ticket, PaginatedResponse } from '../../models/cims.models';
               <!-- Ticket ID Column -->
               <ng-container matColumnDef="id">
                 <th mat-header-cell *matHeaderCellDef>Ticket</th>
-                <td mat-cell *matCellDef="let element" class="ticket-id">#{{ element.id }}</td>
+                <td mat-cell *matCellDef="let element" class="ticket-id">
+                  #{{ element.id }}
+                  <span class="conversation-unread" *ngIf="unreadByTicketId[element.id]" [matTooltip]="unreadByTicketId[element.id] + ' unread conversation messages'">
+                    {{ unreadByTicketId[element.id] }}
+                  </span>
+                </td>
               </ng-container>
 
               <!-- Type Column -->
@@ -238,6 +244,19 @@ import { Ticket, PaginatedResponse } from '../../models/cims.models';
       padding: 24px;
       background: #f4f6f9;
       min-height: 100%;
+    }
+    .conversation-unread {
+      display: inline-grid;
+      place-items: center;
+      min-width: 20px;
+      height: 20px;
+      margin-left: 5px;
+      padding: 0 5px;
+      border-radius: 11px;
+      background: #dc2626;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
     }
 
     .tickets-card {
@@ -606,6 +625,7 @@ export class CimsMyTicketsComponent implements OnInit {
 
   displayedColumns: string[] = ['id', 'type', 'location', 'assignedTo', 'priority', 'status', 'createdAt', 'actions'];
   isLoading = false;
+  unreadByTicketId: Record<number, number> = {};
 
   searchTerm = '';
   statusFilter = '';
@@ -623,10 +643,16 @@ export class CimsMyTicketsComponent implements OnInit {
 
   private readonly FETCH_BATCH_SIZE = 200;
 
-  constructor(private cimsService: CimsService) { }
+  constructor(private cimsService: CimsService, private conversations: ConversationService) { }
 
   ngOnInit(): void {
     this.loadTickets();
+    this.conversations.getUnreadSummary().subscribe({
+      next: items => this.unreadByTicketId = Object.fromEntries(items
+        .filter(item => item.entityType === 'TICKET')
+        .map(item => [item.entityId, item.unreadCount])),
+      error: () => this.unreadByTicketId = {}
+    });
   }
 
   loadTickets(): void {

@@ -18,6 +18,10 @@ import {
   IonSelect,
   IonSelectOption,
   IonTextarea,
+  IonSegment,
+  IonSegmentButton,
+  IonRefresher,
+  IonRefresherContent,
   ActionSheetController
 } from '@ionic/angular/standalone';
 import { TaskService } from '../../services/task.service';
@@ -29,6 +33,7 @@ import { AttachmentResponse, AttachmentService } from '../../services/attachment
 import { ImageAttachmentPickerComponent } from '../../components/image-attachment-picker.component';
 import { OfflineBannerComponent } from 'src/app/components/offline-banner.component';
 import { AppHeaderComponent } from 'src/app/components/app-header.component';
+import { ConversationPanelComponent } from '../../components/conversation-panel.component';
 
 @Component({
   selector: 'app-task-detail',
@@ -40,6 +45,7 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
     OfflineBannerComponent,
     AppHeaderComponent,
     ImageAttachmentPickerComponent,
+    ConversationPanelComponent,
     IonContent,
     IonCard,
     IonCardHeader,
@@ -52,7 +58,11 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
     IonSkeletonText,
     IonSelect,
     IonSelectOption,
-    IonTextarea
+    IonTextarea,
+    IonSegment,
+    IonSegmentButton,
+    IonRefresher,
+    IonRefresherContent
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './task-detail.page.html',
@@ -72,6 +82,8 @@ export class TaskDetailPage implements OnInit, OnDestroy {
     summary: new FormControl('', Validators.required)
   });
   isOnline$ = this.offlineService.isOnline$;
+  selectedSegment: 'details' | 'conversation' = 'details';
+  highlightLatest = false;
   
   private readonly destroy$ = new Subject<void>();
 
@@ -86,6 +98,10 @@ export class TaskDetailPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
+    this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      this.highlightLatest = params.get('conversation') === 'true';
+      if (this.highlightLatest) this.selectedSegment = 'conversation';
+    });
     console.log('[TaskDetailPage] ngOnInit called');
     const idParam = this.route.snapshot.paramMap.get('id');
     const id = Number(idParam);

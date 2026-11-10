@@ -349,7 +349,7 @@ import { CimsNotificationBellComponent } from '../../admin/cims-notification-bel
 
       </nav>
 
-      <div class="nav-section pinned-section" *ngIf="user && !sidebarContentCollapsed && (userRole !== 'FIELD_PERSON' || isSupportEngineer)">
+      <div class="nav-section pinned-section" *ngIf="user && !sidebarContentCollapsed">
         <a routerLink="/tasks/my" routerLinkActive="active" class="dropdown-item pinned-item" (click)="closeSidebarIfMobile()">
           <span class="material-symbols-outlined item-icon">task_alt</span>
           <span>My Tasks</span>

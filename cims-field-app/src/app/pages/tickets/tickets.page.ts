@@ -13,6 +13,7 @@ import { AuthService } from '../../services/auth.service';
 import { Ticket } from '../../models/ticket';
 import { OfflineBannerComponent } from 'src/app/components/offline-banner.component';
 import { AppHeaderComponent } from 'src/app/components/app-header.component';
+import { ConversationUnreadService } from '../../services/conversation.service';
 
 @Component({
   selector: 'app-tickets',
@@ -41,15 +42,18 @@ export class TicketsPage implements OnInit, OnDestroy {
     private router: Router,
     private route: ActivatedRoute,
     private actionSheetCtrl: ActionSheetController,
-    private authService: AuthService
+    private authService: AuthService,
+    public conversationUnread: ConversationUnreadService
   ) {}
 
   ngOnDestroy() {
+    this.conversationUnread.stop();
     this.destroy$.next();
     this.destroy$.complete();
   }
 
   ngOnInit() {
+    this.conversationUnread.start();
     console.log('[TicketsPage] ngOnInit called');
     this.selectedTab = this.route.snapshot.queryParamMap.get('tab') === 'history' ? 'history' : 'queue';
     this.load();
@@ -137,5 +141,9 @@ export class TicketsPage implements OnInit, OnDestroy {
       case 'MEDIUM': return 'tertiary';
       default: return 'success';
     }
+  }
+
+  unreadCount(ticket: Ticket): number {
+    return this.conversationUnread.count('TICKET', ticket.id);
   }
 }

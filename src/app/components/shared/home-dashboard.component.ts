@@ -936,6 +936,15 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
           active: this.canAccessCims(),
           buttonText: this.canAccessCims() ? 'Go to CIMS' : 'Access Restricted',
           accent: '#e11d48'
+        }),
+        this.makeCard({
+          icon: 'task_alt',
+          title: 'Task Management',
+          description: 'View tasks assigned to you and open their details.',
+          route: '/tasks/my',
+          active: true,
+          buttonText: 'Go to My Tasks',
+          accent: '#d97706'
         })
       ];
       this.loadStats();
@@ -1386,7 +1395,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   canAccessTasks(): boolean {
-    return ['SUPPORT_ENGINEER', 'REVIEWER', 'ADMIN'].includes(this.userRole);
+    return ['SUPPORT_ENGINEER', 'FIELD_PERSON', 'REVIEWER', 'ADMIN'].includes(this.userRole);
   }
 
   getCimsRoute(): string {

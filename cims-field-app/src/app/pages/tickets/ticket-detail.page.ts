@@ -19,6 +19,10 @@ import {
   IonTextarea,
   IonSelect,
   IonSelectOption,
+  IonSegment,
+  IonSegmentButton,
+  IonRefresher,
+  IonRefresherContent,
   ActionSheetController,
   ToastController
 } from '@ionic/angular/standalone';
@@ -31,6 +35,7 @@ import { AttachmentResponse, AttachmentService } from '../../services/attachment
 import { ImageAttachmentPickerComponent } from '../../components/image-attachment-picker.component';
 import { OfflineBannerComponent } from 'src/app/components/offline-banner.component';
 import { AppHeaderComponent } from 'src/app/components/app-header.component';
+import { ConversationPanelComponent } from '../../components/conversation-panel.component';
 
 @Component({
   selector: 'app-ticket-detail',
@@ -42,6 +47,7 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
     OfflineBannerComponent,
     AppHeaderComponent,
     ImageAttachmentPickerComponent,
+    ConversationPanelComponent,
     IonContent,
     IonCard,
     IonCardHeader,
@@ -54,7 +60,11 @@ import { AppHeaderComponent } from 'src/app/components/app-header.component';
     IonSkeletonText,
     IonTextarea,
     IonSelect,
-    IonSelectOption
+    IonSelectOption,
+    IonSegment,
+    IonSegmentButton,
+    IonRefresher,
+    IonRefresherContent
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './ticket-detail.page.html',
@@ -75,6 +85,8 @@ export class TicketDetailPage implements OnInit, OnDestroy {
     action: new FormControl<'resolved' | 'revalidation'>('resolved')
   });
   isOnline$ = this.offlineService.isOnline$;
+  selectedSegment: 'details' | 'conversation' = 'details';
+  highlightLatest = false;
   
   private readonly destroy$ = new Subject<void>();
 
@@ -91,6 +103,10 @@ export class TicketDetailPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
+    this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      this.highlightLatest = params.get('conversation') === 'true';
+      if (this.highlightLatest) this.selectedSegment = 'conversation';
+    });
     console.log('[TicketDetailPage] ngOnInit called');
     const idParam = this.route.snapshot.paramMap.get('id');
     const id = Number(idParam);

@@ -16,7 +16,7 @@
           <mat-icon>table_view</mat-icon>
           <span>Export Excel</span>
         </button>
-        <button mat-menu-item (click)="exportPdf()">
+        <button mat-menu-item (click)="exportPdf()">  
           <mat-icon>picture_as_pdf</mat-icon>
           <span>Export PDF</span>
         </button>
@@ -35,9 +35,15 @@
         <input type="date" [(ngModel)]="toDate">
       </label>
       <mat-form-field appearance="outline">
-        <mat-label>Event type</mat-label>
-        <mat-select [(value)]="eventType" [disabled]="filtersLoading">
-          <mat-option value="">All event types</mat-option>
+        <mat-label>Event types</mat-label>
+        <mat-select [(value)]="eventTypes" [disabled]="filtersLoading" multiple
+                    (selectionChange)="onEventTypeSelectionChange()">
+          <mat-select-trigger>
+            {{ eventTypes.length ? eventTypes.length + ' selected' : 'All event types' }}
+          </mat-select-trigger>
+          <mat-option [value]="allEventTypesOption">
+            All event types
+          </mat-option>
           <mat-option *ngFor="let value of filters.eventTypes" [value]="value">{{ value }}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -74,7 +80,10 @@
         <h2>Events</h2>
         <span>{{ totalElements | number }} records</span>
       </div>
-      <span class="loading-label" *ngIf="loading">Loading events…</span>
+      <span class="loading-label" *ngIf="loading">
+        <mat-spinner diameter="18" aria-label="Loading events"></mat-spinner>
+        Loading events…
+      </span>
     </div>
     <div class="table-scroll">
       <table mat-table [dataSource]="events" matSort

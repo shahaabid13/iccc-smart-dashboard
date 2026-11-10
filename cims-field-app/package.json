@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --open",
+    "start": "ng serve --proxy-config proxy.conf.json --open",
     "build": "ng build",
     "cap:copy": "npx cap copy",
     "cap:open:android": "npx cap open android",
@@ -37,6 +37,11 @@
     "@capacitor/android": "^8.5.0",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
+    "@types/jasmine": "^7.0.0",
+    "jasmine-core": "^7.0.2",
+    "karma": "^6.4.4",
+    "karma-chrome-launcher": "^3.2.0",
+    "karma-jasmine": "^5.1.0",
     "typescript": "~5.9.2"
   }
 }

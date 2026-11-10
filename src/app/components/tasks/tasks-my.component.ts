@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { TaskService } from '../../services/task.service';
 import { Task } from '../../models/cims.models';
 import { RouterModule } from '@angular/router';
+import { ConversationService } from '../../services/conversation.service';
 
 @Component({
   standalone: true,
@@ -22,6 +23,9 @@ import { RouterModule } from '@angular/router';
             <div class="text-muted small">Assigned By: {{ t.assignedByName || t.assignedByFullName || t.assignedByUsername || 'Unknown' }} • {{ t.createdAt | date }}</div>
           </div>
           <div>
+            <span *ngIf="unreadByTaskId[t.id]" class="conversation-unread" [attr.aria-label]="unreadByTaskId[t.id] + ' unread conversation messages'">
+              {{ unreadByTaskId[t.id] }}
+            </span>
             <a [routerLink]="['/tasks', t.id]" class="btn btn-primary">Take Action</a>
           </div>
         </div>
@@ -33,16 +37,24 @@ import { RouterModule } from '@angular/router';
         <li class="list-group-item" *ngFor="let h of history">{{ h.title }} — {{ h.status }}</li>
       </ul>
     </div>
-  `
+  `,
+  styles: [`.conversation-unread { display:inline-grid; place-items:center; min-width:20px; height:20px; margin-right:6px; padding:0 5px; border-radius:11px; background:#dc2626; color:#fff; font-size:11px; font-weight:700; }`]
 })
 export class TasksMyComponent implements OnInit {
   tasks: Task[] = [];
   history: Task[] = [];
+  unreadByTaskId: Record<number, number> = {};
 
-  constructor(private taskService: TaskService) {}
+  constructor(private taskService: TaskService, private conversations: ConversationService) {}
 
   ngOnInit(): void {
     this.load();
+    this.conversations.getUnreadSummary().subscribe({
+      next: items => this.unreadByTaskId = Object.fromEntries(items
+        .filter(item => item.entityType === 'TASK')
+        .map(item => [item.entityId, item.unreadCount])),
+      error: () => this.unreadByTaskId = {}
+    });
   }
 
   load() {

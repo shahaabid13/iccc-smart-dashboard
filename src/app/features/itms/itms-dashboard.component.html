@@ -4,9 +4,45 @@
       <div class="breadcrumb">Monitoring Tools / ITMS</div>
       <h1>ITMS Dashboard</h1>
     </div>
-    <div class="date-filters">
+    <div class="header-filters">
+      <div class="period-filter" (click)="$event.stopPropagation()">
+        <button type="button" class="period-trigger" [attr.aria-expanded]="periodMenuOpen"
+          aria-haspopup="menu" (click)="togglePeriodMenu()">
+          <span class="material-symbols-outlined" aria-hidden="true">event</span>
+          {{ periodFilterLabel }}
+          <span class="material-symbols-outlined chevron" aria-hidden="true">expand_more</span>
+        </button>
+        <div class="period-menu" *ngIf="periodMenuOpen" role="menu" aria-label="Filter dashboard period">
+          <button type="button" role="menuitem" class="period-option" (click)="selectAllEvents()">
+            All events
+          </button>
+          <div class="year-option" *ngFor="let year of availablePeriods"
+            (mouseenter)="openYearMenu(year.year)" (mouseleave)="closeYearMenu(year.year)">
+            <div class="year-row">
+              <button type="button" role="menuitem" class="period-option year-select"
+                (click)="selectYear(year.year)">{{ year.year }}</button>
+              <button type="button" class="year-expand" [attr.aria-label]="'Show months for ' + year.year"
+                [attr.aria-expanded]="openYear === year.year" (focus)="openYearMenu(year.year)"
+                (click)="toggleYearMenu(year.year)">
+                <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+              </button>
+            </div>
+            <div class="month-menu" *ngIf="openYear === year.year" role="menu"
+              [attr.aria-label]="'Months with data in ' + year.year" (mouseenter)="openYearMenu(year.year)"
+              (mouseleave)="closeYearMenu(year.year)">
+              <button type="button" role="menuitem" class="period-option"
+                *ngFor="let month of year.months" (click)="selectMonth(year.year, month)"
+                [attr.aria-current]="isMonthSelected(year.year, month) ? 'date' : null">
+                {{ monthName(month) }} {{ year.year }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="date-filters">
       <label>From <input type="date" [value]="fromDate" (change)="setDate('from', $event)"></label>
       <label>To <input type="date" [value]="toDate" (change)="setDate('to', $event)"></label>
+      </div>
     </div>
   </header>
 

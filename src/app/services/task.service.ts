@@ -18,7 +18,7 @@ export class TaskService {
 
   constructor(private http: HttpClient) { }
 
-  createTask(payload: { title: string; description: string; assignedTo?: number }): Observable<Task> {
+  createTask(payload: { title: string; description: string; assignedToUserId?: number }): Observable<Task> {
     return this.http.post<Task>(`${this.apiUrl}`, payload);
   }
 

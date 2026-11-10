@@ -18,6 +18,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { CimsService } from '../../services/cims.service';
+import { ConversationService } from '../../services/conversation.service';
 import { Ticket, PaginatedResponse, IncidentType } from '../../models/cims.models';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -157,6 +158,9 @@ const FETCH_ALL_PAGE_SIZE = 5000;
                 <th mat-header-cell *matHeaderCellDef>ID</th>
                 <td mat-cell *matCellDef="let element" class="ticket-id">
                   #{{ element.id }} <span class="flagged-badge" *ngIf="element.flagged">Flagged</span>
+                  <span class="conversation-unread" *ngIf="unreadByTicketId[element.id]" [matTooltip]="unreadByTicketId[element.id] + ' unread conversation messages'">
+                    {{ unreadByTicketId[element.id] }}
+                  </span>
                 </td>
               </ng-container>
 
@@ -336,6 +340,20 @@ const FETCH_ALL_PAGE_SIZE = 5000;
       line-height: 1.2;
     }
 
+    .conversation-unread {
+      display: inline-grid;
+      place-items: center;
+      min-width: 20px;
+      height: 20px;
+      margin-left: 5px;
+      padding: 0 5px;
+      border-radius: 11px;
+      background: #dc2626;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
     @media (prefers-color-scheme: dark) {
       .flagged-badge { color: #ffc4bd; background: #5a3030; }
     }
@@ -403,6 +421,7 @@ export class CimsAllTicketsComponent implements OnInit {
 
   displayedColumns: string[] = ['id', 'type', 'location', 'assignedTo', 'status', 'raisedBy', 'createdAt', 'closedAt', 'actions'];
   isLoading = false;
+  unreadByTicketId: Record<number, number> = {};
   pageSize = 10;
   currentPage = 0;
   totalElements = 0;
@@ -420,7 +439,8 @@ export class CimsAllTicketsComponent implements OnInit {
   constructor(
     private cimsService: CimsService,
     private snackBar: MatSnackBar,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private conversations: ConversationService
   ) { }
 
   ngOnInit(): void {
@@ -434,6 +454,12 @@ export class CimsAllTicketsComponent implements OnInit {
     this.toDate = createdOn ? new Date(`${createdOn}T00:00:00`) : null;
     this.loadIncidentTypes();
     this.loadAllTickets();
+    this.conversations.getUnreadSummary().subscribe({
+      next: items => this.unreadByTicketId = Object.fromEntries(items
+        .filter(item => item.entityType === 'TICKET')
+        .map(item => [item.entityId, item.unreadCount])),
+      error: () => this.unreadByTicketId = {}
+    });
   }
 
   loadIncidentTypes(): void {

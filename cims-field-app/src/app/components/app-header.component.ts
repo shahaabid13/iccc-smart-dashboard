@@ -1,11 +1,12 @@
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { NavigationEnd, Router } from '@angular/router';
-import { filter, Subscription } from 'rxjs';
+import { filter, Subscription, timer } from 'rxjs';
 import { FieldReminder, FieldReminderService } from '../services/field-reminder.service';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Badge } from '@capawesome/capacitor-badge';
+import { ConversationService, FieldNotification } from '../services/conversation.service';
 import {
   IonHeader,
   IonToolbar,
@@ -60,7 +61,7 @@ import {
         <ion-buttons slot="end">
           <ion-button [id]="reminderTriggerId" aria-label="Ticket reminders">
             <ion-icon name="notifications-outline"></ion-icon>
-            <ion-badge *ngIf="unreadCount > 0" color="danger" class="reminder-count">{{ unreadCount > 99 ? '99+' : unreadCount }}</ion-badge>
+            <ion-badge *ngIf="notificationCount > 0" color="danger" class="reminder-count">{{ notificationCount > 99 ? '99+' : notificationCount }}</ion-badge>
           </ion-button>
           <ion-back-button *ngIf="showBackButton" defaultHref="/tickets" text="" icon="arrow-back-outline"></ion-back-button>
         </ion-buttons>
@@ -70,10 +71,20 @@ import {
       <ng-template>
         <ion-content class="reminder-popover">
           <div class="reminder-heading">
-            <strong>Ticket reminders</strong>
-            <ion-button fill="clear" size="small" [disabled]="unreadCount === 0" (click)="markAllRead()">Mark all read</ion-button>
+            <strong>Notifications</strong>
+            <ion-button fill="clear" size="small" [disabled]="unreadCount === 0" (click)="markAllRead()">Mark reminders read</ion-button>
           </div>
-            <ion-list *ngIf="reminders.length; else noReminders">
+          <ion-list *ngIf="conversationNotifications.length">
+            <ion-item button detail="false" *ngFor="let notification of conversationNotifications" (click)="openConversationNotification(notification)">
+              <ion-label>
+                <h3>{{ notification.title }}</h3>
+                <p class="ion-text-wrap">{{ notification.message }}</p>
+                <p>{{ timeAgo(notification.createdAt) }}</p>
+              </ion-label>
+              <ion-badge *ngIf="!notification.read" color="danger" slot="end">New</ion-badge>
+            </ion-item>
+          </ion-list>
+          <ion-list *ngIf="reminders.length; else noReminders">
             <ion-item button detail="false" *ngFor="let reminder of reminders" (click)="openReminder(reminder)">
               <ion-label>
                 <h3>{{ reminder.title }}</h3>
@@ -158,11 +169,19 @@ export class AppHeaderComponent implements OnInit, OnDestroy {
   private remindersSub?: Subscription;
   private unreadSub?: Subscription;
   private supportedSub?: Subscription;
+  private conversationNotificationSub?: Subscription;
+  conversationNotifications: FieldNotification[] = [];
+  private notificationPoll?: Subscription;
+
+  get notificationCount(): number {
+    return this.unreadCount + this.conversationNotifications.filter(item => !item.read).length;
+  }
 
   constructor(
     private router: Router,
     private location: Location,
-    private reminderService: FieldReminderService
+    private reminderService: FieldReminderService,
+    private conversationService: ConversationService
   ) {}
 
   ngOnInit(): void {
@@ -170,6 +189,11 @@ export class AppHeaderComponent implements OnInit, OnDestroy {
     this.remindersSub = this.reminderService.reminders$.subscribe(items => this.reminders = items);
     this.unreadSub = this.reminderService.unreadCount$.subscribe(count => this.unreadCount = count);
     this.supportedSub = this.reminderService.remindersSupported$.subscribe(value => this.remindersSupported = value);
+    this.loadConversationNotifications();
+    this.notificationPoll = new Subscription();
+    this.notificationPoll.add(timer(30000, 30000).subscribe(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') this.loadConversationNotifications();
+    }));
     this.desktopAlertsLabel = Capacitor.isNativePlatform() ? 'Enable mobile notifications' : 'Enable desktop alerts';
     this.refreshNotificationPermission();
     this.sub = this.router.events
@@ -182,6 +206,8 @@ export class AppHeaderComponent implements OnInit, OnDestroy {
     this.remindersSub?.unsubscribe();
     this.unreadSub?.unsubscribe();
     this.supportedSub?.unsubscribe();
+    this.conversationNotificationSub?.unsubscribe();
+    this.notificationPoll?.unsubscribe();
   }
 
   private updateBackButton(): void {
@@ -196,6 +222,24 @@ export class AppHeaderComponent implements OnInit, OnDestroy {
 
   openReminder(reminder: FieldReminder): void {
     void this.reminderService.markRead(reminder);
+  }
+
+  openConversationNotification(notification: FieldNotification): void {
+    void this.conversationService.navigateFromNotification(notification);
+  }
+
+  handleConversationPush(notification: FieldNotification): void {
+    void this.conversationService.navigateFromNotification(notification);
+  }
+
+  private loadConversationNotifications(): void {
+    this.conversationNotificationSub?.unsubscribe();
+    this.conversationNotificationSub = this.conversationService.getNotifications().subscribe({
+      next: rows => this.conversationNotifications = Array.isArray(rows)
+        ? rows.filter(item => item.type === 'CONVERSATION_TASK' || item.type === 'CONVERSATION_TICKET')
+        : [],
+      error: () => undefined
+    });
   }
 
   markAllRead(): void {
